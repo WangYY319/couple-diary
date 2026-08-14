@@ -3444,7 +3444,17 @@ const DetailMenu = {
 
     // 显示菜单
     const menuEl = document.getElementById('detailMenu');
-    if (menuEl) menuEl.style.display = '';
+    if (menuEl) {
+      menuEl.style.display = '';
+      // 根据最长板块名称动态计算菜单宽度，确保单行显示
+      // 估算: 每个中文字符约16px + 箭头/内边距约48px
+      const maxNameLen = Math.max(...sections.map(s => s.name.length));
+      const estimatedWidth = maxNameLen * 16 + 48;
+      // 转为视口百分比，保证在不同屏幕下自适应
+      const vwWidth = (estimatedWidth / window.innerWidth) * 100;
+      const finalWidth = Math.min(Math.max(vwWidth, 20), 52);
+      menuEl.style.width = finalWidth + '%';
+    }
 
     // 高亮图标
     const iconEl = document.getElementById('navDetailIcon');
