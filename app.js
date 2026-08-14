@@ -416,10 +416,6 @@ const Cloud = {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
         }
-        // 尝试拉取云端音乐（静默，有新音乐才更新）
-        if (typeof MusicPlayer !== 'undefined' && MusicPlayer._tryPullCloudMusic) {
-          MusicPlayer._tryPullCloudMusic();
-        }
       }
     }, 30000); // 30 秒
   },
@@ -585,97 +581,6 @@ const Cloud = {
       byteArrays.push(new Uint8Array(byteNumbers));
     }
     return new Blob(byteArrays, { type: mime || 'application/octet-stream' });
-  },
-
-  // 压缩音频：将大音频文件重新编码为低码率 MP3
-  // 目标：64kbps 单声道，大幅减小文件体积
-  async compressAudio(blob, onProgress) {
-    const TARGET_BITRATE = 64; // 64kbps - 3分钟歌曲约1.4MB
-    const TARGET_SAMPLE_RATE = 44100;
-
-    // 如果文件已经很小，不需要压缩
-    if (blob.size < 2 * 1024 * 1024) {
-      console.log('[Audio] 文件小于2MB，跳过压缩');
-      return blob;
-    }
-
-    // 检查 lamejs 是否可用
-    if (typeof lamejs === 'undefined') {
-      console.warn('[Audio] lamejs 未加载，跳过压缩');
-      showToast('音频压缩库未加载，将尝试直接上传');
-      return blob;
-    }
-
-    try {
-      console.log(`[Audio] 开始压缩: ${(blob.size / 1024 / 1024).toFixed(1)}MB → 目标 ${TARGET_BITRATE}kbps`);
-
-      // 1. 解码音频文件
-      const arrayBuffer = await blob.arrayBuffer();
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-      await audioCtx.close();
-
-      console.log(`[Audio] 原始: ${audioBuffer.sampleRate}Hz, ${audioBuffer.numberOfChannels}声道, ${audioBuffer.duration.toFixed(1)}秒`);
-
-      // 2. 获取单声道数据（如果是立体声则混合）
-      let channelData;
-      if (audioBuffer.numberOfChannels > 1) {
-        // 混合为单声道
-        const left = audioBuffer.getChannelData(0);
-        const right = audioBuffer.getChannelData(1);
-        channelData = new Float32Array(left.length);
-        for (let i = 0; i < left.length; i++) {
-          channelData[i] = (left[i] + right[i]) / 2;
-        }
-      } else {
-        channelData = audioBuffer.getChannelData(0);
-      }
-
-      // 3. 转换为 Int16 格式（lamejs 需要）
-      const samples = new Int16Array(channelData.length);
-      for (let i = 0; i < channelData.length; i++) {
-        const s = Math.max(-1, Math.min(1, channelData[i]));
-        samples[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-      }
-
-      // 4. 使用 lamejs 编码为 MP3
-      const mp3encoder = new lamejs.Mp3Encoder(1, TARGET_SAMPLE_RATE, TARGET_BITRATE);
-      const mp3Data = [];
-      const BLOCK_SIZE = 1152; // lamejs 标准块大小
-      const totalBlocks = Math.ceil(samples.length / BLOCK_SIZE);
-
-      for (let i = 0; i < samples.length; i += BLOCK_SIZE) {
-        const chunk = samples.subarray(i, i + BLOCK_SIZE);
-        const mp3buf = mp3encoder.encodeBuffer(chunk);
-        if (mp3buf.length > 0) mp3Data.push(new Uint8Array(mp3buf));
-
-        // 进度回调
-        if (onProgress && i % (BLOCK_SIZE * 100) === 0) {
-          const pct = Math.round(i / samples.length * 100);
-          onProgress(pct);
-        }
-      }
-
-      // 刷新最后的缓冲区
-      const endBuf = mp3encoder.flush();
-      if (endBuf.length > 0) mp3Data.push(new Uint8Array(endBuf));
-
-      // 5. 合并为 Blob
-      const mp3Blob = new Blob(mp3Data, { type: 'audio/mpeg' });
-
-      console.log(`[Audio] 压缩完成: ${(blob.size / 1024 / 1024).toFixed(1)}MB → ${(mp3Blob.size / 1024 / 1024).toFixed(1)}MB (压缩率 ${(mp3Blob.size / blob.size * 100).toFixed(0)}%)`);
-
-      if (mp3Blob.size >= blob.size) {
-        console.log('[Audio] 压缩后更大，使用原始文件');
-        return blob;
-      }
-
-      return mp3Blob;
-    } catch (e) {
-      console.error('[Audio] 压缩失败:', e);
-      showToast('音频压缩失败，将尝试直接上传');
-      return blob; // 失败则返回原始文件
-    }
   },
 
   // 上传文件（分块）到云端
@@ -844,109 +749,6 @@ const Cloud = {
     if (newPhotos) {
       Photos.render();
       showToast('对方上传了新照片 📸');
-    }
-  },
-
-  // ====== 音乐云同步 ======
-
-  async pushMusic(blob, name) {
-    if (!this.pairCode) return false;
-    try {
-      const originalSize = blob.size;
-      console.log(`[Music] pushMusic: ${name}, ${(originalSize / 1024 / 1024).toFixed(1)}MB`);
-
-      // 先压缩音频（大文件自动降低码率）
-      showToast('正在压缩音频...');
-      const compressedBlob = await this.compressAudio(blob, (pct) => {
-        if (pct % 20 === 0) showToast(`压缩中... ${pct}%`);
-      });
-      const compressedSize = compressedBlob.size;
-      const compressionRatio = (compressedSize / originalSize * 100).toFixed(0);
-
-      if (compressedSize < originalSize) {
-        showToast(`已压缩: ${(originalSize / 1024 / 1024).toFixed(1)}MB → ${(compressedSize / 1024 / 1024).toFixed(1)}MB (${compressionRatio}%)`);
-      }
-
-      const sizeMB = (compressedSize / 1024 / 1024).toFixed(1);
-      const estimatedChunks = Math.ceil(compressedSize * 1.37 / this.CHUNK_SIZE);
-      console.log(`[Music] 压缩后: ${sizeMB}MB, 预计${estimatedChunks}个分块`);
-
-      if (estimatedChunks > 80) {
-        showToast(`文件仍然过大(${sizeMB}MB, ${estimatedChunks}块)，云端最多100条`);
-        return false;
-      }
-
-      // 先删除旧的音乐分块数据
-      console.log('[Music] pushMusic: 清理旧音乐数据...');
-      await this.deleteFile('music/file');
-
-      // 上传压缩后的文件
-      const uploadResult = await this.uploadFile(compressedBlob, 'music/file', (pct) => {
-        if (pct % 25 === 0) showToast(`上传中... ${pct}%`);
-      });
-      if (!uploadResult) {
-        showToast('上传失败（云端存储已满或文件过大）❌');
-        return false;
-      }
-      const uploadedAt = Date.now();
-      const infoOk = await this._retryPOST(
-        this._url('music_info'),
-        JSON.stringify({ name, size: compressedSize, type: 'audio/mpeg', uploadedAt, originalSize }),
-        this.MAX_RETRIES
-      );
-      if (!infoOk) return false;
-      Store.set('cloudMusicAt', uploadedAt);
-      console.log('[Music] pushMusic: 同步完成 ✅');
-      showToast(`音乐已同步给对方 ✅ (${sizeMB}MB)`);
-      return true;
-    } catch (e) {
-      console.error('[Music] pushMusic 异常:', e);
-      showToast('音乐同步失败 ❌');
-      return false;
-    }
-  },
-
-  async pullMusic() {
-    if (!this.pairCode) {
-      console.log('[Music] pullMusic: 未配对，跳过');
-      return null;
-    }
-    try {
-      // 先检查是否有云端音乐
-      const r = await fetch(this._url('music_info'));
-      if (!r.ok) {
-        console.log('[Music] pullMusic: music_info 不可用，HTTP', r.status);
-        return null;
-      }
-      const info = await r.json();
-      if (!info || !info.name) {
-        console.log('[Music] pullMusic: music_info 为空');
-        return null;
-      }
-      console.log('[Music] pullMusic: 云端音乐信息', info.name, 'uploadedAt=', info.uploadedAt);
-
-      // 检查是否和本地已有的一样
-      const savedLocal = Store.get('cloudMusicAt', 0);
-      console.log('[Music] pullMusic: 本地 cloudMusicAt=', savedLocal);
-      if (savedLocal && info.uploadedAt && info.uploadedAt <= savedLocal) {
-        console.log('[Music] pullMusic: 已是最新，跳过');
-        return null;
-      }
-
-      // 下载音乐文件
-      console.log('[Music] pullMusic: 开始下载文件...');
-      const blob = await this.downloadFile('music/file');
-      if (!blob) {
-        console.warn('[Music] pullMusic: downloadFile 返回 null（分块下载失败）');
-        return null;
-      }
-      console.log('[Music] pullMusic: 下载成功，大小=', blob.size, '类型=', blob.type);
-
-      Store.set('cloudMusicAt', info.uploadedAt || Date.now());
-      return { blob, name: info.name };
-    } catch (e) {
-      console.error('[Music] pullMusic 异常:', e);
-      return null;
     }
   },
 
@@ -1228,9 +1030,6 @@ const App = {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
         }
-        if (typeof MusicPlayer !== 'undefined' && MusicPlayer._tryPullCloudMusic) {
-          MusicPlayer._tryPullCloudMusic();
-        }
       }
     });
 
@@ -1311,10 +1110,6 @@ const App = {
         CloudSync.syncOnlineDuration();
         CloudSync.syncLetters();
       }
-      // 尝试拉取云端音乐
-      if (typeof MusicPlayer !== 'undefined' && MusicPlayer._tryPullCloudMusic) {
-        MusicPlayer._tryPullCloudMusic();
-      }
       showToast('已配对成功，开始你们的日记吧 💕');
     });
   },
@@ -1381,10 +1176,6 @@ const App = {
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
-        }
-        // 尝试拉取云端音乐
-        if (typeof MusicPlayer !== 'undefined' && MusicPlayer._tryPullCloudMusic) {
-          MusicPlayer._tryPullCloudMusic();
         }
       });
     }
@@ -3104,100 +2895,15 @@ const MusicPlayer = {
         document.getElementById('musicPlayerArea').style.display = 'block';
         document.getElementById('musicTitle').textContent = saved.name || '已保存的音乐';
         document.getElementById('musicUrlInput').value = '';
-        // 后台尝试从云端拉取对方的音乐（不阻塞 UI）
-        this._tryPullCloudMusic(true).catch(() => {});
         return;
       }
     } catch (e) { /* 静默忽略 */ }
 
-    // 尝试从云端拉取音乐
-    const cloudMusic = await this._tryPullCloudMusic(false);
-    if (!cloudMusic) {
-      // 回退到 URL 链接恢复
-      const savedUrl = Store.get('musicUrl', '');
-      if (savedUrl) {
-        document.getElementById('musicUrlInput').value = savedUrl;
-        this.loadMusic(true);
-      }
-    }
-  },
-
-  // 尝试从云端拉取音乐
-  // silent=true 时不显示错误 toast（用于后台轮询）
-  async _tryPullCloudMusic(silent = false) {
-    if (typeof Cloud === 'undefined' || !Cloud.pairCode) {
-      console.log('[Music] _tryPullCloudMusic: Cloud 未就绪或未配对');
-      return false;
-    }
-    try {
-      const result = await Cloud.pullMusic();
-      if (result && result.blob) {
-        // 保存到本地
-        await this._saveMusic(result.blob, result.name);
-        // 播放
-        if (this._fileUrl) URL.revokeObjectURL(this._fileUrl);
-        const url = URL.createObjectURL(result.blob);
-        this._fileUrl = url;
-        this.audio.src = url;
-        this.audio.load();
-        document.getElementById('musicPlayerArea').style.display = 'block';
-        document.getElementById('musicTitle').textContent = result.name || '对方分享的音乐';
-        document.getElementById('musicUrlInput').value = '';
-        showToast('已同步对方分享的音乐 🎵');
-        return true;
-      } else {
-        // pullMusic 返回 null，根据日志判断原因
-        console.log('[Music] _tryPullCloudMusic: 没有新音乐（已最新或下载失败）');
-        return false;
-      }
-    } catch (e) {
-      console.error('[Music] _tryPullCloudMusic 异常:', e);
-      if (!silent) showToast('音乐同步失败，请稍后重试');
-      return false;
-    }
-  },
-
-  // 强制同步：忽略 cloudMusicAt 检查，直接下载云端音乐
-  async forceSyncMusic() {
-    if (typeof Cloud === 'undefined' || !Cloud.pairCode) {
-      showToast('请先配对');
-      return;
-    }
-    showToast('正在同步音乐...');
-    try {
-      // 获取云端音乐信息
-      const r = await fetch(Cloud._url('music_info'));
-      if (!r.ok) {
-        showToast('云端没有音乐数据');
-        return;
-      }
-      const info = await r.json();
-      if (!info || !info.name) {
-        showToast('云端没有音乐数据');
-        return;
-      }
-      console.log('[Music] forceSync: 强制下载', info.name);
-      // 直接下载，跳过 cloudMusicAt 检查
-      const blob = await Cloud.downloadFile('music/file');
-      if (!blob) {
-        showToast('音乐下载失败（文件数据不完整）');
-        return;
-      }
-      // 保存到本地
-      await this._saveMusic(blob, info.name);
-      if (this._fileUrl) URL.revokeObjectURL(this._fileUrl);
-      const url = URL.createObjectURL(blob);
-      this._fileUrl = url;
-      this.audio.src = url;
-      this.audio.load();
-      document.getElementById('musicPlayerArea').style.display = 'block';
-      document.getElementById('musicTitle').textContent = info.name || '对方分享的音乐';
-      document.getElementById('musicUrlInput').value = '';
-      Store.set('cloudMusicAt', info.uploadedAt || Date.now());
-      showToast('已同步：' + (info.name || '音乐') + ' 🎵');
-    } catch (e) {
-      console.error('[Music] forceSync 异常:', e);
-      showToast('音乐同步失败');
+    // 回退到 URL 链接恢复
+    const savedUrl = Store.get('musicUrl', '');
+    if (savedUrl) {
+      document.getElementById('musicUrlInput').value = savedUrl;
+      this.loadMusic(true);
     }
   },
 
@@ -3266,11 +2972,6 @@ const MusicPlayer = {
     try {
       await this._saveMusic(file, fileName);
       Store.set('musicUrl', ''); // 清除 URL 模式
-      // 云同步音乐给对方（异步，不阻塞 UI）
-      if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
-        showToast(`已导入：${fileName} 🎵 正在同步给对方...`);
-        Cloud.pushMusic(file, fileName).catch(() => {});
-      }
     } catch (e) {
       // 保存失败不影响当前播放
     }
