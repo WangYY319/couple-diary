@@ -1118,10 +1118,7 @@ const App = {
         CloudSync.syncOnlineDuration();
         CloudSync.syncLetters();
       }
-      // 初始化IP地址显示
-      if (typeof IPAddress !== 'undefined') {
-        IPAddress.init();
-      }
+      // IP地址显示已移除
       showToast('已配对成功，开始你们的日记吧 💕');
     });
   },
@@ -1189,10 +1186,7 @@ const App = {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
         }
-        // 初始化IP地址显示
-        if (typeof IPAddress !== 'undefined') {
-          IPAddress.init();
-        }
+        // IP地址显示已移除
       });
     }
   },
@@ -1758,16 +1752,36 @@ const Cards = {
     const display = document.getElementById('nightTextDisplay');
     const area = document.getElementById('nightArea');
     const reveal = document.getElementById('nightReveal');
+    const pairDisplay = document.getElementById('nightPairDisplay');
     if (!display) return;
 
-    const theme = document.documentElement.getAttribute('data-theme');
     const myRole = App.currentRole ? App.currentRole.toLowerCase() : null;
     const myDone = myRole ? data.night[myRole] : false;
     const bothDone = data.night.tao && data.night.yan;
 
-    // 根据主题显示对应文字
-    const nightText = theme === 'blue' ? '姐姐晚安💤' : '弟弟晚安💤';
-    display.textContent = nightText;
+    // 如果有任一方已打卡，显示并列晚安文字
+    if (data.night.tao || data.night.yan) {
+      display.style.display = 'none';
+      if (pairDisplay) {
+        pairDisplay.style.display = 'flex';
+        // 更新打卡状态样式
+        const taoItem = pairDisplay.querySelector('.tao-gn');
+        const yanItem = pairDisplay.querySelector('.yan-gn');
+        if (taoItem) {
+          taoItem.classList.toggle('checked', data.night.tao);
+          taoItem.classList.toggle('unchecked', !data.night.tao);
+        }
+        if (yanItem) {
+          yanItem.classList.toggle('checked', data.night.yan);
+          yanItem.classList.toggle('unchecked', !data.night.yan);
+        }
+      }
+    } else {
+      display.style.display = '';
+      display.textContent = '双击晚安';
+      display.classList.remove('done');
+      if (pairDisplay) pairDisplay.style.display = 'none';
+    }
 
     if (myDone) {
       display.classList.add('done');
@@ -1775,26 +1789,10 @@ const Cards = {
       display.classList.remove('done');
     }
 
-    // 如果有任一方已打卡，显示双方状态
-    let infoEl = area.querySelector('.goodnight-pair-info');
-    if (data.night.tao || data.night.yan) {
-      if (!infoEl) {
-        infoEl = document.createElement('div');
-        infoEl.className = 'goodnight-pair-info';
-        area.appendChild(infoEl);
-      }
-      infoEl.innerHTML = `
-        <div class="gn-item"><span>TAO</span> <span class="gn-check ${data.night.tao ? 'done' : ''}">${data.night.tao ? '✓' : '○'}</span></div>
-        <div class="gn-item"><span>YAN</span> <span class="gn-check ${data.night.yan ? 'done' : ''}">${data.night.yan ? '✓' : '○'}</span></div>
-      `;
-    } else {
-      if (infoEl) infoEl.remove();
-    }
-
     // 双方都打卡后，浮现文字
     if (reveal) {
       if (bothDone) {
-        reveal.innerHTML = `<div class="night-reveal-text">🌙 今夜我们互道晚安，好梦相伴 💕</div>`;
+        reveal.innerHTML = `<div class="night-reveal-text">✨ 今夜我们互道晚安，好梦相伴 💕</div>`;
         reveal.style.display = 'block';
         reveal.classList.add('reveal-show');
       } else {
@@ -2065,6 +2063,138 @@ const Share = {
     const d = new Date(ds);
     document.getElementById('sharePreviewDate').textContent =
       `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 相处日记`;
+    // 初始化日期范围默认为今天
+    const todayInput = document.getElementById('shareDateStart');
+    const endInput = document.getElementById('shareDateEnd');
+    if (todayInput && !todayInput.value) todayInput.value = ds;
+    if (endInput && !endInput.value) endInput.value = ds;
+  },
+
+  setQuickRange(type) {
+    const today = new Date();
+    const todayStrVal = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    const startInput = document.getElementById('shareDateStart');
+    const endInput = document.getElementById('shareDateEnd');
+    if (!startInput || !endInput) return;
+
+    if (type === 'today') {
+      startInput.value = todayStrVal;
+      endInput.value = todayStrVal;
+    } else if (type === 'week') {
+      const dayOfWeek = today.getDay() || 7;
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - dayOfWeek + 1);
+      startInput.value = monday.getFullYear() + '-' + String(monday.getMonth() + 1).padStart(2, '0') + '-' + String(monday.getDate()).padStart(2, '0');
+      endInput.value = todayStrVal;
+    } else if (type === 'month') {
+      startInput.value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-01';
+      endInput.value = todayStrVal;
+    } else if (type === 'all') {
+      startInput.value = '2024-01-01';
+      endInput.value = todayStrVal;
+    }
+    showToast('已选择日期范围');
+  },
+
+  async exportRange() {
+    const startInput = document.getElementById('shareDateStart');
+    const endInput = document.getElementById('shareDateEnd');
+    if (!startInput || !endInput || !startInput.value || !endInput.value) {
+      showToast('请先选择起止日期');
+      return;
+    }
+    const startDate = startInput.value;
+    const endDate = endInput.value;
+    if (startDate > endDate) {
+      showToast('开始日期不能晚于结束日期');
+      return;
+    }
+
+    // 收集日期范围内的所有数据
+    const dates = [];
+    let cur = new Date(startDate);
+    const end = new Date(endDate);
+    while (cur <= end) {
+      const ds = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+      dates.push(ds);
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    let exportText = `TAO & YAN 相处日记\n`;
+    exportText += `导出范围：${startDate} 至 ${endDate}\n`;
+    exportText += `${'='.repeat(40)}\n\n`;
+
+    let hasAnyData = false;
+    dates.forEach(ds => {
+      const data = Store.getDay(ds);
+      if (!data) return;
+      const d = new Date(ds);
+      const dateCN = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+      let dayText = `📅 ${dateCN}\n`;
+      let dayHasData = false;
+
+      // 打卡状态
+      if (data.greet && (data.greet.tao || data.greet.yan)) {
+        dayText += `  ❤️ 爱心打卡：${data.greet.tao ? '✓' : '○'}TAO ${data.greet.yan ? '✓' : '○'}YAN\n`;
+        dayHasData = true;
+      }
+      // 打卡语录
+      if (data.words && (data.words.tao || data.words.yan)) {
+        dayText += `  💬 打卡语录：\n`;
+        if (data.words.tao) dayText += `    TAO: ${data.words.tao}\n`;
+        if (data.words.yan) dayText += `    YAN: ${data.words.yan}\n`;
+        dayHasData = true;
+      }
+      // 打卡愿望
+      if (data.wish && (data.wish.tao || data.wish.yan)) {
+        dayText += `  🌟 打卡愿望：\n`;
+        if (data.wish.tao) dayText += `    TAO: ${data.wish.tao}\n`;
+        if (data.wish.yan) dayText += `    YAN: ${data.wish.yan}\n`;
+        dayHasData = true;
+      }
+      // 晚安
+      if (data.night && (data.night.tao || data.night.yan)) {
+        dayText += `  ✨ 晚安打卡：${data.night.tao ? '✓' : '○'}TAO ${data.night.yan ? '✓' : '○'}YAN\n`;
+        dayHasData = true;
+      }
+      // 运动时间
+      const exerciseData = Store.get('exercise_time', {});
+      if (exerciseData[ds]) {
+        dayText += `  💪 运动健身：TAO ${exerciseData[ds].tao || 0}分钟 / YAN ${exerciseData[ds].yan || 0}分钟\n`;
+        dayHasData = true;
+      }
+      // 英语单词
+      const vocabTAO = Store.get(`vocab_count_${ds}_TAO`, 0);
+      const vocabYAN = Store.get(`vocab_count_${ds}_YAN`, 0);
+      if (vocabTAO > 0 || vocabYAN > 0) {
+        dayText += `  📚 英语刷词：TAO ${vocabTAO}词 / YAN ${vocabYAN}词\n`;
+        dayHasData = true;
+      }
+
+      if (dayHasData) {
+        exportText += dayText + '\n';
+        hasAnyData = true;
+      }
+    });
+
+    if (!hasAnyData) {
+      exportText += '（所选时间段内暂无打卡记录）\n';
+    }
+
+    exportText += `${'='.repeat(40)}\n`;
+    exportText += `导出时间：${new Date().toLocaleString('zh-CN')}\n`;
+
+    // 下载为文本文件
+    const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `相处日记_${startDate}_至_${endDate}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('记录已导出 📄');
   },
 
   _getShareData() {
@@ -2886,7 +3016,7 @@ const DetailMenu = {
   TAB_SECTIONS: {
     0: [
       { icon: '🎭', name: '角色选择', selector: '.role-card' },
-      { icon: '💌', name: '甜蜜文案', selector: '.sweet-card, .card:nth-child(2)' },
+      { icon: '💌', name: '甜蜜语录', selector: '.sweet-card, .card:nth-child(2)' },
       { icon: '🎵', name: '音乐播放', selector: '.music-card, .card:nth-child(3)' },
       { icon: '📊', name: '本周数据透视', selector: '.data-pivot-card' }
     ],
@@ -2901,14 +3031,14 @@ const DetailMenu = {
       { icon: '🌟', name: '打卡愿望', selector: '.wish-card, .card:nth-child(3)' },
       { icon: '🎲', name: '随机问答', selector: '.quiz-card, .card:nth-child(4)' },
       { icon: '🎤', name: '语音留言', selector: '.voice-card, .card:nth-child(5)' },
-      { icon: '🌙', name: '打卡晚安', selector: '.night-card, .card:nth-child(6)' }
+      { icon: '✨', name: '打卡晚安', selector: '.night-card, .card:nth-child(6)' }
     ],
     3: [
       { icon: '💪', name: '运动健身', selector: '.exercise-card, .card:nth-child(1)' },
       { icon: '📚', name: '英语刷词', selector: '.english-card, .card:nth-child(2)' },
       { icon: '📰', name: '热点新闻', selector: '.hotnews-card, .card:nth-child(3)' },
       { icon: '🔬', name: '数理化公式', selector: '.formula-card, .card:nth-child(4)' },
-      { icon: '📜', name: '古诗', selector: '.poem-card, .card:nth-child(5)' },
+      { icon: '📜', name: '唐宋诗词', selector: '.poem-card, .card:nth-child(5)' },
       { icon: '🏛️', name: '历史文化', selector: '.history-card, .card:nth-child(6)' },
       { icon: '🗺️', name: '中国地理', selector: '.geo-card, .card:nth-child(7)' },
       { icon: '💡', name: '生活技巧', selector: '.life-tip-card, .card:nth-child(8)' },
@@ -5784,10 +5914,12 @@ const PoemCard = {
   _renderPoemObj(poem) {
     if (!poem) return;
     const cardTitleEl = document.getElementById('poemCardTitle');
+    const titleEl = document.getElementById('poemTitle');
     const authorEl = document.getElementById('poemAuthor');
     const textEl = document.getElementById('poemText');
-    // 诗名显示在卡片标题位置
-    if (cardTitleEl) cardTitleEl.textContent = poem.title || '古诗';
+    // 卡片标题保持"唐宋诗词"，诗名显示在内容区
+    if (cardTitleEl) cardTitleEl.textContent = '唐宋诗词';
+    if (titleEl) titleEl.textContent = poem.title || '';
     if (authorEl) authorEl.textContent = `${poem.dynasty ? poem.dynasty + ' · ' : ''}${poem.author}`;
     if (textEl) textEl.innerHTML = poem.text.replace(/\n/g, '<br>');
     this._renderReadBadge();
@@ -6591,7 +6723,6 @@ const HotNews = {
       this._items = items;
       this._filterByCat(this._currentCat);
       this._render();
-      this._startScroll();
     } finally {
       this._loading = false;
     }
@@ -6621,7 +6752,6 @@ const HotNews = {
     this._currentScrollY = 0;
     this._filterByCat(cat);
     this._render();
-    this._startScroll();
   },
 
   // 筛选当前分类的新闻，不足则用其他分类补齐
@@ -6708,18 +6838,16 @@ const HotNews = {
       if (container) container.innerHTML = '<div class="hotnews-placeholder">暂无' + this._currentCat + '类热点</div>';
       return;
     }
-    // 首尾各加一份用于无缝循环
-    const all = [...this._catItems, ...this._catItems.slice(0, Math.min(3, this._catItems.length))];
     let html = '<div class="hotnews-scroll-wrap" id="hotnewsScrollWrap">';
-    all.forEach(item => {
+    this._catItems.forEach(item => {
       html += `<div class="hotnews-item">
         <span class="hotnews-rank">${item.rank}</span>
         <span class="hotnews-title">${item.title}</span>
-        <span class="hotnews-cat-tag">${item.category}</span>
       </div>`;
     });
     html += '</div>';
     container.innerHTML = html;
+    container.scrollTop = 0;
   },
 
   _startScroll() {

@@ -270,12 +270,13 @@ html, body {
   position: absolute;
   top: 56px;
   left: 8px;
-  right: 8px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  width: 27%;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10);
   z-index: 100;
   overflow: hidden;
   animation: detailMenuSlide 0.25s ease-out;
@@ -323,11 +324,11 @@ html, body {
 .detail-menu-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  gap: 8px;
+  padding: 10px 12px;
   cursor: pointer;
   transition: background 0.15s;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-main);
 }
 
@@ -1051,6 +1052,53 @@ html, body {
 
 .goodnight-pair-info .gn-check.done { color: #22c55e; }
 
+/* 晚安并列显示 */
+.goodnight-pair-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  animation: fadeIn 0.5s ease;
+}
+
+.gn-pair-item {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 14px;
+  transition: all 0.4s ease;
+}
+
+.gn-pair-item.tao-gn {
+  color: #0e5fb0;
+  background: rgba(27, 127, 227, 0.12);
+}
+
+.gn-pair-item.yan-gn {
+  color: #b8224f;
+  background: rgba(232, 41, 106, 0.12);
+}
+
+.gn-pair-item.checked {
+  text-shadow: 0 2px 8px rgba(var(--theme-rgb), 0.4);
+}
+
+.gn-pair-item.unchecked {
+  opacity: 0.35;
+}
+
+.gn-pair-divider {
+  font-size: 20px;
+  animation: sparklePulse 2s ease-in-out infinite;
+}
+
+@keyframes sparklePulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
 /* === 锁定提示（已移除灰色遮罩）=== */
 .lock-overlay { display: none !important; }
 
@@ -1189,6 +1237,104 @@ html, body {
 .share-preview-text .t2 {
   font-size: 12px; color: #666;
   margin-top: 3px;
+}
+
+/* 导出日期范围 */
+.share-date-range {
+  background: #f8f9fa;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.share-date-range-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.share-date-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.share-date-input-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.share-date-input-group label {
+  font-size: 11px;
+  color: #999;
+}
+
+.share-date-input-group input[type="date"] {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #333;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.share-date-input-group input[type="date"]:focus {
+  border-color: var(--theme-primary);
+}
+
+.share-date-sep {
+  font-size: 13px;
+  color: #999;
+  margin-top: 16px;
+}
+
+.share-date-quick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.share-quick-btn {
+  flex: 1;
+  min-width: 60px;
+  padding: 7px 0;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.share-quick-btn:active {
+  background: var(--theme-light);
+  color: var(--theme-primary);
+  border-color: var(--theme-primary);
+}
+
+.share-export-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--theme-primary), var(--theme-accent));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(var(--theme-rgb), 0.3);
+}
+
+.share-export-btn:active {
+  transform: scale(0.98);
 }
 
 .share-channels {
@@ -2853,18 +2999,16 @@ html, body {
 /* 随机文案 */
 .sweet-text-card {
   text-align: center;
-  background: rgba(255, 255, 255, 0.38);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 24px;
-  padding: 12px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
+  padding: 16px;
   margin-bottom: 12px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
-    0 2px 8px rgba(0, 0, 0, 0.04),
-    inset 0 1px 1px rgba(255, 255, 255, 0.8),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.03);
+    0 6px 24px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
   position: relative;
 }
 
@@ -2907,6 +3051,19 @@ html, body {
 }
 
 .sweet-text-display.fading { opacity: 0; }
+
+/* ============================
+   首页（Tab 0）所有卡片统一毛玻璃效果
+   ============================ */
+#tab-0 .card {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
 
 /* ============================
    语音留言 / 录音功能
@@ -4204,16 +4361,31 @@ html, body {
 .hotnews-container {
   height: 240px;
   position: relative;
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
-  mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--theme-rgb), 0.3) transparent;
+  scroll-behavior: smooth;
+}
+
+.hotnews-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.hotnews-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hotnews-container::-webkit-scrollbar-thumb {
+  background: rgba(var(--theme-rgb), 0.25);
+  border-radius: 4px;
 }
 
 .hotnews-scroll-wrap {
   display: flex;
   flex-direction: column;
   gap: 0;
-  will-change: transform;
 }
 
 .hotnews-item {
@@ -4368,7 +4540,7 @@ html, body {
 }
 
 /* ============================
-   古诗赏析
+   唐宋诗词
    ============================ */
 .poem-content {
   text-align: center;
@@ -4376,10 +4548,6 @@ html, body {
   line-height: 1.6;
   padding: 16px 8px;
   color: var(--text-main);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
 }
 
 .poem-title {
@@ -4428,7 +4596,7 @@ html, body {
   max-width: 90%;
 }
 
-.poem-card { position: relative; padding-bottom: 48px; }
+.poem-card { position: relative; padding-bottom: 48px; min-height: auto; }
 
 /* 已阅标记 */
 .poem-read-badge {

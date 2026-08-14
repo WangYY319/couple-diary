@@ -193,17 +193,12 @@
             <span class="od-time" id="odTimeYAN">0m</span>
           </div>
         </div>
-        <!-- IP地址显示 -->
-        <div class="ip-display-row">
-          <span class="ip-text" id="ipTAO">IP:获取中</span>
-          <span class="ip-sep">·</span>
-          <span class="ip-text" id="ipYAN">IP:获取中</span>
-        </div>
       </div>
 
-      <!-- 甜蜜文案 -->
+      <!-- 甜蜜语录 -->
       <div class="card sweet-text-card">
-        <div class="sweet-text-display" id="sweetText" onclick="SweetText.refresh()">点击获取甜蜜文案</div>
+        <div class="card-title"><span class="icon">💌</span> 甜蜜语录</div>
+        <div class="sweet-text-display" id="sweetText" onclick="SweetText.refresh()">点击获取甜蜜语录</div>
       </div>
 
       <!-- 音乐播放 -->
@@ -431,9 +426,14 @@
       <!-- 打卡晚安（移到最后） -->
       <div class="card" id="card-night" onclick="Cards.handleClick('night')">
         <div class="card-mascot" id="mascot-night"></div>
-        <div class="card-title"><span class="icon">🌙</span> 打卡晚安</div>
+        <div class="card-title"><span class="icon">✨</span> 打卡晚安</div>
         <div class="goodnight-area" id="nightArea">
           <div class="goodnight-text-display" id="nightTextDisplay">双击晚安</div>
+          <div class="goodnight-pair-display" id="nightPairDisplay" style="display:none">
+            <span class="gn-pair-item tao-gn">弟弟晚安</span>
+            <span class="gn-pair-divider">✨</span>
+            <span class="gn-pair-item yan-gn">姐姐晚安</span>
+          </div>
           <div class="goodnight-reveal" id="nightReveal" style="display:none"></div>
         </div>
       </div>
@@ -520,10 +520,11 @@
         </div>
       </div>
 
-      <!-- 古诗 -->
+      <!-- 唐宋诗词 -->
       <div class="card poem-card" id="poemCard" ondblclick="PoemCard.markRead()">
-        <div class="card-title"><span class="icon">📜</span> <span id="poemCardTitle">古诗</span></div>
+        <div class="card-title"><span class="icon">📜</span> <span id="poemCardTitle">唐宋诗词</span></div>
         <div class="poem-content" id="poemContent">
+          <div class="poem-title" id="poemTitle"></div>
           <div class="poem-author" id="poemAuthor"></div>
           <div class="poem-text" id="poemText"></div>
         </div>
@@ -610,6 +611,27 @@
         <div class="t1">TAO &amp; YAN 相处日记</div>
         <div class="t2" id="sharePreviewDate">--</div>
       </div>
+    </div>
+    <div class="share-date-range">
+      <div class="share-date-range-title">📅 导出日期范围</div>
+      <div class="share-date-range-row">
+        <div class="share-date-input-group">
+          <label>开始</label>
+          <input type="date" id="shareDateStart" />
+        </div>
+        <span class="share-date-sep">至</span>
+        <div class="share-date-input-group">
+          <label>结束</label>
+          <input type="date" id="shareDateEnd" />
+        </div>
+      </div>
+      <div class="share-date-quick">
+        <button class="share-quick-btn" onclick="Share.setQuickRange('today')">今天</button>
+        <button class="share-quick-btn" onclick="Share.setQuickRange('week')">本周</button>
+        <button class="share-quick-btn" onclick="Share.setQuickRange('month')">本月</button>
+        <button class="share-quick-btn" onclick="Share.setQuickRange('all')">全部</button>
+      </div>
+      <button class="share-export-btn" onclick="Share.exportRange()">📤 导出所选时间段记录</button>
     </div>
     <div class="share-channels">
       <div class="share-channel wechat" onclick="Share.to('wechat')"><div class="share-channel-icon">💬</div><div class="label">微信好友</div></div>
