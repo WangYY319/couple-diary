@@ -3586,7 +3586,7 @@ const IPAddress = {
 
 // ====== 数据透视模块（本周柱状图） ======
 const DataPivot = {
-  _currentMetric: 'online', // online | exercise | vocab
+  _currentMetric: 'pomodoro', // pomodoro | exercise | vocab
   _weekDays: [], // 本周7天的日期字符串
 
   // 获取本周7天日期（周一到周日）
@@ -3618,11 +3618,12 @@ const DataPivot = {
   // 获取某天某角色的数据
   _getDayValue(dateStr, role, metric) {
     const key = role.toLowerCase();
-    if (metric === 'online') {
-      const data = Store.get('online_duration', {});
+    if (metric === 'pomodoro') {
+      // 番茄管理：从 pomodoro_history 读取每日完成的番茄数
+      const data = Store.get('pomodoro_history', {});
       const day = data[dateStr];
       if (!day) return 0;
-      return Math.round((day[key] || 0) / 60); // 秒转分钟
+      return day[key] || 0;
     } else if (metric === 'exercise') {
       const data = Store.get('exercise_time', {});
       const day = data[dateStr];
@@ -3649,7 +3650,7 @@ const DataPivot = {
   // 格式化显示值
   _formatValue(val, metric) {
     if (val === 0) return '';
-    if (metric === 'online') return val + 'm';
+    if (metric === 'pomodoro') return val + '🍅';
     if (metric === 'exercise') return val + 'm';
     if (metric === 'vocab') return val;
     return val;
@@ -6095,9 +6096,18 @@ const Pomodoro = {
       data[role.toLowerCase()] = (data[role.toLowerCase()] || 0) + 1;
       Store.set('pomodoro_count', data);
       this._renderStats();
+
+      // 记录每日历史（用于数据透视柱状图）
+      const dateStr = todayStr();
+      const history = Store.get('pomodoro_history', {});
+      if (!history[dateStr]) history[dateStr] = { tao: 0, yan: 0 };
+      history[dateStr][role.toLowerCase()] = (history[dateStr][role.toLowerCase()] || 0) + 1;
+      Store.set('pomodoro_history', history);
+
       // 云同步
       if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
         CloudSync.syncPomodoro();
+        CloudSync.syncPomodoroHistory();
       }
       showToast('🍅 完成一个番茄！专注力 +1');
     }
@@ -6319,38 +6329,9 @@ const PoemCard = {
     return a;
   },
 
-  // 每天固定一首：先尝试 jinrishici API，失败用本地日期种子
+  // 每天固定一首：使用本地精选名诗库（确保都是唐诗宋词名言名句）
   async init() {
     const dateStr = todayStr();
-    const cached = Store.get(`poem_${dateStr}`, null);
-    if (cached && cached.source === 'api') {
-      this._currentPoem = cached.poem;
-      this._renderPoemObj(this._currentPoem);
-      return;
-    }
-    // 尝试从 jinrishici API 获取
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch('https://v1.jinrishici.com/all.json', { signal: controller.signal });
-      clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.content) {
-          this._currentPoem = {
-            title: data.origin && data.origin.title ? data.origin.title : '佚名诗',
-            author: data.author || '佚名',
-            dynasty: data.dynasty || '',
-            text: data.origin && data.origin.content ? data.origin.content.join('\n') : data.content,
-            analysis: data.origin && data.origin.translate ? data.origin.translate : '品读古诗词之美，感受古人智慧。'
-          };
-          Store.set(`poem_${dateStr}`, { source: 'api', poem: this._currentPoem });
-          this._renderPoemObj(this._currentPoem);
-          return;
-        }
-      }
-    } catch (e) { /* fall through to local */ }
-    // 本地数据兜底
     const localCached = Store.get(`poem_local_${dateStr}`, -1);
     if (localCached >= 0 && localCached < this.POEMS.length) {
       this._currentIndex = localCached;
@@ -6366,31 +6347,8 @@ const PoemCard = {
     this._renderPoem(this._currentIndex);
   },
 
-  // 手动换一首：先试 API，失败用本地随机
+  // 手动换一首：从本地精选名诗库随机选取
   async refresh() {
-    // 尝试 API
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch('https://v1.jinrishici.com/all.json', { signal: controller.signal });
-      clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.content) {
-          this._currentPoem = {
-            title: data.origin && data.origin.title ? data.origin.title : '佚名诗',
-            author: data.author || '佚名',
-            dynasty: data.dynasty || '',
-            text: data.origin && data.origin.content ? data.origin.content.join('\n') : data.content,
-            analysis: data.origin && data.origin.translate ? data.origin.translate : '品读古诗词之美，感受古人智慧。'
-          };
-          this._renderPoemObj(this._currentPoem);
-          showToast('为你换了一首新诗 📜');
-          return;
-        }
-      }
-    } catch (e) { /* fall through to local */ }
-    // 本地随机
     if (this.POEMS.length <= 1) {
       this._currentIndex = 0;
     } else {
@@ -6417,10 +6375,12 @@ const PoemCard = {
     const titleEl = document.getElementById('poemTitle');
     const authorEl = document.getElementById('poemAuthor');
     const textEl = document.getElementById('poemText');
-    // 卡片标题保持"唐宋诗词"，诗名显示在内容区
-    if (cardTitleEl) cardTitleEl.textContent = '唐宋诗词';
-    if (titleEl) titleEl.textContent = poem.title || '';
-    if (authorEl) authorEl.textContent = `${poem.dynasty ? poem.dynasty + ' · ' : ''}${poem.author}`;
+    // 抬头显示诗词名称（如：静夜思）
+    if (cardTitleEl) cardTitleEl.textContent = poem.title || '唐宋诗词';
+    // 隐藏内容区诗名（已移至抬头显示）
+    if (titleEl) titleEl.style.display = 'none';
+    // 作者旁注明朝代，如：〔唐〕李白
+    if (authorEl) authorEl.textContent = `〔${poem.dynasty || ''}〕${poem.author || '佚名'}`;
     if (textEl) textEl.innerHTML = poem.text.replace(/\n/g, '<br>');
     ReadMark.render('poem');
   }
@@ -7647,18 +7607,23 @@ const LetterBox = {
     document.body.appendChild(overlay);
   },
 
-  // 更新邮筒徽章（未读数量）
+  // 更新邮筒徽章（未读数量）和已接收信件数量
   updateBadges() {
     ['TAO', 'YAN'].forEach(role => {
       const badge = document.getElementById('mailboxBadge' + role);
-      if (!badge) return;
-      // 显示发送给该角色且该角色尚未查看的未读信件数
+      const countEl = document.getElementById('mailboxCount' + role);
+      // 已接收信件总数
+      const received = this.letters.filter(l => l.to === role).length;
+      if (countEl) countEl.textContent = `已收 ${received} 封`;
+      // 未读数量
       const unread = this.letters.filter(l => l.to === role && (!l.readBy || !l.readBy[role])).length;
-      if (unread > 0) {
-        badge.style.display = 'flex';
-        badge.textContent = unread > 9 ? '9+' : String(unread);
-      } else {
-        badge.style.display = 'none';
+      if (badge) {
+        if (unread > 0) {
+          badge.style.display = 'flex';
+          badge.textContent = unread > 9 ? '9+' : String(unread);
+        } else {
+          badge.style.display = 'none';
+        }
       }
     });
   },

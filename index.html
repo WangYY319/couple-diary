@@ -237,7 +237,7 @@
       <div class="card data-pivot-card">
         <div class="card-title"><span class="icon">📊</span> 本周数据透视</div>
         <div class="pivot-tabs">
-          <button class="pivot-tab active" data-metric="online" onclick="DataPivot.switch('online')">在线时长</button>
+          <button class="pivot-tab active" data-metric="pomodoro" onclick="DataPivot.switch('pomodoro')">番茄管理</button>
           <button class="pivot-tab" data-metric="exercise" onclick="DataPivot.switch('exercise')">运动健身</button>
           <button class="pivot-tab" data-metric="vocab" onclick="DataPivot.switch('vocab')">英语单词</button>
         </div>
@@ -303,10 +303,12 @@
             <div class="letter-mailbox tao" onclick="LetterBox.openMailbox('TAO')" style="position:relative">
               📮
               <span class="letter-mailbox-badge" id="mailboxBadgeTAO" style="display:none"></span>
+              <div class="letter-mailbox-count" id="mailboxCountTAO">已收 0 封</div>
             </div>
             <div class="letter-mailbox yan" onclick="LetterBox.openMailbox('YAN')" style="position:relative">
               📮
               <span class="letter-mailbox-badge" id="mailboxBadgeYAN" style="display:none"></span>
+              <div class="letter-mailbox-count" id="mailboxCountYAN">已收 0 封</div>
             </div>
           </div>
           <button class="letter-export-btn" onclick="LetterBox.exportAll()" title="导出分享">📤</button>
