@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="blue">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1b7fe3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="相处日记">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="img/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="img/favicon.svg">
+  <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
+  <title>TAO&YAN 相处日记</title>
+  <link rel="stylesheet" href="style.css">
+<script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
+<script>
+(function(){
+  try{
+    var beacon=new BeaconAction({
+      appkey:'0WEB06U85YBSLJNL',
+      versionCode:'1.0.0',
+      channelID:'share',
+      delay:1000,
+      sessionDuration:30*60*1000,
+      isOversea:false,
+      needReportRqdEvent:false
+    });
+    beacon.onDirectUserAction('preview_page_view',{
+      'url':location.href,
+      'referrer':document.referrer,
+      'title':document.title,
+      'sandbox_id':'3abe425f315c4958abf8e9bee6bc8155'
+    });
+  }catch(e){}
+})();
+</script></head>
+<body>
+
+<!-- 入口选择页 -->
+<div class="entry-screen" id="entryScreen">
+  <div class="entry-title">TAO &amp; YAN</div>
+  <div class="entry-subtitle">相处日记 💕 请选择进入名称</div>
+  <div class="entry-buttons">
+    <button class="entry-btn" data-role="TAO" onclick="App.selectRole('TAO')">
+      <span class="emoji">🐱</span>
+      <span class="name">TAO</span>
+      <span class="desc">浅蓝主题</span>
+    </button>
+    <button class="entry-btn" data-role="YAN" onclick="App.selectRole('YAN')">
+      <span class="emoji">🐶</span>
+      <span class="name">YAN</span>
+      <span class="desc">浅粉主题</span>
+    </button>
+  </div>
+</div>
+
+<!-- 配对页 -->
+<div class="entry-screen pair-screen" id="pairScreen" style="display:none">
+  <div class="entry-title">TAO &amp; YAN</div>
+  <div class="entry-subtitle">💕 配对后两人才可同步数据</div>
+  <div class="pair-view" id="pairCreateView" style="display:flex">
+    <div class="pair-section">
+      <div class="pair-section-title">创建新配对</div>
+      <div class="pair-section-desc">选择你的身份，生成配对码给对方</div>
+      <div class="pair-role-buttons">
+        <button class="pair-role-btn tao" id="pairCreateBtn-TAO" onclick="Pair.create('TAO')">
+          <span class="emoji">🐱</span><span>我是 TAO</span>
+        </button>
+        <button class="pair-role-btn yan" id="pairCreateBtn-YAN" onclick="Pair.create('YAN')">
+          <span class="emoji">🐶</span><span>我是 YAN</span>
+        </button>
+      </div>
+    </div>
+    <div class="pair-divider">或</div>
+    <div class="pair-section">
+      <div class="pair-section-title">已有配对码？</div>
+      <div class="pair-section-desc">输入对方的配对码加入</div>
+      <button class="pair-action-btn" onclick="Pair.showJoinView()">输入配对码加入</button>
+    </div>
+  </div>
+  <div class="pair-view" id="pairShowCodeView" style="display:none">
+    <div class="pair-section">
+      <div class="pair-section-title">你的配对码</div>
+      <div class="pair-section-desc">把这个码发给对方，对方输入后即可同步</div>
+      <div class="pair-code-display" id="pairCreatedCode">------</div>
+      <button class="pair-action-btn primary" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('pairCreatedCode').textContent); showToast('配对码已复制')">复制配对码</button>
+      <button class="pair-action-btn" onclick="Pair.enterAfterCreate()">先进入应用，等对方加入</button>
+    </div>
+  </div>
+  <div class="pair-view" id="pairJoinView" style="display:none">
+    <div class="pair-section">
+      <div class="pair-section-title">输入配对码</div>
+      <div class="pair-section-desc">请输入对方分享的 6 位配对码</div>
+      <input type="text" class="pair-code-input" id="pairCodeInput" maxlength="6" placeholder="ABCDEF" autocomplete="off">
+      <div class="pair-role-buttons">
+        <button class="pair-role-btn tao" id="pairJoinBtn-TAO" onclick="Pair.join('TAO')">
+          <span class="emoji">🐱</span><span>我是 TAO</span>
+        </button>
+        <button class="pair-role-btn yan" id="pairJoinBtn-YAN" onclick="Pair.join('YAN')">
+          <span class="emoji">🐶</span><span>我是 YAN</span>
+        </button>
+      </div>
+      <button class="pair-back-btn" onclick="Pair.showCreateView()">← 返回</button>
+    </div>
+  </div>
+  <div class="pair-view" id="pairSwitchView" style="display:none">
+    <div class="pair-section">
+      <div class="pair-section-title">切换角色</div>
+      <div class="pair-section-desc">当前配对码：<b id="switchPairCode">------</b></div>
+      <div class="pair-role-buttons">
+        <button class="pair-role-btn tao" onclick="Pair.switchTo('TAO')">
+          <span class="emoji">🐱</span><span>切换为 TAO</span>
+        </button>
+        <button class="pair-role-btn yan" onclick="Pair.switchTo('YAN')">
+          <span class="emoji">🐶</span><span>切换为 YAN</span>
+        </button>
+      </div>
+      <button class="pair-back-btn danger" onclick="App.unpair()">解除配对</button>
+    </div>
+  </div>
+</div>
+
+<!-- 主应用 -->
+<div class="app" id="mainApp" style="display:none">
+
+  <!-- 爱心雨容器 -->
+  <div class="love-rain-container" id="loveRainContainer"></div>
+
+  <!-- 浮动粒子背景 -->
+  <div class="floating-particles">
+    <span class="particle">💕</span><span class="particle">✨</span>
+    <span class="particle">💖</span><span class="particle">🌟</span>
+    <span class="particle">💕</span><span class="particle">✨</span>
+    <span class="particle">💝</span><span class="particle">🌸</span>
+  </div>
+
+  <!-- 顶部导航栏 -->
+  <header class="nav-bar">
+    <div class="nav-left" onclick="App.exitHistory()" title="点击返回今天">
+      <span class="nav-date-icon">📅</span>
+      <div class="nav-left-text">
+        <span class="date" id="navDate">--</span>
+      </div>
+      <span class="back-today-hint" id="backTodayHint" style="display:none">⏎ 今天</span>
+    </div>
+    <div class="nav-title" id="navTitle">TAO<span class="heart"> ❤️ </span>YAN</div>
+    <div class="nav-right">
+      <button class="nav-btn" id="settingBtn" onclick="Setting.open()" aria-label="设置">⚙️</button>
+    </div>
+  </header>
+
+  <!-- 内容区 -->
+  <main class="content" id="content">
+
+    <!-- ====== Tab 0: 首页（角色+音乐+文案） ====== -->
+    <div class="tab-page active" id="tab-0" data-tab="0">
+      <!-- 角色选择 -->
+      <div class="card role-card">
+        <div class="card-title"><span class="icon">🎭</span> 角色选择</div>
+        <div class="role-display" id="roleDisplay">
+          <div class="role-current" id="roleCurrent">
+            <span class="role-emoji" id="roleCurrentEmoji">🐱</span>
+            <span class="role-name" id="roleCurrentName">TAO</span>
+          </div>
+          <div class="role-switch-btns">
+            <button class="role-pill tao" id="pillTAO" onclick="Setting.switchRoleTo('TAO')">🐱 TAO</button>
+            <button class="role-pill yan" id="pillYAN" onclick="Setting.switchRoleTo('YAN')">🐶 YAN</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 音乐播放 -->
+      <div class="card music-card">
+        <div class="card-title"><span class="icon">🎵</span> 音乐播放</div>
+        <div class="music-input-row">
+          <input type="text" class="music-url-input" id="musicUrlInput" placeholder="粘贴音乐链接 (mp3/音频URL)" />
+          <button class="music-load-btn" onclick="MusicPlayer.loadMusic()">识别</button>
+        </div>
+        <div class="music-file-row">
+          <input type="file" id="musicFileInput" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac" style="display:none" onchange="MusicPlayer.loadFile(this)">
+          <label class="music-file-btn" for="musicFileInput">📂 上传本地音乐</label>
+        </div>
+        <div class="music-player-area" id="musicPlayerArea" style="display:none">
+          <div class="music-info">
+            <span class="music-title" id="musicTitle">未知曲目</span>
+          </div>
+          <div class="music-controls">
+            <button class="music-play-btn" id="musicPlayBtn" onclick="MusicPlayer.toggle()">
+              <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8,5.14v14l11-7L8,5.14z"/></svg>
+              <svg class="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6,5h4v14H6V5z M14,5h4v14h-4V5z"/></svg>
+            </button>
+            <div class="music-progress-bar"><div class="music-progress-fill" id="musicProgress"></div></div>
+          </div>
+          <audio id="musicAudio" preload="auto" loop></audio>
+        </div>
+      </div>
+
+      <!-- 录音功能 -->
+      <div class="card record-card">
+        <div class="card-title"><span class="icon">🎤</span> 语音留言</div>
+        <div class="record-area">
+          <button class="record-btn" id="recordBtn" onclick="VoiceRecord.toggle()">
+            <span class="record-icon-default">🎙️ 点击录音</span>
+            <span class="record-icon-recording" style="display:none">🔴 录音中... <span id="recordTimer">0</span>s</span>
+          </button>
+        </div>
+        <div class="voice-list" id="voiceList"></div>
+      </div>
+
+      <!-- 随机文案 -->
+      <div class="card sweet-text-card">
+        <div class="card-title"><span class="icon">💌</span> 今日甜蜜</div>
+        <div class="sweet-text-display" id="sweetText">点击下方按钮获取甜蜜文案</div>
+        <button class="sweet-refresh-btn" onclick="SweetText.refresh()">✨ 换一句</button>
+      </div>
+    </div>
+
+    <!-- ====== Tab 1: 爱心打卡+照片 ====== -->
+    <div class="tab-page" id="tab-1" data-tab="1">
+      <!-- 打卡问好（爱心） -->
+      <div class="card" id="card-greet" onclick="Cards.handleClick('greet')">
+        <div class="card-mascot" id="mascot-greet"></div>
+        <div class="card-title"><span class="icon">❤️</span> 爱心打卡</div>
+        <div class="checkin-area" id="greetArea">
+          <div class="heart-container">
+            <span class="heart-half left" id="heartLeft">
+              <svg viewBox="0 0 100 90" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50,86 C50,86 8,56 8,28 C8,15 18,5 30,5 C40,5 46,12 50,20 C54,12 60,5 70,5 C82,5 92,15 92,28 C92,56 50,86 50,86 Z" fill="#ddd"/>
+              </svg>
+            </span>
+            <span class="heart-half right" id="heartRight">
+              <svg viewBox="0 0 100 90" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50,86 C50,86 8,56 8,28 C8,15 18,5 30,5 C40,5 46,12 50,20 C54,12 60,5 70,5 C82,5 92,15 92,28 C92,56 50,86 50,86 Z" fill="#ddd"/>
+              </svg>
+            </span>
+            <div class="heart-merged" id="heartMerged"></div>
+            <span class="heart-count" id="heartCount">0</span>
+          </div>
+        </div>
+        <div class="checkin-status" id="greetStatus">双击打卡</div>
+      </div>
+
+      <!-- 照片上传 -->
+      <div class="card photo-card">
+        <div class="card-title"><span class="icon">📷</span> 我们的照片</div>
+        <div class="photo-upload-area">
+          <input type="file" id="photoInput" accept="image/*" multiple hidden onchange="Photos.upload(this)">
+          <button class="photo-upload-btn" onclick="document.getElementById('photoInput').click()">📸 上传照片</button>
+        </div>
+        <div class="photo-grid" id="photoGrid"></div>
+      </div>
+    </div>
+
+    <!-- ====== Tab 2: 总览（原有所有界面） ====== -->
+    <div class="tab-page" id="tab-2" data-tab="2">
+      <!-- 历史查看栏 -->
+      <div class="history-bar" id="historyBar" style="display:none">
+        <span class="date-text" id="historyDate"></span>
+        <button class="back-btn" onclick="App.exitHistory()">← 返回今天 <span class="back-shortcut">(T)</span></button>
+      </div>
+
+      <!-- 全完成横幅 -->
+      <div class="complete-banner" id="completeBanner" style="display:none">
+        <span class="emoji">🎉</span>今日打卡圆满完成！
+        <button class="share-btn-mini" onclick="Share.open()">分享 ↗</button>
+      </div>
+
+      <!-- 日历 -->
+      <div class="calendar-card">
+        <div class="cal-header-row">
+          <button class="cal-nav-btn" onclick="Calendar.prevMonth()">‹</button>
+          <span class="cal-month-title" id="calMonthTitle"></span>
+          <button class="cal-nav-btn" onclick="Calendar.nextMonth()">›</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
+
+      <!-- 打卡语录 -->
+      <div class="card" id="card-words">
+        <div class="card-mascot" id="mascot-words"></div>
+        <div class="card-title"><span class="icon">💬</span> 打卡语录</div>
+        <div class="edit-area" data-owner="tao">
+          <div class="edit-label TAO"><span class="dot tao-dot"></span> TAO</div>
+          <div class="edit-box-wrapper">
+            <div class="edit-box" id="edit-tao-words" data-role="tao" data-card="words" data-placeholder="TAO今天想对YAN说的小秘密"></div>
+            <button class="lock-icon-btn tao-lock" id="lock-tao-words" title="点击锁定">🐱</button>
+          </div>
+        </div>
+        <div class="edit-area" data-owner="yan">
+          <div class="edit-label YAN"><span class="dot yan-dot"></span> YAN</div>
+          <div class="edit-box-wrapper">
+            <div class="edit-box" id="edit-yan-words" data-role="yan" data-card="words" data-placeholder="YAN今天想对TAO说的小秘密"></div>
+            <button class="lock-icon-btn yan-lock" id="lock-yan-words" title="点击锁定">🐶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 打卡愿望 -->
+      <div class="card" id="card-wish">
+        <div class="card-mascot" id="mascot-wish"></div>
+        <div class="card-title"><span class="icon">🌟</span> 打卡愿望</div>
+        <div class="edit-area" data-owner="tao">
+          <div class="edit-label TAO"><span class="dot tao-dot"></span> TAO</div>
+          <div class="edit-box-wrapper">
+            <div class="edit-box" id="edit-tao-wish" data-role="tao" data-card="wish" data-placeholder="TAO今天对YAN的反思"></div>
+            <button class="lock-icon-btn tao-lock" id="lock-tao-wish" title="点击锁定">🐱</button>
+          </div>
+        </div>
+        <div class="edit-area" data-owner="yan">
+          <div class="edit-label YAN"><span class="dot yan-dot"></span> YAN</div>
+          <div class="edit-box-wrapper">
+            <div class="edit-box" id="edit-yan-wish" data-role="yan" data-card="wish" data-placeholder="YAN今天对TAO的反思"></div>
+            <button class="lock-icon-btn yan-lock" id="lock-yan-wish" title="点击锁定">🐶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 打卡晚安 -->
+      <div class="card" id="card-night" onclick="Cards.handleClick('night')">
+        <div class="card-mascot" id="mascot-night"></div>
+        <div class="card-title"><span class="icon">🌙</span> 打卡晚安</div>
+        <div class="goodnight-area" id="nightArea">
+          <div class="goodnight-text-display" id="nightTextDisplay">双击晚安</div>
+        </div>
+      </div>
+
+      <!-- 随机问答 -->
+      <div class="card quiz-card">
+        <div class="card-title"><span class="icon">🎲</span> 随机问答</div>
+        <div class="quiz-stats-row">
+          <div class="quiz-stat tao-stat">
+            <span class="quiz-stat-emoji">🐱</span>
+            <span class="quiz-stat-name">TAO</span>
+            <span class="quiz-stat-count" id="quizCountTAO">0/5</span>
+          </div>
+          <div class="quiz-stat yan-stat">
+            <span class="quiz-stat-emoji">🐶</span>
+            <span class="quiz-stat-name">YAN</span>
+            <span class="quiz-stat-count" id="quizCountYAN">0/5</span>
+          </div>
+        </div>
+        <div class="quiz-content" id="quizContent">
+          <div class="quiz-placeholder" id="quizPlaceholder">点击下方按钮开始今日问答 💕</div>
+          <div class="quiz-question-area" id="quizQuestionArea" style="display:none">
+            <div class="quiz-question-text" id="quizQuestionText"></div>
+            <div class="quiz-question-index" id="quizQuestionIndex"></div>
+            <div class="quiz-choices" id="quizChoices"></div>
+          </div>
+          <div class="quiz-result-area" id="quizResultArea" style="display:none">
+            <div class="quiz-result-title">🎉 今日问答完成！</div>
+            <div class="quiz-result-list" id="quizResultList"></div>
+          </div>
+        </div>
+        <button class="quiz-start-btn" id="quizStartBtn" onclick="RandomQA.start()">开始问答</button>
+        <button class="quiz-view-btn" id="quizViewBtn" style="display:none" onclick="RandomQA.viewPartner()">查看对方选择</button>
+      </div>
+
+      <!-- 英语刷词 -->
+      <div class="card vocab-card">
+        <div class="card-title"><span class="icon">📚</span> 英语刷词</div>
+        <div class="vocab-stats-row">
+          <div class="vocab-stat tao-stat">
+            <span class="vocab-stat-emoji">🐱</span>
+            <span class="vocab-stat-name">TAO</span>
+            <span class="vocab-stat-count" id="vocabCountTAO">0</span>
+          </div>
+          <div class="vocab-stat yan-stat">
+            <span class="vocab-stat-emoji">🐶</span>
+            <span class="vocab-stat-name">YAN</span>
+            <span class="vocab-stat-count" id="vocabCountYAN">0</span>
+          </div>
+        </div>
+        <div class="vocab-content" id="vocabContent">
+          <div class="vocab-word-area" id="vocabWordArea" style="display:none">
+            <div class="vocab-word-text" id="vocabWordText"></div>
+            <div class="vocab-word-meaning" id="vocabWordMeaning" style="display:none"></div>
+            <div class="vocab-word-index" id="vocabWordIndex"></div>
+          </div>
+          <div class="vocab-placeholder" id="vocabPlaceholder">点击下方按钮开始刷词 📖</div>
+        </div>
+        <div class="vocab-controls" id="vocabControls" style="display:none">
+          <button class="vocab-btn know-btn" onclick="EnglishVocab.know()">✓ 认识</button>
+          <button class="vocab-btn forget-btn" onclick="EnglishVocab.forget()">✗ 忘记</button>
+        </div>
+        <button class="vocab-start-btn" id="vocabStartBtn" onclick="EnglishVocab.start()">开始刷词</button>
+      </div>
+
+      <!-- 下载按钮 -->
+      <button class="download-btn" id="downloadBtn" style="display:none" onclick="Download.downloadCard()">📥 下载当日卡片</button>
+    </div>
+
+    <!-- ====== Tab 3: 历史记录 ====== -->
+    <div class="tab-page" id="tab-3" data-tab="3">
+      <div class="history-view">
+        <div class="history-export-bar">
+          <button class="history-share-btn" onclick="HistoryView.sharePDF()">📤 分享历史记录</button>
+        </div>
+        <div class="history-section">
+          <div class="history-section-title"><span class="icon">💬</span> 打卡语录 · 历史</div>
+          <div class="history-list" id="historyWordsList"></div>
+        </div>
+        <div class="history-section">
+          <div class="history-section-title"><span class="icon">🌟</span> 打卡愿望 · 历史</div>
+          <div class="history-list" id="historyWishList"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- 底部导航栏 -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-tab active" data-tab="0" onclick="TabNav.switch(0)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3,9.5L12,3l9,6.5V20a1,1,0,0,1-1,1h-5v-7h-6v7H4a1,1,0,0,1-1-1V9.5z"/>
+      </svg>
+      <span class="nav-tab-label">首页</span>
+    </button>
+    <button class="nav-tab" data-tab="1" onclick="TabNav.switch(1)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.84,4.61a5.5,5.5,0,0,0-7.78,0L12,5.67l-1.06-1.06a5.5,5.5,0,0,0-7.78,7.78l1.06,1.06L12,21.23l7.78-7.78,1.06-1.06a5.5,5.5,0,0,0,0-7.78z"/>
+      </svg>
+      <span class="nav-tab-label">打卡</span>
+    </button>
+    <button class="nav-tab" data-tab="2" onclick="TabNav.switch(2)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3,9h18M9,3v18"/><path d="M14,14h4M14,17h3"/>
+      </svg>
+      <span class="nav-tab-label">总览</span>
+    </button>
+    <button class="nav-tab" data-tab="3" onclick="TabNav.switch(3)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 15.5,14"/>
+      </svg>
+      <span class="nav-tab-label">历史</span>
+    </button>
+  </nav>
+</div>
+
+<!-- 照片放大弹窗 -->
+<div class="photo-lightbox" id="photoLightbox" onclick="Photos.closeLightbox(event)">
+  <img class="photo-lightbox-img" id="photoLightboxImg" src="" />
+  <button class="photo-lightbox-save" id="photoLightboxSave">💾 保存</button>
+  <button class="photo-lightbox-close" onclick="document.getElementById('photoLightbox').classList.remove('show')">✕</button>
+</div>
+
+<!-- 分享弹窗 -->
+<div class="share-mask" id="shareMask" onclick="Share.close(event)">
+  <div class="share-sheet" onclick="event.stopPropagation()">
+    <div class="share-title">分享今日打卡 💕</div>
+    <div class="share-subtitle">传递我们今天的小心动</div>
+    <div class="share-preview">
+      <div class="share-preview-card">🌟</div>
+      <div class="share-preview-text">
+        <div class="t1">TAO &amp; YAN 相处日记</div>
+        <div class="t2" id="sharePreviewDate">--</div>
+      </div>
+    </div>
+    <div class="share-channels">
+      <div class="share-channel wechat" onclick="Share.to('wechat')"><div class="share-channel-icon">💬</div><div class="label">微信好友</div></div>
+      <div class="share-channel moments" onclick="Share.to('moments')"><div class="share-channel-icon">📱</div><div class="label">朋友圈</div></div>
+      <div class="share-channel qq" onclick="Share.to('qq')"><div class="share-channel-icon">🐧</div><div class="label">QQ</div></div>
+      <div class="share-channel weibo" onclick="Share.to('weibo')"><div class="share-channel-icon">📝</div><div class="label">微博</div></div>
+      <div class="share-channel xhs" onclick="Share.to('xhs')"><div class="share-channel-icon">📕</div><div class="label">小红书</div></div>
+      <div class="share-channel copy" onclick="Share.to('copy')"><div class="share-channel-icon">📋</div><div class="label">复制链接</div></div>
+      <div class="share-channel save share_channel-save" onclick="Share.to('save')"><div class="share-channel-icon">💾</div><div class="label">保存图片</div></div>
+      <div class="share-channel more" onclick="Share.to('more')"><div class="share-channel-icon">⋯</div><div class="label">更多</div></div>
+    </div>
+    <button class="share-cancel" onclick="Share.close()">取消</button>
+  </div>
+</div>
+
+<!-- 设置弹窗 -->
+<div class="setting-mask" id="settingMask" onclick="Setting.close(event)">
+  <div class="setting-sheet" onclick="event.stopPropagation()">
+    <div class="setting-title">设置</div>
+    <div class="setting-group">
+      <div class="setting-label">切换角色</div>
+      <div class="setting-desc" id="settingCurrentRole">当前角色：-</div>
+      <div class="setting-role-btns">
+        <button class="setting-role-btn tao" onclick="Setting.switchRoleTo('TAO')"><span class="emoji">🐱</span><span>TAO</span></button>
+        <button class="setting-role-btn yan" onclick="Setting.switchRoleTo('YAN')"><span class="emoji">🐶</span><span>YAN</span></button>
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">配对信息</div>
+      <div class="setting-desc" id="settingPairInfo">未配对</div>
+      <div class="setting-status-list" id="settingStatusList">
+        <div class="status-item" data-role="TAO"><span class="status-emoji">🐱</span><span class="status-name">TAO</span><span class="status-dot off"></span><span class="status-text">离线</span></div>
+        <div class="status-item" data-role="YAN"><span class="status-emoji">🐶</span><span class="status-name">YAN</span><span class="status-dot off"></span><span class="status-text">离线</span></div>
+      </div>
+      <button class="setting-btn danger" onclick="Setting.unpair()">解除配对</button>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">背景图</div>
+      <div class="setting-desc">上传一张属于你们的照片作为应用背景</div>
+      <div class="setting-preview" id="bgPreview"></div>
+      <input type="file" id="bgInput" accept="image/*" hidden onchange="Setting.uploadBg(this)">
+      <button class="setting-btn primary" onclick="document.getElementById('bgInput').click()">📷 上传背景图</button>
+      <button class="setting-btn" onclick="Setting.resetBg()">恢复默认</button>
+      <div class="setting-sub-label">背景图显示程度</div>
+      <input type="range" id="bgOpacity" class="setting-range" min="20" max="100" value="100" oninput="Setting.setBgOpacity(this.value)">
+      <div class="setting-range-label" id="bgOpacityLabel">100%</div>
+    </div>
+    <button class="setting-cancel" onclick="Setting.close()">关闭</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
