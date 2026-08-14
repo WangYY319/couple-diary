@@ -5384,226 +5384,169 @@ const RandomQA = {
 
 // ====== 英语刷词模块（27考研词汇乱序版） ======
 const EnglishVocab = {
-  // 考研核心词汇（精选200词）
-  WORD_LIST: [
+  // 2027考研英语大纲词汇（来源: GitHub开源词库 KyleBing/english-vocabulary）
+  // 共9602词（官方大纲5500词 + 派生词/复合词）
+  DAILY_GOAL: 100,
+  get WORD_LIST() {
+    return typeof KAORYAN_WORDS !== 'undefined' ? KAORYAN_WORDS : this._FALLBACK_WORDS;
+  },
+
+  // 本地兜底词表（网络加载失败时使用）
+  _FALLBACK_WORDS: [
     { en: 'abandon', cn: 'v.放弃；抛弃' },
-    { en: 'abide', cn: 'v.遵守；忍受' },
-    { en: 'abnormal', cn: 'a.反常的；不规则的' },
-    { en: 'abolish', cn: 'v.废除；取消' },
-    { en: 'abrupt', cn: 'a.突然的；唐突的' },
-    { en: 'absorb', cn: 'v.吸收；吸引' },
-    { en: 'abstract', cn: 'a.抽象的 n.摘要' },
-    { en: 'absurd', cn: 'a.荒谬的；可笑的' },
-    { en: 'abundance', cn: 'n.丰富；充裕' },
+    { en: 'absolute', cn: 'a.绝对的；完全的' },
+    { en: 'academic', cn: 'a.学术的；学院的' },
     { en: 'accelerate', cn: 'v.加速；促进' },
-    { en: 'accommodate', cn: 'v.容纳；适应' },
-    { en: 'accompany', cn: 'v.陪伴；伴随' },
     { en: 'accomplish', cn: 'v.完成；实现' },
     { en: 'accumulate', cn: 'v.积累；积聚' },
     { en: 'accurate', cn: 'a.精确的；正确的' },
+    { en: 'achieve', cn: 'v.实现；达到' },
     { en: 'acknowledge', cn: 'v.承认；答谢' },
     { en: 'acquire', cn: 'v.获得；学到' },
     { en: 'adapt', cn: 'v.适应；改编' },
     { en: 'adequate', cn: 'a.充足的；适当的' },
+    { en: 'adjust', cn: 'v.调整；调节' },
     { en: 'administer', cn: 'v.管理；执行' },
-    { en: 'admire', cn: 'v.钦佩；赞赏' },
-    { en: 'adopt', cn: 'v.采纳；收养' },
-    { en: 'adverse', cn: 'a.不利的；相反的' },
     { en: 'advocate', cn: 'v.提倡 n.拥护者' },
     { en: 'aesthetic', cn: 'a.审美的；美学的' },
-    { en: 'afford', cn: 'v.买得起；负担得起' },
-    { en: 'aggravate', cn: 'v.加重；恶化' },
     { en: 'aggregate', cn: 'n.总计 a.合计的' },
-    { en: 'aggressive', cn: 'a.侵略性的；有进取心的' },
-    { en: 'agony', cn: 'n.极度痛苦' },
-    { en: 'alleviate', cn: 'v.减轻；缓和' },
     { en: 'allocate', cn: 'v.分配；配给' },
-    { en: 'alter', cn: 'v.改变；变更' },
     { en: 'ambiguous', cn: 'a.模棱两可的' },
-    { en: 'amend', cn: 'v.修正；修改' },
-    { en: 'amiable', cn: 'a.和蔼的；友好的' },
-    { en: 'analogy', cn: 'n.类比；相似' },
     { en: 'analyze', cn: 'v.分析；解析' },
-    { en: 'anonymous', cn: 'a.匿名的；无名的' },
     { en: 'anticipate', cn: 'v.预期；预料' },
     { en: 'apparent', cn: 'a.明显的；表面的' },
-    { en: 'appeal', cn: 'v.呼吁；吸引 n.恳求' },
-    { en: 'appetite', cn: 'n.食欲；欲望' },
-    { en: 'applaud', cn: 'v.鼓掌；称赞' },
-    { en: 'applicable', cn: 'a.适用的；合适的' },
     { en: 'appreciate', cn: 'v.欣赏；感激' },
     { en: 'approach', cn: 'v.接近 n.方法' },
     { en: 'appropriate', cn: 'a.适当的 v.挪用' },
     { en: 'arbitrary', cn: 'a.任意的；专横的' },
-    { en: 'arouse', cn: 'v.引起；唤醒' },
-    { en: 'ascend', cn: 'v.上升；攀登' },
     { en: 'ascertain', cn: 'v.查明；确定' },
-    { en: 'aspire', cn: 'v.渴望；立志' },
     { en: 'assemble', cn: 'v.集合；装配' },
-    { en: 'assert', cn: 'v.断言；宣称' },
     { en: 'assess', cn: 'v.评估；估价' },
     { en: 'assign', cn: 'v.分配；指派' },
-    { en: 'assimilate', cn: 'v.吸收；同化' },
-    { en: 'associate', cn: 'v.联系；交往' },
     { en: 'assume', cn: 'v.假定；承担' },
-    { en: 'assure', cn: 'v.保证；使确信' },
     { en: 'attain', cn: 'v.达到；获得' },
     { en: 'attribute', cn: 'v.归因于 n.属性' },
     { en: 'authentic', cn: 'a.真实的；可靠的' },
-    { en: 'autonomous', cn: 'a.自治的；自主的' },
-    { en: 'avail', cn: 'v.有用 n.效用' },
-    { en: 'avert', cn: 'v.转移；避免' },
     { en: 'ban', cn: 'v.禁止 n.禁令' },
-    { en: 'bankrupt', cn: 'a.破产的 v.使破产' },
     { en: 'bargain', cn: 'n.交易 v.讨价还价' },
     { en: 'barrier', cn: 'n.障碍；屏障' },
-    { en: 'behalf', cn: 'n.代表；利益' },
     { en: 'beneficial', cn: 'a.有益的；有利的' },
-    { en: 'betray', cn: 'v.背叛；泄露' },
-    { en: 'bias', cn: 'n.偏见 v.使有偏见' },
     { en: 'boost', cn: 'v.促进；提升' },
     { en: 'boundary', cn: 'n.边界；分界线' },
-    { en: 'breed', cn: 'v.繁殖；培育' },
-    { en: 'bribe', cn: 'n.贿赂 v.行贿' },
     { en: 'brilliant', cn: 'a.杰出的；灿烂的' },
-    { en: 'burden', cn: 'n.负担 v.加重压' },
     { en: 'calculate', cn: 'v.计算；推测' },
-    { en: 'campaign', cn: 'n.运动；战役' },
     { en: 'candidate', cn: 'n.候选人；应试者' },
-    { en: 'capable', cn: 'a.有能力的；能干的' },
     { en: 'capacity', cn: 'n.容量；能力' },
-    { en: 'capture', cn: 'v.捕获；俘获' },
-    { en: 'casual', cn: 'a.随便的；偶然的' },
     { en: 'category', cn: 'n.种类；范畴' },
-    { en: 'cease', cn: 'v.停止；终止' },
-    { en: 'ceremony', cn: 'n.仪式；典礼' },
-    { en: 'certificate', cn: 'n.证书；证明' },
     { en: 'challenge', cn: 'n.挑战 v.向...挑战' },
-    { en: 'champion', cn: 'n.冠军 v.支持' },
-    { en: 'chaos', cn: 'n.混乱；无秩序' },
-    { en: 'character', cn: 'n.性格；特征' },
-    { en: 'charge', cn: 'v.充电；收费 n.费用' },
-    { en: 'charity', cn: 'n.慈善；施舍' },
-    { en: 'cherish', cn: 'v.珍惜；珍爱' },
-    { en: 'circulate', cn: 'v.循环；流通' },
     { en: 'circumstance', cn: 'n.情况；环境' },
-    { en: 'claim', cn: 'v.声称；索取' },
     { en: 'clarify', cn: 'v.澄清；阐明' },
-    { en: 'classify', cn: 'v.分类；归类' },
     { en: 'collaborate', cn: 'v.合作；协作' },
-    { en: 'collapse', cn: 'v.倒塌；崩溃' },
-    { en: 'commemorate', cn: 'v.纪念；庆祝' },
-    { en: 'commence', cn: 'v.开始；着手' },
-    { en: 'compatible', cn: 'a.兼容的；相容的' },
-    { en: 'compensate', cn: 'v.补偿；赔偿' },
-    { en: 'compete', cn: 'v.竞争；比赛' },
-    { en: 'compile', cn: 'v.编辑；编制' },
-    { en: 'complaint', cn: 'n.抱怨；投诉' },
     { en: 'complement', cn: 'v.补充 n.补语' },
-    { en: 'complex', cn: 'a.复杂的 n.综合体' },
     { en: 'comply', cn: 'v.遵从；顺从' },
-    { en: 'component', cn: 'n.组成部分；元件' },
-    { en: 'compose', cn: 'v.组成；创作' },
     { en: 'comprehend', cn: 'v.理解；领悟' },
-    { en: 'comprise', cn: 'v.包含；由...组成' },
-    { en: 'conceal', cn: 'v.隐藏；隐瞒' },
-    { en: 'concede', cn: 'v.让步；承认' },
-    { en: 'conceive', cn: 'v.构思；设想' },
-    { en: 'concentrate', cn: 'v.集中；浓缩' },
     { en: 'concept', cn: 'n.概念；观念' },
-    { en: 'concern', cn: 'v.关心；涉及' },
-    { en: 'concise', cn: 'a.简明的；简洁的' },
-    { en: 'condemn', cn: 'v.谴责；判刑' },
-    { en: 'confess', cn: 'v.承认；坦白' },
-    { en: 'confine', cn: 'v.限制；禁闭' },
-    { en: 'confirm', cn: 'v.确认；证实' },
-    { en: 'conflict', cn: 'n.冲突 v.矛盾' },
-    { en: 'conform', cn: 'v.遵从；符合' },
-    { en: 'confront', cn: 'v.面对；对抗' },
-    { en: 'confuse', cn: 'v.使困惑；混淆' },
-    { en: 'congress', cn: 'n.国会；会议' },
-    { en: 'conquer', cn: 'v.征服；战胜' },
-    { en: 'conscience', cn: 'n.良心；道德感' },
-    { en: 'consensus', cn: 'n.共识；一致' },
+    { en: 'conclude', cn: 'v.推断；结束' },
     { en: 'consequence', cn: 'n.结果；后果' },
-    { en: 'conserve', cn: 'v.保存；保守' },
     { en: 'considerable', cn: 'a.相当大的；可观的' },
-    { en: 'consist', cn: 'v.由...组成；在于' },
     { en: 'constitute', cn: 'v.构成；组成' },
-    { en: 'construct', cn: 'v.建造；构造' },
-    { en: 'consult', cn: 'v.咨询；商议' },
     { en: 'consume', cn: 'v.消耗；消费' },
-    { en: 'contemplate', cn: 'v.沉思；考虑' },
     { en: 'contemporary', cn: 'a.当代的；同时代的' },
-    { en: 'contempt', cn: 'n.轻视；蔑视' },
-    { en: 'contend', cn: 'v.竞争；主张' },
-    { en: 'contest', cn: 'n.比赛 v.竞争' },
     { en: 'context', cn: 'n.上下文；背景' },
-    { en: 'contract', cn: 'n.合同 v.收缩' },
-    { en: 'contradict', cn: 'v.反驳；矛盾' },
-    { en: 'contrast', cn: 'n.对比 v.对照' },
     { en: 'contribute', cn: 'v.贡献；捐献' },
-    { en: 'controversy', cn: 'n.争论；争议' },
-    { en: 'convene', cn: 'v.召集；集合' },
     { en: 'convey', cn: 'v.传达；运送' },
     { en: 'convince', cn: 'v.使确信；说服' },
-    { en: 'corporate', cn: 'a.公司的；法人的' },
-    { en: 'correlate', cn: 'v.相关；关联' },
-    { en: 'correspond', cn: 'v.符合；通信' },
-    { en: 'corrupt', cn: 'a.腐败的 v.使腐败' },
-    { en: 'counsel', cn: 'n.忠告 v.劝告' },
-    { en: 'counter', cn: 'v.反对 ad.相反地' },
-    { en: 'courtesy', cn: 'n.礼貌；好意' },
     { en: 'crucial', cn: 'a.至关重要的；关键的' },
     { en: 'cultivate', cn: 'v.培养；耕作' },
-    { en: 'cumulative', cn: 'a.累积的；渐增的' },
-    { en: 'curiosity', cn: 'n.好奇心；珍品' },
-    { en: 'current', cn: 'a.当前的 n.潮流' },
-    { en: 'curriculum', cn: 'n.课程；全部课程' },
-    { en: 'deceive', cn: 'v.欺骗；蒙蔽' },
-    { en: 'declare', cn: 'v.宣布；声明' },
     { en: 'decline', cn: 'v.下降；谢绝' },
     { en: 'dedicate', cn: 'v.奉献；致力于' },
-    { en: 'deduce', cn: 'v.推断；演绎' },
-    { en: 'deficiency', cn: 'n.缺乏；不足' },
     { en: 'define', cn: 'v.定义；阐明' },
-    { en: 'delegates', cn: 'n.代表 v.委派' },
-    { en: 'deliberate', cn: 'a.故意的 v.深思' },
-    { en: 'delicate', cn: 'a.精致的；微妙的' },
     { en: 'demonstrate', cn: 'v.证明；演示' },
-    { en: 'denote', cn: 'v.表示；意味着' },
-    { en: 'denounce', cn: 'v.谴责；告发' },
-    { en: 'depict', cn: 'v.描绘；描述' },
-    { en: 'deprive', cn: 'v.剥夺；使丧失' },
     { en: 'derive', cn: 'v.源于；获得' },
-    { en: 'descend', cn: 'v.下降；遗传' },
     { en: 'deserve', cn: 'v.应得；值得' },
-    { en: 'designate', cn: 'v.指定；任命' },
-    { en: 'despise', cn: 'v.鄙视；蔑视' },
-    { en: 'detect', cn: 'v.察觉；发现' },
-    { en: 'deteriorate', cn: 'v.恶化；变坏' },
     { en: 'determine', cn: 'v.决定；决心' },
-    { en: 'devise', cn: 'v.设计；发明' },
-    { en: 'diminish', cn: 'v.减少；缩小' },
-    { en: 'diplomacy', cn: 'n.外交；策略' },
-    { en: 'discard', cn: 'v.丢弃；抛弃' },
-    { en: 'discern', cn: 'v.辨别；识别' },
     { en: 'discipline', cn: 'n.纪律 v.训练' },
-    { en: 'disclose', cn: 'v.揭露；透露' },
-    { en: 'discount', cn: 'n.折扣 v.打折' },
-    { en: 'discreet', cn: 'a.谨慎的；慎重的' },
-    { en: 'dispute', cn: 'n.争论 v.争论' },
-    { en: 'dissolve', cn: 'v.溶解；解散' },
     { en: 'distinct', cn: 'a.明显的；不同的' },
-    { en: 'distort', cn: 'v.扭曲；歪曲' },
     { en: 'distribute', cn: 'v.分发；分配' },
-    { en: 'divert', cn: 'v.转移；使转向' },
     { en: 'domain', cn: 'n.领域；范围' },
     { en: 'dominate', cn: 'v.统治；支配' },
-    { en: 'donate', cn: 'v.捐赠；捐献' },
-    { en: 'draft', cn: 'n.草稿 v.起草' },
-    { en: 'drastic', cn: 'a.猛烈的；激烈的' },
-    { en: 'dwell', cn: 'v.居住；细想' },
+    { en: 'eliminate', cn: 'v.消除；排除' },
+    { en: 'emerge', cn: 'v.出现；浮现' },
+    { en: 'emphasis', cn: 'n.强调；重点' },
+    { en: 'enhance', cn: 'v.提高；增强' },
+    { en: 'essential', cn: 'a.必要的；本质的' },
+    { en: 'evaluate', cn: 'v.评估；评价' },
+    { en: 'evident', cn: 'a.明显的；显然的' },
+    { en: 'evolve', cn: 'v.进化；演变' },
+    { en: 'exaggerate', cn: 'v.夸大；夸张' },
+    { en: 'exceed', cn: 'v.超过；超出' },
+    { en: 'exclude', cn: 'v.排除；排斥' },
+    { en: 'exhibit', cn: 'v.展览；显示' },
+    { en: 'expand', cn: 'v.扩展；膨胀' },
+    { en: 'exploit', cn: 'v.开发；利用' },
+    { en: 'facilitate', cn: 'v.促进；使便利' },
+    { en: 'fluctuate', cn: 'v.波动；起伏' },
+    { en: 'fundamental', cn: 'a.基本的；根本的' },
+    { en: 'generate', cn: 'v.产生；发生' },
+    { en: 'guarantee', cn: 'n.保证 v.担保' },
+    { en: 'hypothesis', cn: 'n.假设；假说' },
+    { en: 'identify', cn: 'v.识别；认同' },
+    { en: 'implement', cn: 'v.实施 n.工具' },
+    { en: 'imply', cn: 'v.暗示；意味' },
+    { en: 'indicate', cn: 'v.指出；表明' },
+    { en: 'inevitable', cn: 'a.不可避免的；必然的' },
+    { en: 'initiate', cn: 'v.发起；开始' },
+    { en: 'innovate', cn: 'v.创新；改革' },
+    { en: 'integrate', cn: 'v.整合；融入' },
+    { en: 'interpret', cn: 'v.解释；口译' },
+    { en: 'investigate', cn: 'v.调查；研究' },
+    { en: 'justify', cn: 'v.证明...正当；辩解' },
+    { en: 'launch', cn: 'v.发射；发起' },
+    { en: 'manifest', cn: 'v.表明 a.明显的' },
+    { en: 'manipulate', cn: 'v.操纵；操作' },
+    { en: 'modify', cn: 'v.修改；调整' },
+    { en: 'negotiate', cn: 'v.谈判；协商' },
+    { en: 'obstacle', cn: 'n.障碍；阻碍' },
+    { en: 'obtain', cn: 'v.获得；得到' },
+    { en: 'participate', cn: 'v.参加；参与' },
+    { en: 'perceive', cn: 'v.察觉；理解' },
+    { en: 'persist', cn: 'v.坚持；持续' },
+    { en: 'phenomenon', cn: 'n.现象；奇迹' },
+    { en: 'preserve', cn: 'v.保存；保护' },
+    { en: 'prevail', cn: 'v.盛行；获胜' },
+    { en: 'priority', cn: 'n.优先；优先权' },
+    { en: 'profound', cn: 'a.深刻的；深远的' },
+    { en: 'promote', cn: 'v.促进；提升' },
+    { en: 'prosperity', cn: 'n.繁荣；兴旺' },
+    { en: 'pursue', cn: 'v.追求；追逐' },
+    { en: 'qualify', cn: 'v.取得资格；限定' },
+    { en: 'reinforce', cn: 'v.加强；增援' },
+    { en: 'release', cn: 'v.释放；发布' },
+    { en: 'relevant', cn: 'a.相关的；切题的' },
+    { en: 'reluctant', cn: 'a.不情愿的；勉强的' },
+    { en: 'resemble', cn: 'v.相似；类似于' },
+    { en: 'resolve', cn: 'v.解决；决心' },
+    { en: 'restrict', cn: 'v.限制；约束' },
+    { en: 'retain', cn: 'v.保持；保留' },
+    { en: 'reveal', cn: 'v.揭示；透露' },
+    { en: 'secure', cn: 'a.安全的 v.获得' },
+    { en: 'significant', cn: 'a.重要的；有意义的' },
+    { en: 'simulate', cn: 'v.模拟；模仿' },
+    { en: 'sophisticated', cn: 'a.复杂的；老练的' },
+    { en: 'stimulate', cn: 'v.刺激；激励' },
+    { en: 'subsequent', cn: 'a.随后的；后来的' },
+    { en: 'substance', cn: 'n.物质；实质' },
+    { en: 'sustain', cn: 'v.维持；承受' },
+    { en: 'tackle', cn: 'v.处理；解决' },
+    { en: 'tend', cn: 'v.倾向于；趋于' },
+    { en: 'transform', cn: 'v.转变；改造' },
+    { en: 'transmit', cn: 'v.传输；传递' },
+    { en: 'ultimate', cn: 'a.最终的；极限的' },
+    { en: 'undermine', cn: 'v.破坏；削弱' },
+    { en: 'utilize', cn: 'v.利用；使用' },
+    { en: 'vary', cn: 'v.变化；改变' },
+    { en: 'violate', cn: 'v.违反；侵犯' },
+    { en: 'yield', cn: 'v.屈服；产生 n.产量' }
   ],
 
   _shuffled: [],
@@ -5646,11 +5589,18 @@ const EnglishVocab = {
   render() {
     const taoCount = this._getCount('TAO');
     const yanCount = this._getCount('YAN');
+    const goal = this.DAILY_GOAL;
 
     const taoEl = document.getElementById('vocabCountTAO');
     const yanEl = document.getElementById('vocabCountYAN');
-    if (taoEl) taoEl.textContent = taoCount;
-    if (yanEl) yanEl.textContent = yanCount;
+    if (taoEl) taoEl.textContent = `${taoCount}/${goal}`;
+    if (yanEl) yanEl.textContent = `${yanCount}/${goal}`;
+
+    // 状态栏：两个角色都完成100词时显示绿色"已完成"
+    const taoStat = document.querySelector('.vocab-stat.tao-stat');
+    const yanStat = document.querySelector('.vocab-stat.yan-stat');
+    if (taoStat) taoStat.classList.toggle('vocab-done', taoCount >= goal);
+    if (yanStat) yanStat.classList.toggle('vocab-done', yanCount >= goal);
 
     // 如果当前正在刷词中，不重置
     if (this._currentIndex > 0 && this._shuffled.length > 0) return;
@@ -5659,32 +5609,42 @@ const EnglishVocab = {
     const myCount = this._getCount(myRole);
     const startBtn = document.getElementById('vocabStartBtn');
     if (startBtn) {
-      startBtn.textContent = myCount > 0 ? '继续刷词' : '开始刷词';
+      if (myCount >= goal) {
+        startBtn.textContent = '已完成今日100词，再刷一批';
+      } else if (myCount > 0) {
+        startBtn.textContent = `继续刷词 (${myCount}/${goal})`;
+      } else {
+        startBtn.textContent = '开始刷词';
+      }
     }
   },
 
   start() {
     const myRole = App.currentRole;
+    const goal = this.DAILY_GOAL;
 
-    // 恢复或创建乱序列表
+    // 恢复或创建当日100词批次
     let savedProgress = this._getProgress(myRole);
     if (savedProgress && savedProgress.length > 0) {
       this._shuffled = savedProgress.map(i => this.WORD_LIST[i]);
       this._currentIndex = this._getCount(myRole);
-      if (this._currentIndex >= this._shuffled.length) {
-        // 已刷完所有单词，重新开始
-        const shuffledIndices = this._shuffle(this.WORD_LIST.map((_, i) => i));
-        this._shuffled = shuffledIndices.map(i => this.WORD_LIST[i]);
+      if (this._currentIndex >= goal) {
+        // 今日100词已刷完，重新生成新一批
+        const allIndices = this.WORD_LIST.map((_, i) => i);
+        const batch = this._shuffle(allIndices).slice(0, goal);
+        this._shuffled = batch.map(i => this.WORD_LIST[i]);
         this._currentIndex = 0;
         this._setCount(myRole, 0);
-        this._setProgress(myRole, shuffledIndices);
+        this._setProgress(myRole, batch);
       }
     } else {
-      const shuffledIndices = this._shuffle(this.WORD_LIST.map((_, i) => i));
-      this._shuffled = shuffledIndices.map(i => this.WORD_LIST[i]);
+      // 从全词库中随机抽取100词作为今日批次
+      const allIndices = this.WORD_LIST.map((_, i) => i);
+      const batch = this._shuffle(allIndices).slice(0, goal);
+      this._shuffled = batch.map(i => this.WORD_LIST[i]);
       this._currentIndex = 0;
       this._setCount(myRole, 0);
-      this._setProgress(myRole, shuffledIndices);
+      this._setProgress(myRole, batch);
     }
 
     this._showingMeaning = false;
@@ -5697,7 +5657,7 @@ const EnglishVocab = {
   },
 
   _showWord() {
-    if (this._currentIndex >= this._shuffled.length) {
+    if (this._currentIndex >= this.DAILY_GOAL) {
       this._finishAll();
       return;
     }
@@ -5711,7 +5671,7 @@ const EnglishVocab = {
     meaningEl.textContent = word.cn;
 
     document.getElementById('vocabWordIndex').textContent =
-      `第 ${this._currentIndex + 1} / ${this._shuffled.length} 词`;
+      `第 ${this._currentIndex + 1} / ${this.DAILY_GOAL} 词`;
 
     // 重置按钮状态
     const knowBtn = document.querySelector('.know-btn');
@@ -5721,7 +5681,7 @@ const EnglishVocab = {
   },
 
   know() {
-    if (this._currentIndex >= this._shuffled.length) return;
+    if (this._currentIndex >= this.DAILY_GOAL) return;
 
     // 认识 → 自动过渡到下一个单词
     this._currentIndex++;
@@ -5741,7 +5701,7 @@ const EnglishVocab = {
   },
 
   forget() {
-    if (this._currentIndex >= this._shuffled.length) return;
+    if (this._currentIndex >= this.DAILY_GOAL) return;
 
     if (!this._showingMeaning) {
       // 显示中文词意
@@ -5768,17 +5728,22 @@ const EnglishVocab = {
   },
 
   _finishAll() {
+    const myRole = App.currentRole;
+    const goal = this.DAILY_GOAL;
+
+    // 保持已完成的计数（不重置为0）
+    this._setCount(myRole, goal);
+    this.render();
+
     document.getElementById('vocabWordArea').style.display = 'none';
     document.getElementById('vocabControls').style.display = 'none';
     document.getElementById('vocabPlaceholder').style.display = '';
-    document.getElementById('vocabPlaceholder').innerHTML = '🎉 今日全部单词已刷完！<br>点击下方按钮重新开始';
+    document.getElementById('vocabPlaceholder').innerHTML = '✅ 今日100词已完成！<br>点击下方按钮再刷一批';
     document.getElementById('vocabStartBtn').style.display = '';
-    document.getElementById('vocabStartBtn').textContent = '重新开始';
-    showToast('🎉 全部单词刷完！');
+    document.getElementById('vocabStartBtn').textContent = '已完成今日100词，再刷一批';
+    showToast('✅ 今日100词刷完！');
 
-    // 重置进度
-    const myRole = App.currentRole;
-    this._setCount(myRole, 0);
+    // 重置当前批次（下次开始会抽取新一批100词）
     this._setProgress(myRole, null);
     this._shuffled = [];
     this._currentIndex = 0;

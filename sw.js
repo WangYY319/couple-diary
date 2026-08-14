@@ -1,10 +1,11 @@
 /* TAO & YAN 相处日记 - Service Worker */
-const CACHE_NAME = 'couple-pwa-v47';
+const CACHE_NAME = 'couple-pwa-v48';
 const URLS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './vocab-data.js',
   './manifest.json',
   './img/favicon.svg'
 ];
