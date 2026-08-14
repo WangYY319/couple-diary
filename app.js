@@ -1053,6 +1053,8 @@ const App = {
     HotNews.init();
     LetterBox.init();
     ExerciseTime.init();
+    HistoryCard.init();
+    GeoCard.init();
     // 首页在线时长统计
     OnlineDuration.refresh();
     // 首页在线状态刷新
@@ -2823,6 +2825,8 @@ const TabNav = {
       PoemCard.init();
       LifeTip.init();
       Joke.init();
+      HistoryCard.init();
+      GeoCard.init();
     }
     // 切换到记录页时刷新爱心状态
     if (tabIndex === 1) { Cards.renderGreet(); Photos.render(); LetterBox.updateBadges(); }
@@ -5878,6 +5882,256 @@ const Joke = {
     const el = document.getElementById('jokeContent');
     if (!el) return;
     el.textContent = this.JOKES[this._currentIndex];
+  }
+};
+
+// ====== 历史文化模块 ======
+const HistoryCard = {
+  // 中国历史人物与事件（每条不超过30字）
+  HISTORY: [
+    '秦始皇统一六国，建立首个中央集权王朝。',
+    '汉武帝罢黜百家独尊儒术，开拓丝绸之路。',
+    '唐太宗李世民开创贞观之治，国力鼎盛。',
+    '武则天是中国历史上唯一的正统女皇帝。',
+    '宋太祖赵匡胤杯酒释兵权，结束五代乱局。',
+    '成吉思汗统一蒙古各部，建立横跨欧亚帝国。',
+    '明太祖朱元璋出身贫农，驱逐元朝建大明。',
+    '康熙帝平三藩收台湾，开创康乾盛世。',
+    '孔子创立儒家学说，被尊为万世师表。',
+    '老子著《道德经》，道家思想影响深远。',
+    '孙武著《孙子兵法》，被誉为兵学圣典。',
+    '屈原投汨罗江殉国，端午节由此而来。',
+    '司马迁忍辱著《史记》，开创纪传体通史。',
+    '诸葛亮鞠躬尽瘁死而后已，忠臣典范。',
+    '李白被誉诗仙，斗酒诗百篇传颂千古。',
+    '杜甫被尊诗圣，记录安史之乱民间疾苦。',
+    '苏轼诗词书画皆绝，宋代文坛泰斗。',
+    '王羲之兰亭集序被誉为天下第一行书。',
+    '毕昇发明活字印刷术，推动文明传播。',
+    '蔡伦改进造纸术，改变人类书写历史。',
+    '郑和七下西洋，展示明朝国威于海外。',
+    '张骞出使西域，开辟丝绸之路连接东西方。',
+    '大禹治水三过家门不入，传为佳话。',
+    '商鞅变法使秦国强大，为统一奠定基础。',
+    '霍去病封狼居胥，少年将军击退匈奴。',
+    '岳飞精忠报国抗金，写下满江红传世。',
+    '文天祥留取丹心照汗青，宁死不降元。',
+    '林则徐虎门销烟，拉开近代反侵略序幕。',
+    '辛亥革命推翻帝制，孙中山就任临时大总统。',
+    '五四运动爆发，新文化运动推向高潮。',
+    '红军长征两万五千里，铸就革命精神。',
+    '商汤伐桀建立商朝，开创以德治国先例。',
+    '武王伐纣牧野之战，周朝建立分封天下。',
+    '春秋五霸争雄，齐桓公晋文公称霸中原。',
+    '战国七雄并立，合纵连横谋略频出。',
+    '陈胜吴广揭竿而起，中国首次农民起义。',
+    '楚汉相争项羽败亡，刘邦建立汉朝。',
+    '王莽篡汉改制失败，绿林赤眉起义蜂起。',
+    '三国鼎立魏蜀吴，曹操刘备孙权争霸。',
+    '西晋统一三国，八王之乱致五胡乱华。',
+    '隋文帝统一南北，开创开皇之治盛世。',
+    '隋炀帝开凿大运河，贯通南北水路交通。',
+    '玄武门之变李世民夺位，开启贞观盛世。',
+    '安史之乱由盛转衰，唐朝由巅峰走向没落。',
+    '王安石变法图强，新旧党争耗尽国力。',
+    '靖康之变北宋灭亡，徽钦二帝被掳北上。',
+    '元世祖忽必烈建元朝，推行行省制度。',
+    '靖难之役朱棣夺位，迁都北京建紫禁城。',
+    '土木堡之变英宗被俘，于谦力挽狂澜守北京。',
+    '努尔哈赤建后金，萨尔浒之战大败明军。',
+    '鸦片战争爆发，中国沦为半殖民地社会。',
+    '甲午中日战争北洋水师覆灭，签马关条约。',
+    '戊戌变法百日维新失败，六君子就义。',
+    '义和团运动兴起，八国联军侵华签辛丑条约。',
+    '秦始皇修筑长城，抵御北方匈奴入侵。',
+    '曹植七步成诗，才高八斗传为美谈。',
+    '范仲淹先天下之忧而忧，士大夫精神典范。',
+    '包拯铁面无私断案，被誉包青天。',
+    '戚继光抗倭东南沿海，戚家军威名远扬。',
+    '郑成功收复台湾，驱逐荷兰殖民者。',
+    '李时珍著《本草纲目》，中医药学集大成。',
+    '徐霞客游历天下，著《徐霞客游记》。',
+  ],
+
+  _currentIndex: 0,
+
+  _seededShuffle(arr, seed) {
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+    const rng = () => { h = (h * 9301 + 49297) % 233280; return h / 233280; };
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  },
+
+  init() {
+    const dateStr = todayStr();
+    const cached = Store.get(`history_${dateStr}`, null);
+    if (cached !== null && cached >= 0 && cached < this.HISTORY.length) {
+      this._currentIndex = cached;
+    } else {
+      const indices = this._seededShuffle(
+        this.HISTORY.map((_, i) => i),
+        dateStr
+      );
+      const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const yesterdayCache = Store.get(`history_${yesterdayStr}`, null);
+      let yesterdayIndex = -1;
+      if (yesterdayCache !== null && yesterdayCache >= 0) {
+        yesterdayIndex = yesterdayCache;
+      }
+      this._currentIndex = indices.find(i => i !== yesterdayIndex) ?? indices[0];
+      Store.set(`history_${dateStr}`, this._currentIndex);
+    }
+    this._render();
+  },
+
+  refresh() {
+    if (this.HISTORY.length <= 1) {
+      this._currentIndex = 0;
+    } else {
+      let idx;
+      do {
+        idx = Math.floor(Math.random() * this.HISTORY.length);
+      } while (idx === this._currentIndex);
+      this._currentIndex = idx;
+    }
+    const dateStr = todayStr();
+    Store.set(`history_${dateStr}`, this._currentIndex);
+    this._render();
+    showToast('已换一条新历史 🏛️');
+  },
+
+  _render() {
+    const el = document.getElementById('historyContent');
+    if (!el) return;
+    el.textContent = this.HISTORY[this._currentIndex] || this.HISTORY[0];
+  }
+};
+
+// ====== 地理知识模块 ======
+const GeoCard = {
+  // 中国地貌与旅游景点（每条不超过30字）
+  GEO: [
+    '珠穆朗玛峰海拔8848米，世界最高峰。',
+    '长江全长6300公里，中国第一大河。',
+    '黄河被誉为母亲河，中华文明发源地。',
+    '青藏高原被称为世界屋脊，平均海拔4500米。',
+    '塔克拉玛干沙漠是中国最大沙漠。',
+    '桂林山水甲天下，喀斯特地貌闻名世界。',
+    '黄山以奇松怪石云海温泉四绝著称。',
+    '九寨沟五彩池水色变幻如人间仙境。',
+    '张家界石柱林立，电影阿凡达取景地。',
+    '长城东起山海关西至嘉峪关绵延万里。',
+    '故宫占地72万平方米，世界最大宫殿群。',
+    '兵马俑被誉为世界第八大奇迹。',
+    '莫高窟壁画飞天，丝路艺术宝库。',
+    '布达拉宫矗立红山之巅，藏传佛教圣地。',
+    '泰山被尊为五岳之首，历代帝王封禅。',
+    '华山以险著称，长空栈道惊心动魄。',
+    '峨眉山金顶云海日出，佛教名山之一。',
+    '青海湖是中国最大内陆咸水湖。',
+    '鄱阳湖是中国最大淡水湖候鸟天堂。',
+    '壶口瀑布黄河奔腾，气势磅礴壮观。',
+    '黄果树瀑布是中国最大的瀑布。',
+    '三峡大坝是世界最大水利枢纽工程。',
+    '丹霞地貌以广东丹霞山命名色彩斑斓。',
+    '张家界天门山玻璃栈道惊险刺激。',
+    '丽江古城纳西风情，世界文化遗产。',
+    '稻城亚丁三座神山被称为最后的香格里拉。',
+    '喀纳斯湖神秘水怪传说吸引无数游客。',
+    '长白山天池火山口湖，中朝界湖。',
+    '呼伦贝尔大草原是中国最美草原之一。',
+    '纳木错是西藏三大圣湖之一海拔最高。',
+    '雅鲁藏布大峡谷是世界最深峡谷。',
+    '乐山大佛依山而刻，世界最大石佛。',
+    '龙门石窟洛阳石刻艺术宝库。',
+    '云冈石窟大同北魏佛教艺术杰作。',
+    '武夷山丹霞碧水，茶文化与自然融合。',
+    '三清山花岗岩奇峰云雾缭绕如仙境。',
+    '梵净山蘑菇石奇观，佛教弥勒道场。',
+    '可可西里无人区藏羚羊的家园。',
+    '怒江大峡谷仅次于雅鲁藏布大峡谷。',
+    '月牙泉鸣沙山沙漠中的千年绿洲奇迹。',
+    '敦煌月牙泉沙漠绿洲千年不涸之谜。',
+    '衡山南岳独秀，五岳之一风景秀丽。',
+    '嵩山少林寺武术发源地中岳嵩山。',
+    '恒山悬空寺建在悬崖峭壁上北岳。',
+    '武当山道教圣地太极发源地。',
+    '普陀山观音道场海天佛国。',
+    '五台山文殊菩萨道场佛教圣地。',
+    '九华山地藏菩萨道场莲花佛国。',
+    '峨眉山普贤菩萨道场佛光云海。',
+    '西双版纳热带雨林傣族风情浓郁。',
+    '香格里拉梅里雪山日照金山震撼人心。',
+    '额济纳胡杨林千年不死不朽壮美。',
+    '荔波小七孔喀斯特水上森林绿宝石。',
+    '张掖丹霞地貌七彩山峦如油画。',
+    '恩施大峡谷湖北地质奇观绝壁天坑。',
+    '神农架原始森林神秘传说野人之谜。',
+    '镜泊湖火山堰塞湖吊水楼瀑布壮观。',
+    '趵突泉济南天下第一泉三股水涌。',
+  ],
+
+  _currentIndex: 0,
+
+  _seededShuffle(arr, seed) {
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+    const rng = () => { h = (h * 9301 + 49297) % 233280; return h / 233280; };
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  },
+
+  init() {
+    const dateStr = todayStr();
+    const cached = Store.get(`geo_${dateStr}`, null);
+    if (cached !== null && cached >= 0 && cached < this.GEO.length) {
+      this._currentIndex = cached;
+    } else {
+      const indices = this._seededShuffle(
+        this.GEO.map((_, i) => i),
+        dateStr
+      );
+      const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const yesterdayCache = Store.get(`geo_${yesterdayStr}`, null);
+      let yesterdayIndex = -1;
+      if (yesterdayCache !== null && yesterdayCache >= 0) {
+        yesterdayIndex = yesterdayCache;
+      }
+      this._currentIndex = indices.find(i => i !== yesterdayIndex) ?? indices[0];
+      Store.set(`geo_${dateStr}`, this._currentIndex);
+    }
+    this._render();
+  },
+
+  refresh() {
+    if (this.GEO.length <= 1) {
+      this._currentIndex = 0;
+    } else {
+      let idx;
+      do {
+        idx = Math.floor(Math.random() * this.GEO.length);
+      } while (idx === this._currentIndex);
+      this._currentIndex = idx;
+    }
+    const dateStr = todayStr();
+    Store.set(`geo_${dateStr}`, this._currentIndex);
+    this._render();
+    showToast('已换一条新地理 🗺️');
+  },
+
+  _render() {
+    const el = document.getElementById('geoContent');
+    if (!el) return;
+    el.textContent = this.GEO[this._currentIndex] || this.GEO[0];
   }
 };
 

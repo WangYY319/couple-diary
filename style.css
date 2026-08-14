@@ -4150,6 +4150,84 @@ html, body {
 }
 
 /* ============================
+   历史文化
+   ============================ */
+.history-content {
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px 8px;
+  color: var(--text-main);
+}
+
+.history-card { position: relative; padding-bottom: 48px; }
+
+.history-refresh-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--theme-light);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  z-index: 2;
+}
+
+.history-refresh-btn:hover {
+  background: var(--theme-primary);
+  color: #fff;
+  transform: rotate(180deg) scale(1.05);
+}
+
+/* ============================
+   地理知识
+   ============================ */
+.geo-content {
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px 8px;
+  color: var(--text-main);
+}
+
+.geo-card { position: relative; padding-bottom: 48px; }
+
+.geo-refresh-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--theme-light);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  z-index: 2;
+}
+
+.geo-refresh-btn:hover {
+  background: var(--theme-primary);
+  color: #fff;
+  transform: rotate(180deg) scale(1.05);
+}
+
+/* ============================
    生活常识
    ============================ */
 .life-tip-content {
