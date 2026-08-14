@@ -1591,6 +1591,86 @@ html, body {
   margin-bottom: 4px;
 }
 
+/* === 导出面板 === */
+.export-panel-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 10001;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.export-panel-overlay.show { display: flex; }
+
+.export-panel-modal {
+  width: 100%; max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  animation: sheetUp 0.3s ease;
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.export-panel-title {
+  font-size: 18px; font-weight: 800;
+  text-align: center; margin-bottom: 16px;
+  color: var(--text-main);
+}
+
+.export-section {
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  background: var(--theme-bg);
+}
+
+.export-section-title {
+  font-size: 15px; font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.export-section-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.export-date-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.export-date-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #e0e0e8;
+  border-radius: 8px;
+  font-size: 13px;
+  max-width: 120px;
+}
+
+.export-btn-row {
+  display: flex;
+  gap: 8px;
+}
+
+.export-btn-row .setting-btn {
+  flex: 1;
+}
+
 /* === 设置弹窗：切换角色按钮 === */
 .setting-role-btns {
   display: flex; gap: 10px; margin-top: 4px;
@@ -3345,11 +3425,11 @@ html, body {
 }
 
 .voice-list {
-  max-height: 240px;
+  max-height: 220px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   padding: 4px 2px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
@@ -4483,16 +4563,16 @@ html, body {
 
 .voice-bubble {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 12px;
-  border-radius: 16px;
-  margin: 4px 0;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 14px;
+  margin: 3px 0;
   background: rgba(255,255,255,0.7);
-  cursor: default;
+  cursor: pointer;
   transition: all 0.2s;
-  font-size: 13px;
-  max-width: 75%;
+  font-size: 12px;
+  max-width: 72%;
   position: relative;
 }
 
@@ -4501,15 +4581,15 @@ html, body {
   align-self: flex-start;
   margin-right: auto;
   border-left: 3px solid #1b7fe3;
-  border-radius: 16px 16px 16px 4px;
+  border-radius: 14px 14px 14px 4px;
 }
 
 .voice-bubble.right {
   align-self: flex-end;
   margin-left: auto;
   border-right: 3px solid #e8296a;
-  border-radius: 16px 16px 4px 16px;
-  text-align: right;
+  border-radius: 14px 14px 4px 14px;
+  flex-direction: row-reverse;
 }
 
 .voice-bubble.tao {
@@ -4520,41 +4600,19 @@ html, body {
   background: linear-gradient(135deg, rgba(232,41,106,0.08), rgba(232,41,106,0.03));
 }
 
-.voice-bubble-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.voice-bubble.right .voice-bubble-header {
-  justify-content: flex-end;
-}
-
-.voice-bubble-body {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 4px 0;
-  transition: transform 0.15s;
-}
-
-.voice-bubble.right .voice-bubble-body {
-  flex-direction: row-reverse;
-}
-
-.voice-bubble-body:active {
+.voice-bubble:active {
   transform: scale(0.97);
 }
 
 /* 播放进度条 */
 .voice-progress-bar {
   flex: 1;
-  height: 4px;
+  height: 3px;
   border-radius: 2px;
   background: rgba(0,0,0,0.08);
   overflow: hidden;
-  min-width: 60px;
+  min-width: 50px;
+  max-width: 80px;
 }
 
 .voice-progress-fill {
@@ -4569,11 +4627,11 @@ html, body {
 
 /* 播放按钮：只有播放按钮有颜色变化 */
 .voice-play-icon {
-  font-size: 16px;
+  font-size: 12px;
   color: #999;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;

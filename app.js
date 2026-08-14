@@ -4536,17 +4536,11 @@ const VoiceRecord = {
           const progress = this._playProgress || 0;
           progressBar = `<div class="voice-progress-bar"><div class="voice-progress-fill" style="width:${progress}%"></div></div>`;
         }
-        html += `<div class="voice-bubble ${roleColor} ${bubbleSide}${isPlaying ? ' playing' : ''}">
-          <div class="voice-bubble-header">
-            <span class="voice-role-tag ${roleColor}">${v.role}</span>
-            <span class="voice-duration">${v.duration}s</span>
-            <span class="voice-time">${timeStr}</span>
-            ${unreadDot}
-          </div>
-          <div class="voice-bubble-body" onclick="VoiceRecord.play(${idx})">
-            ${progressBar}
-            <span class="voice-play-icon${isPlaying ? ' active' : ''}">${isPlaying ? '⏸' : '▶'}</span>
-          </div>
+        html += `<div class="voice-bubble ${roleColor} ${bubbleSide}${isPlaying ? ' playing' : ''}" onclick="VoiceRecord.play(${idx})">
+          <span class="voice-play-icon${isPlaying ? ' active' : ''}">${isPlaying ? '⏸' : '▶'}</span>
+          ${isPlaying ? progressBar : `<span class="voice-duration">${v.duration}s</span>`}
+          <span class="voice-time">${timeStr}</span>
+          ${unreadDot}
         </div>`;
       });
       html += '</div>';
@@ -6377,9 +6371,33 @@ const Pomodoro = {
   _timer: null,
 
   init() {
+    this._checkWeeklyReset();
     this._remaining = this.DURATION;
     this._updateDisplay();
     this._renderStats();
+  },
+
+  // 每周一重置：检查是否进入了新的一周
+  _checkWeeklyReset() {
+    const today = new Date();
+    const dayOfWeek = today.getDay() || 7; // 周日=7
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - dayOfWeek + 1);
+    monday.setHours(0, 0, 0, 0);
+    const weekKey = monday.getFullYear() + '-' + (monday.getMonth() + 1) + '-' + monday.getDate();
+    const savedWeek = Store.get('pomodoro_week_key', '');
+    if (savedWeek !== weekKey) {
+      // 新的一周，重置计数
+      Store.set('pomodoro_count', { tao: 0, yan: 0 });
+      Store.set('pomodoro_week_key', weekKey);
+      // 同时清理过期的历史记录（保留本周的）
+      const history = Store.get('pomodoro_history', {});
+      const weekStartStr = weekKey;
+      Object.keys(history).forEach(dateStr => {
+        if (dateStr < weekStartStr) delete history[dateStr];
+      });
+      Store.set('pomodoro_history', history);
+    }
   },
 
   toggle() {
@@ -6440,9 +6458,10 @@ const Pomodoro = {
     const hint = document.getElementById('pomodoroHint');
     if (hint) hint.textContent = '完成一个番茄！休息一下吧 🎉';
 
-    // 统计：当前角色 +1
+    // 统计：当前角色 +1（先检查是否需要每周重置）
     const role = App.currentRole;
     if (role) {
+      this._checkWeeklyReset();
       const data = Store.get('pomodoro_count', { tao: 0, yan: 0 });
       data[role.toLowerCase()] = (data[role.toLowerCase()] || 0) + 1;
       Store.set('pomodoro_count', data);
@@ -8048,6 +8067,363 @@ const LetterBox = {
       timestamp: cl.timestamp || 0,
       readBy: cl.readBy || {}
     };
+  }
+};
+
+// ====== 一键导出面板模块 ======
+const ExportPanel = {
+
+  open() {
+    const overlay = document.getElementById('exportPanelOverlay');
+    if (!overlay) return;
+    // 默认日期为今天
+    const today = todayStr();
+    const ls = document.getElementById('exportLetterStart');
+    const le = document.getElementById('exportLetterEnd');
+    const cs = document.getElementById('exportCheckinStart');
+    const ce = document.getElementById('exportCheckinEnd');
+    if (ls && !ls.value) ls.value = today;
+    if (le && !le.value) le.value = today;
+    if (cs && !cs.value) cs.value = today;
+    if (ce && !ce.value) ce.value = today;
+    overlay.classList.add('show');
+  },
+
+  close(ev) {
+    if (ev && ev.target !== ev.currentTarget) return;
+    document.getElementById('exportPanelOverlay').classList.remove('show');
+  },
+
+  // 第一部分：导出全部照片
+  async exportPhotos() {
+    if (!Photos.photos || Photos.photos.length === 0) {
+      showToast('暂无照片可导出');
+      return;
+    }
+    showToast(`正在导出 ${Photos.photos.length} 张照片...`);
+    // 逐张下载
+    for (let i = 0; i < Photos.photos.length; i++) {
+      const p = Photos.photos[i];
+      try {
+        let blob = p.blob;
+        if (!blob && p.dataUrl) {
+          const res = await fetch(p.dataUrl);
+          blob = await res.blob();
+        }
+        if (!blob) continue;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const ext = blob.type && blob.type.split('/')[1] ? blob.type.split('/')[1] : 'jpg';
+        a.download = `照片_${i + 1}_${p.date || todayStr()}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        // 间隔避免浏览器拦截
+        await new Promise(r => setTimeout(r, 300));
+      } catch (e) {
+        console.warn('export photo error', e);
+      }
+    }
+    showToast('照片导出完成 📷');
+  },
+
+  // 第二部分：信件导出（可按日期范围）
+  exportLetters(mode) {
+    if (!LetterBox.letters || LetterBox.letters.length === 0) {
+      showToast('还没有信件可以导出');
+      return;
+    }
+    const startVal = document.getElementById('exportLetterStart').value;
+    const endVal = document.getElementById('exportLetterEnd').value;
+    let filtered = LetterBox.letters;
+    if (startVal && endVal) {
+      filtered = filtered.filter(l => l.date >= startVal && l.date <= endVal);
+    }
+    if (filtered.length === 0) {
+      showToast('所选日期范围内无信件');
+      return;
+    }
+    const sorted = [...filtered].sort((a, b) => b.timestamp - a.timestamp);
+    let text = 'TAO & YAN 信件合集\n';
+    text += `导出日期: ${todayStr()}\n`;
+    if (startVal && endVal) text += `日期范围: ${startVal} 至 ${endVal}\n`;
+    text += `信件总数: ${sorted.length}\n`;
+    text += '='.repeat(30) + '\n\n';
+    sorted.forEach((l, i) => {
+      text += `【第${i + 1}封】\n`;
+      text += `来自: ${l.from}\n`;
+      text += `致: ${l.to}\n`;
+      text += `日期: ${l.date}\n`;
+      text += `内容: ${l.content}\n`;
+      text += '-'.repeat(20) + '\n\n';
+    });
+
+    if (mode === 'share') {
+      if (navigator.share) {
+        navigator.share({ title: 'TAO & YAN 信件合集', text: text }).catch(() => {});
+      } else {
+        this._copyToClipboard(text, '信件内容已复制');
+      }
+    } else {
+      this._downloadText(text, `TAO_YAN_信件合集_${startVal || '全部'}.txt`);
+      showToast('信件已导出 📧');
+    }
+  },
+
+  // 第三部分：打卡导出（复用 Share.exportRange 逻辑）
+  exportCheckin(mode) {
+    const startVal = document.getElementById('exportCheckinStart').value;
+    const endVal = document.getElementById('exportCheckinEnd').value;
+    if (!startVal || !endVal) {
+      showToast('请先选择起止日期');
+      return;
+    }
+    if (startVal > endVal) {
+      showToast('开始日期不能晚于结束日期');
+      return;
+    }
+
+    const dates = [];
+    let cur = new Date(startVal);
+    const end = new Date(endVal);
+    while (cur <= end) {
+      const ds = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+      dates.push(ds);
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    let exportText = `TAO & YAN 相处日记\n`;
+    exportText += `导出范围：${startVal} 至 ${endVal}\n`;
+    exportText += `${'='.repeat(40)}\n\n`;
+    let hasAnyData = false;
+    dates.forEach(ds => {
+      const data = Store.getDay(ds);
+      if (!data) return;
+      const d = new Date(ds);
+      const dateCN = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+      let dayText = `📅 ${dateCN}\n`;
+      let dayHasData = false;
+      if (data.greet && (data.greet.tao || data.greet.yan)) {
+        dayText += `  ❤️ 爱心打卡：${data.greet.tao ? '✓' : '○'}TAO ${data.greet.yan ? '✓' : '○'}YAN\n`;
+        dayHasData = true;
+      }
+      if (data.words && (data.words.tao || data.words.yan)) {
+        dayText += `  💬 打卡语录：\n`;
+        if (data.words.tao) dayText += `    TAO: ${data.words.tao}\n`;
+        if (data.words.yan) dayText += `    YAN: ${data.words.yan}\n`;
+        dayHasData = true;
+      }
+      if (data.wish && (data.wish.tao || data.wish.yan)) {
+        dayText += `  🌟 打卡愿望：\n`;
+        if (data.wish.tao) dayText += `    TAO: ${data.wish.tao}\n`;
+        if (data.wish.yan) dayText += `    YAN: ${data.wish.yan}\n`;
+        dayHasData = true;
+      }
+      if (data.night && (data.night.tao || data.night.yan)) {
+        dayText += `  ✨ 晚安打卡：${data.night.tao ? '✓' : '○'}TAO ${data.night.yan ? '✓' : '○'}YAN\n`;
+        dayHasData = true;
+      }
+      const exerciseData = Store.get('exercise_time', {});
+      if (exerciseData[ds]) {
+        dayText += `  💪 运动健身：TAO ${exerciseData[ds].tao || 0}分钟 / YAN ${exerciseData[ds].yan || 0}分钟\n`;
+        dayHasData = true;
+      }
+      const vocabTAO = Store.get(`vocab_count_${ds}_TAO`, 0);
+      const vocabYAN = Store.get(`vocab_count_${ds}_YAN`, 0);
+      if (vocabTAO > 0 || vocabYAN > 0) {
+        dayText += `  📚 英语刷词：TAO ${vocabTAO}词 / YAN ${vocabYAN}词\n`;
+        dayHasData = true;
+      }
+      if (dayHasData) {
+        exportText += dayText + '\n';
+        hasAnyData = true;
+      }
+    });
+    if (!hasAnyData) {
+      exportText += '（所选时间段内暂无打卡记录）\n';
+    }
+    exportText += `${'='.repeat(40)}\n`;
+    exportText += `导出时间：${new Date().toLocaleString('zh-CN')}\n`;
+
+    if (mode === 'share') {
+      if (navigator.share) {
+        navigator.share({ title: 'TAO & YAN 打卡记录', text: exportText }).catch(() => {});
+      } else {
+        this._copyToClipboard(exportText, '打卡记录已复制');
+      }
+    } else {
+      this._downloadText(exportText, `相处日记_打卡_${startVal}_至_${endVal}.txt`);
+      showToast('打卡记录已导出 📄');
+    }
+  },
+
+  // 第四部分：娱乐内容导出（仅当天）
+  exportEntertainment(mode) {
+    const ds = todayStr();
+    const d = new Date(ds);
+    const dateCN = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    let text = `TAO & YAN 娱乐内容导出\n`;
+    text += `日期：${dateCN}\n`;
+    text += `${'='.repeat(40)}\n\n`;
+
+    // 1. 番茄管理
+    const pomoData = Store.get('pomodoro_count', { tao: 0, yan: 0 });
+    const pomoHistory = Store.get('pomodoro_history', {});
+    const todayPomo = pomoHistory[ds] || { tao: 0, yan: 0 };
+    text += `🍅 番茄管理\n`;
+    text += `  今日：TAO ${todayPomo.tao || 0}个 / YAN ${todayPomo.yan || 0}个\n`;
+    text += `  本周累计：TAO ${pomoData.tao || 0}个 / YAN ${pomoData.yan || 0}个\n\n`;
+
+    // 2. 英语刷词
+    const vocabTAO = Store.get(`vocab_count_${ds}_TAO`, 0);
+    const vocabYAN = Store.get(`vocab_count_${ds}_YAN`, 0);
+    text += `📚 英语刷词\n`;
+    text += `  今日：TAO ${vocabTAO}词 / YAN ${vocabYAN}词\n\n`;
+
+    // 3. 热点新闻
+    text += `📰 热点新闻\n`;
+    if (typeof HotNews !== 'undefined' && HotNews._catItems && HotNews._catItems.length > 0) {
+      HotNews._catItems.forEach(item => {
+        text += `  ${item.rank}. ${item.title}\n`;
+      });
+    } else {
+      text += `  暂无新闻数据\n`;
+    }
+    text += '\n';
+
+    // 4. 数理化（公式+常识）
+    text += `🔬 数理化\n`;
+    if (typeof FormulaCard !== 'undefined') {
+      const seed = FormulaCard._getDaySeed();
+      const cats = ['数学', '物理', '化学'];
+      text += `  【公式】\n`;
+      cats.forEach(cat => {
+        const list = FormulaCard.DATA.filter(f => f.category === cat);
+        if (list.length > 0) {
+          const f = list[seed % list.length];
+          text += `    ${cat} · ${f.name}：${f.expression}\n`;
+        }
+      });
+      text += `  【常识】\n`;
+      cats.forEach(cat => {
+        const list = FormulaCard.KNOWLEDGE.filter(k => k.category === cat);
+        if (list.length > 0) {
+          const k = list[(seed + (FormulaCard._knowledgeOffset || 0)) % list.length];
+          text += `    ${cat} · ${k.title}：${k.text}\n`;
+        }
+      });
+    }
+    text += '\n';
+
+    // 5. 唐宋诗词
+    text += `📜 唐宋诗词\n`;
+    if (typeof PoemCard !== 'undefined' && PoemCard._currentPoem) {
+      const p = PoemCard._currentPoem;
+      text += `  《${p.title}》 〔${p.dynasty}〕${p.author}\n`;
+      text += `  ${p.text.replace(/\n/g, '\n  ')}\n`;
+      if (p.analysis) text += `  【解读】${p.analysis}\n`;
+    } else if (typeof PoemCard !== 'undefined' && PoemCard.POEMS.length > 0) {
+      const p = PoemCard.POEMS[PoemCard._currentIndex || 0];
+      text += `  《${p.title}》 〔${p.dynasty}〕${p.author}\n`;
+      text += `  ${p.text.replace(/\n/g, '\n  ')}\n`;
+    }
+    text += '\n';
+
+    // 6. 历史文化
+    text += `🏛️ 历史文化\n`;
+    if (typeof HistoryCard !== 'undefined' && HistoryCard.HISTORY.length > 0) {
+      const idx = Store.get(`history_${ds}`, -1);
+      const h = idx >= 0 ? HistoryCard.HISTORY[idx] : HistoryCard.HISTORY[0];
+      text += `  ${h}\n`;
+    }
+    text += '\n';
+
+    // 7. 中国地理
+    text += `🗺️ 中国地理\n`;
+    if (typeof GeoCard !== 'undefined' && GeoCard.GEO.length > 0) {
+      const idx = Store.get(`geo_${ds}`, -1);
+      const g = idx >= 0 ? GeoCard.GEO[idx] : GeoCard.GEO[0];
+      text += `  ${g}\n`;
+    }
+    text += '\n';
+
+    // 8. 生活技巧
+    text += `💡 生活技巧\n`;
+    if (typeof LifeTip !== 'undefined' && LifeTip.TIPS.length > 0) {
+      const idx = Store.get(`tip_${ds}`, -1);
+      const t = idx >= 0 ? LifeTip.TIPS[idx] : LifeTip.TIPS[0];
+      text += `  ${t}\n`;
+    }
+    text += '\n';
+
+    // 9. 笑话大全
+    text += `😄 笑话大全\n`;
+    if (typeof Joke !== 'undefined' && Joke.JOKES.length > 0) {
+      const idx = Store.get(`joke_${ds}`, -1);
+      const j = idx >= 0 ? Joke.JOKES[idx] : Joke.JOKES[0];
+      text += `  ${j}\n`;
+    }
+    text += '\n';
+
+    // 10. 地标打卡
+    text += `📍 地标打卡\n`;
+    const landmarkData = Store.get('landmark_checkins', {});
+    const checked = Object.entries(landmarkData).filter(([k, v]) => v.tao || v.yan);
+    if (checked.length > 0) {
+      checked.forEach(([key, state]) => {
+        const parts = key.split('/');
+        if (parts[1]) {
+          text += `  ${parts[0]} · ${parts[1]}：${state.tao ? '🐱' : ''}${state.yan ? '🐶' : ''}\n`;
+        } else {
+          text += `  ${parts[0]}：${state.tao ? '🐱' : ''}${state.yan ? '🐶' : ''}\n`;
+        }
+      });
+    } else {
+      text += `  暂无打卡记录\n`;
+    }
+    text += '\n';
+
+    text += `${'='.repeat(40)}\n`;
+    text += `导出时间：${new Date().toLocaleString('zh-CN')}\n`;
+
+    if (mode === 'share') {
+      if (navigator.share) {
+        navigator.share({ title: 'TAO & YAN 娱乐内容', text: text }).catch(() => {});
+      } else {
+        this._copyToClipboard(text, '娱乐内容已复制');
+      }
+    } else {
+      this._downloadText(text, `娱乐内容_${ds}.txt`);
+      showToast('娱乐内容已导出 🎮');
+    }
+  },
+
+  // 工具：下载文本文件
+  _downloadText(text, filename) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  // 工具：复制到剪贴板
+  _copyToClipboard(text, msg) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(msg + '，可粘贴分享');
+      }).catch(() => {
+        showToast('复制失败，请使用导出功能');
+      });
+    } else {
+      showToast('当前环境不支持分享，请使用导出功能');
+    }
   }
 };
 

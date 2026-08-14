@@ -743,7 +743,70 @@
         <button class="setting-btn" onclick="Setting.resetTheme()">恢复默认</button>
       </div>
     </div>
+    <div class="setting-group">
+      <div class="setting-label">一键导出</div>
+      <div class="setting-desc">导出照片、信件、打卡记录、娱乐内容</div>
+      <button class="setting-btn primary" onclick="ExportPanel.open()">📦 打开导出面板</button>
+    </div>
     <button class="setting-cancel" onclick="Setting.close()">关闭</button>
+  </div>
+</div>
+
+<!-- 导出面板 -->
+<div class="export-panel-overlay" id="exportPanelOverlay" onclick="ExportPanel.close(event)">
+  <div class="export-panel-modal" onclick="event.stopPropagation()">
+    <div class="export-panel-title">📦 一键导出</div>
+
+    <!-- 照片导出 -->
+    <div class="export-section">
+      <div class="export-section-title">📷 照片导出</div>
+      <div class="export-section-desc">一次性导出全部已上传照片</div>
+      <button class="setting-btn primary" onclick="ExportPanel.exportPhotos()">导出全部照片</button>
+    </div>
+
+    <!-- 信件导出 -->
+    <div class="export-section">
+      <div class="export-section-title">📧 信件导出</div>
+      <div class="export-section-desc">选择日期范围导出信件</div>
+      <div class="export-date-row">
+        <label>起：</label>
+        <input type="date" id="exportLetterStart" class="export-date-input">
+        <label>止：</label>
+        <input type="date" id="exportLetterEnd" class="export-date-input">
+      </div>
+      <div class="export-btn-row">
+        <button class="setting-btn" onclick="ExportPanel.exportLetters('share')">分享</button>
+        <button class="setting-btn primary" onclick="ExportPanel.exportLetters('download')">导出</button>
+      </div>
+    </div>
+
+    <!-- 打卡导出 -->
+    <div class="export-section">
+      <div class="export-section-title">❤️ 每日打卡导出</div>
+      <div class="export-section-desc">与每日打卡的导出分享功能相同</div>
+      <div class="export-date-row">
+        <label>起：</label>
+        <input type="date" id="exportCheckinStart" class="export-date-input">
+        <label>止：</label>
+        <input type="date" id="exportCheckinEnd" class="export-date-input">
+      </div>
+      <div class="export-btn-row">
+        <button class="setting-btn" onclick="ExportPanel.exportCheckin('share')">分享</button>
+        <button class="setting-btn primary" onclick="ExportPanel.exportCheckin('download')">导出</button>
+      </div>
+    </div>
+
+    <!-- 娱乐导出 -->
+    <div class="export-section">
+      <div class="export-section-title">🎮 娱乐内容导出</div>
+      <div class="export-section-desc">导出当天娱乐页面全部内容（番茄/英语/新闻/数理化/诗词/历史/地理/生活/笑话/地标）</div>
+      <div class="export-btn-row">
+        <button class="setting-btn" onclick="ExportPanel.exportEntertainment('share')">分享</button>
+        <button class="setting-btn primary" onclick="ExportPanel.exportEntertainment('download')">导出</button>
+      </div>
+    </div>
+
+    <button class="setting-cancel" onclick="ExportPanel.close()">关闭</button>
   </div>
 </div>
 
