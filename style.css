@@ -5542,6 +5542,31 @@ html, body {
 
 .landmark-bubble:active { transform: scale(0.92); }
 
+/* 省级有打卡但市级未全部完成 → 角色颜色点点 */
+.landmark-dots {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.landmark-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.landmark-dot.tao {
+  background: #1b7fe3;
+  box-shadow: 0 0 4px rgba(27,127,227,0.4);
+}
+
+.landmark-dot.yan {
+  background: #e8296a;
+  box-shadow: 0 0 4px rgba(232,41,106,0.4);
+}
+
 /* TAO 打卡 → 左侧边框高亮 */
 .landmark-bubble.tao-on {
   border-left: 3px solid #1b7fe3;

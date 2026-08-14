@@ -8518,6 +8518,32 @@ const LandmarkCheckin = {
       bubble.dataset.key = key;
       bubble.dataset.idx = idx;
 
+      // 省级有打卡痕迹但市级未全部完成 → 显示角色颜色点点
+      const isMuni = this.MUNICIPALITIES.includes(prov.name);
+      if (!isMuni) {
+        const dots = [];
+        // 检查 TAO：省级已打卡但市级未全部打卡
+        if (state.tao) {
+          const taoCitiesDone = prov.cities.filter(c => (data[key + '/' + c] || {}).tao).length;
+          if (taoCitiesDone < prov.cities.length) dots.push('tao');
+        }
+        // 检查 YAN：省级已打卡但市级未全部打卡
+        if (state.yan) {
+          const yanCitiesDone = prov.cities.filter(c => (data[key + '/' + c] || {}).yan).length;
+          if (yanCitiesDone < prov.cities.length) dots.push('yan');
+        }
+        if (dots.length > 0) {
+          const dotWrap = document.createElement('div');
+          dotWrap.className = 'landmark-dots';
+          dots.forEach(r => {
+            const d = document.createElement('span');
+            d.className = 'landmark-dot ' + r;
+            dotWrap.appendChild(d);
+          });
+          bubble.appendChild(dotWrap);
+        }
+      }
+
       // 单击展开 / 双击打卡
       this._bindBubbleEvents(bubble, key, idx, false);
       grid.appendChild(bubble);
