@@ -105,9 +105,56 @@ const Cloud = {
   pollTimer: null,
   lastSyncAt: 0,
 
-  // 初始化：从 localStorage 恢复配对码
-  init() {
+  // 初始化：从 localStorage 恢复配对码，如果丢失则从 IndexedDB 恢复
+  async init() {
     this.pairCode = Store.get('pairCode', null);
+    if (!this.pairCode) {
+      // LocalStorage 可能被清除，从 IndexedDB 恢复
+      const backup = await this._getBackup();
+      if (backup && backup.pairCode) {
+        this.pairCode = backup.pairCode;
+        Store.set('pairCode', backup.pairCode);
+        if (backup.role) Store.set('role', backup.role);
+      }
+    } else {
+      // 确保 IndexedDB 也有备份
+      this._saveBackup(this.pairCode, Store.get('role', null));
+    }
+  },
+
+  // IndexedDB 备份（不受清缓存影响）
+  _backupDB() {
+    return new Promise((resolve) => {
+      const req = indexedDB.open('couple_backup_db', 1);
+      req.onerror = () => resolve(null);
+      req.onsuccess = () => resolve(req.result);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('backup')) db.createObjectStore('backup');
+      };
+    });
+  },
+
+  async _saveBackup(pairCode, role) {
+    try {
+      const db = await this._backupDB();
+      if (!db) return;
+      const tx = db.transaction('backup', 'readwrite');
+      tx.objectStore('backup').put({ pairCode, role, savedAt: Date.now() }, 'pair_info');
+    } catch (e) { /* ignore */ }
+  },
+
+  async _getBackup() {
+    try {
+      const db = await this._backupDB();
+      if (!db) return null;
+      return new Promise((resolve) => {
+        const tx = db.transaction('backup', 'readonly');
+        const req = tx.objectStore('backup').get('pair_info');
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      });
+    } catch (e) { return null; }
   },
 
   isPaired() { return !!this.pairCode; },
@@ -163,6 +210,7 @@ const Cloud = {
     this.pairCode = code;
     Store.set('pairCode', code);
     Store.set('role', role);
+    this._saveBackup(code, role); // 立即备份到 IndexedDB
 
     const meta = {
       creator: role,
@@ -210,6 +258,7 @@ const Cloud = {
       this.pairCode = code;
       Store.set('pairCode', code);
       Store.set('role', role);
+      this._saveBackup(code, role); // 立即备份到 IndexedDB
       return { ok: true, code };
     } catch (e) {
       return { ok: false, error: '网络错误，请稍后重试' };
@@ -234,6 +283,8 @@ const Cloud = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
+      // 同时更新云端全部日记备份
+      this.pushAllDays();
       this.lastSyncAt = Date.now();
     } catch (e) { /* 静默失败，下次重试 */ }
   },
@@ -248,6 +299,30 @@ const Cloud = {
     } catch (e) { return null; }
   },
 
+  // 推送全部日记数据到云端（作为整体备份，防止本地清空后丢失）
+  async pushAllDays() {
+    if (!this.pairCode) return;
+    const allDays = Store.getAllDays();
+    if (!allDays || Object.keys(allDays).length === 0) return;
+    try {
+      await fetch(this._url('days_all'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(allDays)
+      });
+    } catch (e) { /* ignore */ }
+  },
+
+  // 拉取云端全部日记数据（恢复用）
+  async pullAllDays() {
+    if (!this.pairCode) return null;
+    try {
+      const r = await fetch(this._url('days_all'));
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (e) { return null; }
+  },
+
   // 同步所有数据（进入应用时）
   async syncAll() {
     if (!this.pairCode) return;
@@ -255,7 +330,26 @@ const Cloud = {
     this.isSyncing = true;
 
     try {
-      // 拉取所有本地已有的日期 + 今天
+      // 1. 先拉取云端全部日记备份（防止本地数据丢失后无法恢复）
+      const allRemoteDays = await this.pullAllDays();
+      if (allRemoteDays && typeof allRemoteDays === 'object') {
+        const remoteDates = Object.keys(allRemoteDays);
+        const localDates = Object.keys(Store.getAllDays());
+        // 如果云端有本地没有的日期，说明本地数据可能丢失，需要恢复
+        const missingDates = remoteDates.filter(ds => !localDates.includes(ds));
+        if (missingDates.length > 0 || remoteDates.length > localDates.length) {
+          const changed = Store.mergeRemoteDays(allRemoteDays);
+          if (changed) {
+            if (typeof Cards !== 'undefined') {
+              Cards.renderAll();
+              Cards.updateRolePermissions();
+            }
+            if (typeof Calendar !== 'undefined') Calendar.render();
+          }
+        }
+      }
+
+      // 2. 拉取所有本地已有的日期 + 今天
       const localDays = Store.getAllDays();
       const dates = new Set(Object.keys(localDays));
       dates.add(todayStr());
@@ -288,6 +382,9 @@ const Cloud = {
           await this.pushDay(ds);
         }
       }
+
+      // 3. 推送全部日记备份到云端（更新备份）
+      await this.pushAllDays();
 
       this.lastSyncAt = Date.now();
       if (anyChanged) {
@@ -749,7 +846,7 @@ const App = {
   viewDate: null,
   isHistory: false,
 
-  init() {
+  async init() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
       // 监听 Service Worker 强制刷新消息
@@ -760,8 +857,8 @@ const App = {
       });
     }
 
-    // 初始化云同步
-    Cloud.init();
+    // 初始化云同步（等待完成，确保 IndexedDB 恢复配对码）
+    await Cloud.init();
 
     // 检查是否已配对+已选角色
     const savedRole = Store.get('role', null);
@@ -770,6 +867,14 @@ const App = {
       // 已配对且已选角色：直接进入应用
       this.currentRole = savedRole;
       this.enterApp();
+    } else if (paired && !savedRole) {
+      // 已配对但未选角色（LocalStorage 部分丢失），从备份恢复角色
+      const backup = await Cloud._getBackup();
+      if (backup && backup.role) {
+        this.currentRole = backup.role;
+        Store.set('role', backup.role);
+        this.enterApp();
+      }
     } else {
       // 显示角色选择页（entryScreen 默认就显示）
       // 用户选完角色后 selectRole → showPairScreen
