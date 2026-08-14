@@ -800,6 +800,35 @@ html, body {
   margin-top: 8px;
 }
 
+/* 小心心冒出动画 */
+.floating-heart {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  user-select: none;
+  animation: heartFloatUp 1.6s ease-out forwards;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+@keyframes heartFloatUp {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.3) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(calc(var(--dx) * 0.2), calc(var(--dy) * 0.15)) scale(1.2) rotate(calc(var(--rot) * 0.2));
+  }
+  60% {
+    opacity: 0.9;
+    transform: translate(calc(var(--dx) * 0.7), calc(var(--dy) * 0.6)) scale(1) rotate(calc(var(--rot) * 0.7));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.5) rotate(var(--rot));
+  }
+}
+
 /* === 文字编辑框 === */
 .edit-area {
   margin-bottom: 12px;
@@ -3397,6 +3426,80 @@ html, body {
   box-shadow:
     0 6px 24px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* 角色信息卡片 - 提高醒目度 */
+#tab-0 .role-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.5) 50%, rgba(245, 248, 255, 0.6) 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.10),
+    0 2px 8px rgba(27, 127, 227, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
+  position: relative;
+  overflow: visible;
+}
+
+/* 角色卡片内层装饰背景 */
+#tab-0 .role-card::before {
+  content: '';
+  position: absolute;
+  top: -20px; right: -20px;
+  width: 100px; height: 100px;
+  background: radial-gradient(circle, rgba(232, 41, 106, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+#tab-0 .role-card::after {
+  content: '';
+  position: absolute;
+  bottom: -20px; left: -20px;
+  width: 100px; height: 100px;
+  background: radial-gradient(circle, rgba(27, 127, 227, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* 角色配对行 - 提高颜色饱和度 */
+.role-pair-item.tao {
+  background: linear-gradient(135deg, rgba(27, 127, 227, 0.22), rgba(27, 127, 227, 0.12));
+  color: #0a4d99;
+  border: 1.5px solid rgba(27, 127, 227, 0.25);
+  box-shadow: 0 2px 10px rgba(27, 127, 227, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.role-pair-item.yan {
+  background: linear-gradient(135deg, rgba(232, 41, 106, 0.22), rgba(232, 41, 106, 0.12));
+  color: #a01a48;
+  border: 1.5px solid rgba(232, 41, 106, 0.25);
+  box-shadow: 0 2px 10px rgba(232, 41, 106, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.role-pair-item.active.tao {
+  background: linear-gradient(135deg, rgba(27, 127, 227, 0.35), rgba(27, 127, 227, 0.18));
+  border-color: rgba(27, 127, 227, 0.5);
+  box-shadow: 0 4px 16px rgba(27, 127, 227, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.role-pair-item.active.yan {
+  background: linear-gradient(135deg, rgba(232, 41, 106, 0.35), rgba(232, 41, 106, 0.18));
+  border-color: rgba(232, 41, 106, 0.5);
+  box-shadow: 0 4px 16px rgba(232, 41, 106, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* 角色头像环 - 增加层次 */
+.role-avatar-wrap {
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+}
+
+.role-pair-item.active.tao .role-avatar-wrap {
+  box-shadow: 0 3px 12px rgba(27, 127, 227, 0.3), 0 0 0 2px rgba(27, 127, 227, 0.4);
+}
+
+.role-pair-item.active.yan .role-avatar-wrap {
+  box-shadow: 0 3px 12px rgba(232, 41, 106, 0.3), 0 0 0 2px rgba(232, 41, 106, 0.4);
 }
 
 /* ============================

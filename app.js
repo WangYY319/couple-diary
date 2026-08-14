@@ -2053,7 +2053,15 @@ const Cards = {
     const data = this.getDayData();
     const role = App.currentRole.toLowerCase();
 
-    if (cardType === 'greet' && data.greet.tao && data.greet.yan) return;
+    // 发射爱心：已打卡后不可取消，双方都完成后直接返回
+    if (cardType === 'greet') {
+      if (data.greet[role]) {
+        // 已打卡，触发小心心冒出效果但不取消
+        this.spawnHearts();
+        return;
+      }
+      if (data.greet.tao && data.greet.yan) return;
+    }
     // 晚安随时可打卡，只需检查是否双方都已完成
     if (cardType === 'night' && data.night.tao && data.night.yan) return;
 
@@ -2063,6 +2071,7 @@ const Cards = {
 
     if (now - lastClick < 350) {
       this.doCheckin(cardType, role);
+      this.spawnHearts();
       this.clickStates[key] = 0;
     } else {
       const cardEl = document.getElementById('card-' + cardType);
@@ -2122,6 +2131,32 @@ const Cards = {
     Calendar.render();
     App.updateNav();
     HistoryView.render();
+  },
+
+  // 小心心冒出动画
+  spawnHearts() {
+    const cardEl = document.getElementById('card-greet');
+    if (!cardEl) return;
+    const rect = cardEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height * 0.4;
+
+    const colors = ['#e8296a', '#1b7fe3', '#ff6b9d', '#5bc0eb', '#f06292', '#4fc3f7'];
+    for (let i = 0; i < 8; i++) {
+      const heart = document.createElement('div');
+      heart.className = 'floating-heart';
+      heart.textContent = '❤';
+      heart.style.left = (cx + (Math.random() - 0.5) * 60) + 'px';
+      heart.style.top = cy + 'px';
+      heart.style.color = colors[i % colors.length];
+      heart.style.fontSize = (14 + Math.random() * 14) + 'px';
+      heart.style.setProperty('--dx', ((Math.random() - 0.5) * 120) + 'px');
+      heart.style.setProperty('--dy', (-80 - Math.random() * 60) + 'px');
+      heart.style.setProperty('--rot', ((Math.random() - 0.5) * 60) + 'deg');
+      heart.style.animationDelay = (i * 60) + 'ms';
+      document.body.appendChild(heart);
+      setTimeout(() => heart.remove(), 1800);
+    }
   },
 
   bindEditBoxes() {
@@ -3424,7 +3459,7 @@ const DetailMenu = {
       { icon: '📊', name: '本周数透', selector: '.data-pivot-card, .card:nth-child(4)' }
     ],
     1: [
-      { icon: '❤️', name: '爱心打卡', selector: '#card-greet, .card:nth-child(1)' },
+      { icon: '❤️', name: '发射爱心', selector: '#card-greet, .card:nth-child(1)' },
       { icon: '📷', name: '相处照片', selector: '.photo-card, .card:nth-child(2)' },
       { icon: '✉️', name: '投递信件', selector: '#card-letter, .card:nth-child(3)' }
     ],
