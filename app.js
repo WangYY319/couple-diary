@@ -6284,6 +6284,7 @@ const FormulaCard = {
 const ReadMark = {
   // 卡片ID映射：cardKey → badge元素ID
   BADGE_IDS: {
+    formula: 'formulaReadBadge',
     poem: 'poemReadBadge',
     history: 'historyReadBadge',
     geo: 'geoReadBadge',

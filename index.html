@@ -550,7 +550,7 @@
       </div>
 
       <!-- 数理化 -->
-      <div class="card formula-card">
+      <div class="card formula-card" ondblclick="ReadMark.toggle('formula')">
         <div class="card-title"><span class="icon">🔬</span> 数理化</div>
         <div class="formula-tabs" id="formulaTabs">
           <button class="formula-tab active" data-type="formula" onclick="FormulaCard.switchType('formula')">公式</button>
@@ -567,6 +567,7 @@
         <div class="formula-knowledge" id="formulaKnowledge" style="display:none">
           <div class="formula-knowledge-content" id="formulaKnowledgeContent"></div>
         </div>
+        <div class="read-badge" id="formulaReadBadge"></div>
         <button class="formula-refresh-btn" id="formulaRefreshBtn" onclick="FormulaCard.refresh()" title="换一批">🔄</button>
       </div>
 
