@@ -348,8 +348,85 @@ const Cloud = {
           showToast('对方有新的打卡了 ✨');
         }
       }
+
+      // 同步问答和刷词数据（不锁定 isSyncing）
+      this.syncQuizVocab();
     } catch (e) { /* ignore */ }
     this.isSyncing = false;
+  },
+
+  // 同步问答和刷词数据到云端
+  async pushQuizVocab() {
+    if (!this.pairCode) return;
+    const ds = todayStr();
+    const role = App.currentRole;
+    const quizAnswers = Store.get(`quiz_a_${ds}_${role}`, []);
+    const quizQuestions = Store.get(`quiz_q_${ds}`, null);
+    const vocabCount = Store.get(`vocab_count_${ds}_${role}`, 0);
+    const vocabProg = Store.get(`vocab_prog_${ds}_${role}`, null);
+
+    try {
+      await fetch(this._url(`extra/${ds}/${role}`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quizAnswers, quizQuestions, vocabCount, vocabProg, ts: Date.now() })
+      });
+    } catch (e) { /* ignore */ }
+  },
+
+  // 拉取对方的问答和刷词数据
+  async pullQuizVocab() {
+    if (!this.pairCode) return;
+    const ds = todayStr();
+    const otherRole = App.currentRole === 'TAO' ? 'YAN' : 'TAO';
+    try {
+      const r = await fetch(this._url(`extra/${ds}/${otherRole}`));
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (e) { return null; }
+  },
+
+  // 同步问答和刷词（轮询时调用）
+  async syncQuizVocab() {
+    if (!this.pairCode) return;
+    const ds = todayStr();
+
+    // 推送自己的数据
+    await this.pushQuizVocab();
+
+    // 拉取对方的数据
+    const remote = await this.pullQuizVocab();
+    if (!remote) return;
+
+    const otherRole = App.currentRole === 'TAO' ? 'YAN' : 'TAO';
+    let changed = false;
+
+    // 更新问答统计
+    const remoteQuizAnswers = remote.quizAnswers || [];
+    const localQuizAnswers = Store.get(`quiz_a_${ds}_${otherRole}`, []);
+    if (remoteQuizAnswers.length !== localQuizAnswers.length) {
+      Store.set(`quiz_a_${ds}_${otherRole}`, remoteQuizAnswers);
+      changed = true;
+    }
+
+    // 确保题目一致（如果自己还没有题目，用对方的）
+    if (remote.quizQuestions && !Store.get(`quiz_q_${ds}`, null)) {
+      Store.set(`quiz_q_${ds}`, remote.quizQuestions);
+    }
+
+    // 更新刷词统计
+    const remoteVocabCount = remote.vocabCount || 0;
+    const localVocabCount = Store.get(`vocab_count_${ds}_${otherRole}`, -1);
+    if (remoteVocabCount !== localVocabCount) {
+      Store.set(`vocab_count_${ds}_${otherRole}`, remoteVocabCount);
+      changed = true;
+    }
+
+    if (changed) {
+      // 刷新UI
+      if (typeof RandomQA !== 'undefined') RandomQA.render();
+      if (typeof EnglishVocab !== 'undefined') EnglishVocab.render();
+    }
   }
 };
 
@@ -462,6 +539,7 @@ const App = {
     this.enterApp();
     Cloud.heartbeat();
     Cloud.syncAll().then(() => {
+      Cloud.syncQuizVocab();
       Cloud.startPolling();
       showToast('已配对成功，开始你们的日记吧 💕');
     });
@@ -3321,6 +3399,7 @@ const RandomQA = {
   _answer(choiceIndex) {
     this._answers.push(choiceIndex);
     this._setAnswers(App.currentRole, this._answers);
+    if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushQuizVocab();
     this._currentIndex++;
 
     if (this._currentIndex >= 5) {
@@ -3751,6 +3830,7 @@ const EnglishVocab = {
     this._currentIndex++;
     const myRole = App.currentRole;
     this._setCount(myRole, this._currentIndex);
+    if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushQuizVocab();
     this.render();
 
     // 短暂动画
@@ -3784,6 +3864,7 @@ const EnglishVocab = {
       this._currentIndex++;
       const myRole = App.currentRole;
       this._setCount(myRole, this._currentIndex);
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushQuizVocab();
       this.render();
       this._showWord();
     }
