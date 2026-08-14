@@ -3372,61 +3372,81 @@ html, body {
 /* ============================
    音乐播放全局效果
    ============================ */
-/* 所有卡片边框波纹波动 */
+/* 所有卡片边框波纹波动 - 增强呼吸效果 */
 body.music-active .card {
-  animation: cardRipple 2.5s ease-in-out infinite;
+  animation: cardBreathe 3s ease-in-out infinite;
 }
 
-@keyframes cardRipple {
+@keyframes cardBreathe {
   0%, 100% {
     box-shadow: 0 2px 10px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+    border-color: rgba(255, 255, 255, 0.6);
   }
   50% {
-    box-shadow: 0 4px 18px rgba(var(--theme-rgb), 0.12), 0 0 0 1.5px rgba(var(--theme-rgb), 0.15);
+    box-shadow: 0 6px 28px rgba(var(--theme-rgb), 0.18), 0 0 0 2px rgba(var(--theme-rgb), 0.22);
+    border-color: rgba(var(--theme-rgb), 0.25);
   }
 }
 
-/* Tab0 卡片波纹 */
+/* Tab0 卡片波纹 - 增强呼吸效果 */
 body.music-active #tab-0 .card {
-  animation: cardRippleTab0 2.5s ease-in-out infinite;
+  animation: cardBreatheTab0 3s ease-in-out infinite;
 }
 
-@keyframes cardRippleTab0 {
+@keyframes cardBreatheTab0 {
   0%, 100% {
     box-shadow: 0 4px 18px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.5);
+    border-color: rgba(255, 255, 255, 0.6);
   }
   50% {
-    box-shadow: 0 6px 24px rgba(var(--theme-rgb), 0.12), 0 0 0 1.5px rgba(var(--theme-rgb), 0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+    box-shadow: 0 8px 36px rgba(var(--theme-rgb), 0.18), 0 0 0 2px rgba(var(--theme-rgb), 0.22), inset 0 1px 0 rgba(255,255,255,0.5);
+    border-color: rgba(var(--theme-rgb), 0.25);
   }
 }
 
-/* 所有猫狗图标左右摇晃 */
-body.music-active .lock-icon-btn,
-body.music-active .role-avatar-placeholder,
-body.music-active .quiz-stat-emoji,
-body.music-active .pomodoro-stat-icon,
-body.music-active .vocab-stat-emoji,
-body.music-active .exercise-emoji,
-body.music-active .status-emoji,
-body.music-active .entry-btn .emoji,
-body.music-active .pair-role-btn .emoji,
-body.music-active .setting-role-btn .emoji,
-body.music-active .pivot-leg-tao,
-body.music-active .pivot-leg-yan {
-  animation: petSway 2s ease-in-out infinite;
+/* 音乐图标掉落容器 */
+.music-fall-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9998;
+  overflow: hidden;
 }
 
-body.music-active .pivot-leg-tao { animation-delay: 0.3s; }
-body.music-active .pivot-leg-yan { animation-delay: 0.6s; }
-body.music-active .quiz-stat-emoji:first-child { animation-delay: 0.2s; }
-body.music-active .pomodoro-stat-icon:first-child { animation-delay: 0.4s; }
-body.music-active .vocab-stat-emoji:first-child { animation-delay: 0.3s; }
-body.music-active .exercise-emoji:first-child { animation-delay: 0.5s; }
+/* 掉落的音乐图标 */
+.music-fall-item {
+  position: absolute;
+  top: -30px;
+  font-size: 18px;
+  opacity: 0;
+  animation: musicFall 6s ease-in forwards;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
 
-@keyframes petSway {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-8deg); }
-  75% { transform: rotate(8deg); }
+@keyframes musicFall {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0) rotate(0deg) scale(0.5);
+  }
+  10% {
+    opacity: 0.7;
+    transform: translateY(10vh) translateX(10px) rotate(15deg) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateY(50vh) translateX(-15px) rotate(-10deg) scale(1);
+  }
+  90% {
+    opacity: 0.4;
+    transform: translateY(90vh) translateX(20px) rotate(20deg) scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(105vh) translateX(0) rotate(0deg) scale(0.6);
+  }
 }
 
 @keyframes musicNote {

@@ -4362,15 +4362,51 @@ const MusicPlayer = {
     const title = document.getElementById('navTitle');
     if (title) title.classList.add('music-playing');
     document.body.classList.add('music-active');
+    this._startMusicFall();
   },
 
   stopNavWave() {
     const title = document.getElementById('navTitle');
     if (title) title.classList.remove('music-playing');
     document.body.classList.remove('music-active');
+    this._stopMusicFall();
     if (this.progressTimer) {
       clearInterval(this.progressTimer);
       this.progressTimer = null;
+    }
+  },
+
+  // 音乐图标掉落
+  _musicFallTimer: null,
+  _startMusicFall() {
+    const container = document.getElementById('musicFallContainer');
+    if (!container) return;
+    container.style.display = '';
+    const icons = ['🎵', '🍻', '🎉', '😘', '🍃'];
+    if (this._musicFallTimer) clearInterval(this._musicFallTimer);
+    this._musicFallTimer = setInterval(() => {
+      // 每次随机决定是否生成（稀少感）
+      if (Math.random() > 0.4) return;
+      const item = document.createElement('div');
+      item.className = 'music-fall-item';
+      item.textContent = icons[Math.floor(Math.random() * icons.length)];
+      item.style.left = (Math.random() * 100) + '%';
+      item.style.fontSize = (14 + Math.random() * 10) + 'px';
+      item.style.animationDuration = (5 + Math.random() * 3) + 's';
+      container.appendChild(item);
+      setTimeout(() => { if (item.parentNode) item.remove(); }, 9000);
+    }, 1500);
+  },
+
+  _stopMusicFall() {
+    if (this._musicFallTimer) {
+      clearInterval(this._musicFallTimer);
+      this._musicFallTimer = null;
+    }
+    const container = document.getElementById('musicFallContainer');
+    if (container) {
+      container.style.display = 'none';
+      container.innerHTML = '';
     }
   }
 };
