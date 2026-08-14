@@ -137,7 +137,7 @@
 
   <!-- 顶部导航栏 -->
   <header class="nav-bar">
-    <div class="nav-left" onclick="App.exitHistory()" title="点击返回今天">
+    <div class="nav-left" id="navLeftBtn" onclick="App.onNavLeftClick()" title="点击查看日历 / 返回今天">
       <span class="nav-date-icon">📅</span>
       <div class="nav-left-text">
         <span class="date" id="navDate">--</span>
@@ -203,20 +203,9 @@
         </div>
       </div>
 
-      <!-- 录音功能 -->
-      <div class="card record-card">
-        <div class="card-title"><span class="icon">🎤</span> 语音留言</div>
-        <div class="record-area">
-          <button class="record-btn" id="recordBtn" onclick="VoiceRecord.toggle()">
-            <span class="record-icon-default">🎙️ 点击录音</span>
-            <span class="record-icon-recording" style="display:none">🔴 录音中... <span id="recordTimer">0</span>s</span>
-          </button>
-        </div>
-        <div class="voice-list" id="voiceList"></div>
-      </div>
     </div>
 
-    <!-- ====== Tab 1: 爱心打卡+照片 ====== -->
+    <!-- ====== Tab 1: 记录（爱心打卡+照片） ====== -->
     <div class="tab-page" id="tab-1" data-tab="1">
       <!-- 打卡问好（爱心） -->
       <div class="card" id="card-greet" onclick="Cards.handleClick('greet')">
@@ -316,15 +305,6 @@
         </div>
       </div>
 
-      <!-- 打卡晚安 -->
-      <div class="card" id="card-night" onclick="Cards.handleClick('night')">
-        <div class="card-mascot" id="mascot-night"></div>
-        <div class="card-title"><span class="icon">🌙</span> 打卡晚安</div>
-        <div class="goodnight-area" id="nightArea">
-          <div class="goodnight-text-display" id="nightTextDisplay">双击晚安</div>
-        </div>
-      </div>
-
       <!-- 随机问答 -->
       <div class="card quiz-card">
         <div class="card-title"><span class="icon">🎲</span> 随机问答</div>
@@ -356,6 +336,43 @@
         <button class="quiz-view-btn" id="quizViewBtn" style="display:none" onclick="RandomQA.viewPartner()">查看对方选择</button>
       </div>
 
+      <!-- 历史统计缩略提示（无边框单行） -->
+      <div class="history-hint-bar" id="historyHintBar">
+        <span id="historyHintText">统计加载中...</span>
+        <button class="history-hint-export" onclick="HistoryView.sharePDF()">📤</button>
+      </div>
+
+      <!-- 语音留言（从首页移入） -->
+      <div class="card record-card">
+        <div class="card-title"><span class="icon">🎤</span> 语音留言</div>
+        <div class="record-area">
+          <button class="record-btn" id="recordBtn" onclick="VoiceRecord.toggle()">
+            <span class="record-icon-default">🎙️ 点击录音</span>
+            <span class="record-icon-recording" style="display:none">🔴 录音中... <span id="recordTimer">0</span>s</span>
+          </button>
+        </div>
+        <div class="voice-scroll-container" id="voiceScrollContainer">
+          <div class="voice-list" id="voiceList"></div>
+        </div>
+      </div>
+
+      <!-- 打卡晚安（移到最后） -->
+      <div class="card" id="card-night" onclick="Cards.handleClick('night')">
+        <div class="card-mascot" id="mascot-night"></div>
+        <div class="card-title"><span class="icon">🌙</span> 打卡晚安</div>
+        <div class="goodnight-area" id="nightArea">
+          <div class="goodnight-text-display" id="nightTextDisplay">双击晚安</div>
+          <div class="goodnight-reveal" id="nightReveal" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- 下载按钮 -->
+      <button class="download-btn" id="downloadBtn" style="display:none" onclick="Download.downloadCard()">📥 下载当日卡片</button>
+    </div>
+
+    <!-- ====== Tab 3: 娱乐 ====== -->
+    <div class="tab-page" id="tab-3" data-tab="3">
+
       <!-- 英语刷词 -->
       <div class="card vocab-card">
         <div class="card-title"><span class="icon">📚</span> 英语刷词</div>
@@ -386,25 +403,57 @@
         <button class="vocab-start-btn" id="vocabStartBtn" onclick="EnglishVocab.start()">开始刷词</button>
       </div>
 
-      <!-- 下载按钮 -->
-      <button class="download-btn" id="downloadBtn" style="display:none" onclick="Download.downloadCard()">📥 下载当日卡片</button>
-    </div>
-
-    <!-- ====== Tab 3: 历史记录 ====== -->
-    <div class="tab-page" id="tab-3" data-tab="3">
-      <div class="history-view">
-        <div class="history-export-bar">
-          <button class="history-share-btn" onclick="HistoryView.sharePDF()">📤 分享历史记录</button>
+      <!-- 热点新闻 -->
+      <div class="card hotnews-card">
+        <div class="card-title"><span class="icon">📰</span> 热点新闻</div>
+        <div class="hotnews-container" id="hotnewsContainer">
+          <div class="hotnews-placeholder">加载今日热点中...</div>
         </div>
-        <div class="history-section">
-          <div class="history-section-title"><span class="icon">💬</span> 打卡语录 · 历史</div>
-          <div class="history-list" id="historyWordsList"></div>
-        </div>
-        <div class="history-section">
-          <div class="history-section-title"><span class="icon">🌟</span> 打卡愿望 · 历史</div>
-          <div class="history-list" id="historyWishList"></div>
+        <div class="hotnews-controls">
+          <button class="hotnews-pause-btn" id="hotnewsPauseBtn" onclick="HotNews.togglePause()">⏸️</button>
         </div>
       </div>
+
+      <!-- 数理化公式 -->
+      <div class="card formula-card">
+        <div class="card-title"><span class="icon">🔬</span> 数理化公式</div>
+        <div class="formula-category-row" id="formulaCategoryRow"></div>
+        <div class="formula-detail" id="formulaDetail" style="display:none">
+          <div class="formula-name" id="formulaName"></div>
+          <div class="formula-expression" id="formulaExpression"></div>
+          <div class="formula-usage" id="formulaUsage"></div>
+          <div class="formula-principle" id="formulaPrinciple"></div>
+          <button class="formula-back-btn" onclick="FormulaCard.backToList()">← 返回列表</button>
+        </div>
+      </div>
+
+      <!-- 古诗赏析 -->
+      <div class="card poem-card">
+        <div class="card-title"><span class="icon">📜</span> 古诗赏析</div>
+        <div class="poem-content" id="poemContent">
+          <div class="poem-title" id="poemTitle"></div>
+          <div class="poem-author" id="poemAuthor"></div>
+          <div class="poem-text" id="poemText"></div>
+          <button class="poem-analysis-btn" id="poemAnalysisBtn" onclick="PoemCard.toggleAnalysis()">📖 查看赏析</button>
+          <div class="poem-analysis" id="poemAnalysis" style="display:none"></div>
+        </div>
+        <button class="poem-refresh-btn" onclick="PoemCard.refresh()">🔄 换一首</button>
+      </div>
+
+      <!-- 生活常识 -->
+      <div class="card life-tip-card">
+        <div class="card-title"><span class="icon">💡</span> 生活常识</div>
+        <div class="life-tip-content" id="lifeTipContent">加载中...</div>
+        <button class="life-tip-refresh-btn" onclick="LifeTip.refresh()">🔄 换一条</button>
+      </div>
+
+      <!-- 笑话大全 -->
+      <div class="card joke-card">
+        <div class="card-title"><span class="icon">😄</span> 笑话大全</div>
+        <div class="joke-content" id="jokeContent">加载中...</div>
+        <button class="joke-refresh-btn" onclick="Joke.refresh()">🔄 换一个</button>
+      </div>
+
     </div>
 
   </main>
@@ -421,19 +470,19 @@
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20.84,4.61a5.5,5.5,0,0,0-7.78,0L12,5.67l-1.06-1.06a5.5,5.5,0,0,0-7.78,7.78l1.06,1.06L12,21.23l7.78-7.78,1.06-1.06a5.5,5.5,0,0,0,0-7.78z"/>
       </svg>
-      <span class="nav-tab-label">打卡</span>
+      <span class="nav-tab-label">记录</span>
     </button>
     <button class="nav-tab" data-tab="2" onclick="TabNav.switch(2)">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3,9h18M9,3v18"/><path d="M14,14h4M14,17h3"/>
       </svg>
-      <span class="nav-tab-label">总览</span>
+      <span class="nav-tab-label">打卡</span>
     </button>
     <button class="nav-tab" data-tab="3" onclick="TabNav.switch(3)">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 15.5,14"/>
       </svg>
-      <span class="nav-tab-label">历史</span>
+      <span class="nav-tab-label">娱乐</span>
     </button>
   </nav>
 </div>

@@ -9,6 +9,9 @@
   --theme-accent: #0e5fb0;
   --theme-rgb: 27, 127, 227;
   --mascot: '🐱';
+  --text-main: #2d2d3f;
+  --text-muted: #8a8a9a;
+  --card-bg: #ffffff;
 }
 
 [data-theme="blue"] {
@@ -18,6 +21,9 @@
   --theme-accent: #0e5fb0;
   --theme-rgb: 27, 127, 227;
   --mascot: '🐱';
+  --text-main: #2d2d3f;
+  --text-muted: #8a8a9a;
+  --card-bg: #ffffff;
 }
 
 [data-theme="pink"] {
@@ -27,6 +33,9 @@
   --theme-accent: #b8224f;
   --theme-rgb: 232, 41, 106;
   --mascot: '🐶';
+  --text-main: #2d2d3f;
+  --text-muted: #8a8a9a;
+  --card-bg: #ffffff;
 }
 
 * {
@@ -3452,4 +3461,373 @@ html, body {
   transform: scale(0.97);
   background: var(--theme-primary);
   color: #fff;
+}
+
+/* ============================
+   历史统计缩略提示
+   ============================ */
+.history-hint-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 8px 4px;
+}
+
+.history-hint-export {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ============================
+   语音留言滚动容器
+   ============================ */
+.voice-scroll-container {
+  max-height: 240px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.voice-date-group {
+  margin-bottom: 12px;
+}
+
+.voice-date-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 4px 0;
+  text-align: center;
+}
+
+.voice-bubble {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  margin: 4px 0;
+  background: var(--theme-light);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+}
+
+.voice-bubble.mine {
+  align-self: flex-end;
+  margin-left: auto;
+  max-width: 80%;
+}
+
+.voice-bubble.theirs {
+  align-self: flex-start;
+  max-width: 80%;
+}
+
+.voice-bubble.tao {
+  border-left: 3px solid #1b7fe3;
+}
+
+.voice-bubble.yan {
+  border-left: 3px solid #e8296a;
+}
+
+.voice-bubble.playing {
+  background: var(--theme-primary);
+  color: #fff;
+}
+
+.voice-unread-dot {
+  width: 8px;
+  height: 8px;
+  background: #4caf50;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.voice-role-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.voice-duration,
+.voice-time {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.voice-play-icon {
+  margin-left: auto;
+}
+
+/* ============================
+   晚安浮现文字
+   ============================ */
+.goodnight-reveal {
+  margin-top: 12px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.goodnight-reveal.reveal-show {
+  opacity: 1;
+  animation: fadeIn 0.5s ease;
+}
+
+.night-reveal-text {
+  text-align: center;
+  font-size: 15px;
+  color: var(--theme-primary);
+  padding: 12px;
+  font-weight: 500;
+}
+
+/* ============================
+   热点新闻
+   ============================ */
+.hotnews-container {
+  min-height: 120px;
+  position: relative;
+}
+
+.hotnews-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 13px;
+}
+
+.hotnews-rank {
+  font-weight: 700;
+  color: var(--theme-primary);
+  min-width: 24px;
+}
+
+.hotnews-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hotnews-hot {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.hotnews-placeholder {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.hotnews-controls {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.hotnews-pause-btn {
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 12px;
+}
+
+/* ============================
+   数理化公式
+   ============================ */
+.formula-category-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.formula-cat-btn {
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 2px solid var(--theme-primary);
+  background: transparent;
+  color: var(--theme-primary);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.formula-cat-btn.active {
+  background: var(--theme-primary);
+  color: #fff;
+}
+
+.formula-list-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--theme-light);
+  margin-bottom: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.formula-list-item:active {
+  transform: scale(0.98);
+}
+
+.formula-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--theme-primary);
+  margin-bottom: 8px;
+}
+
+.formula-expression {
+  font-size: 18px;
+  font-family: monospace;
+  background: var(--theme-light);
+  padding: 12px;
+  border-radius: 8px;
+  margin: 8px 0;
+  text-align: center;
+  word-break: break-all;
+}
+
+.formula-usage,
+.formula-principle {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 8px 0;
+  color: var(--text-main);
+}
+
+.formula-back-btn {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--theme-light);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* ============================
+   古诗赏析
+   ============================ */
+.poem-content {
+  text-align: center;
+  padding: 12px 0;
+}
+
+.poem-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--theme-primary);
+  margin-bottom: 4px;
+}
+
+.poem-author {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.poem-text {
+  font-size: 16px;
+  line-height: 2;
+  white-space: pre-line;
+  margin-bottom: 16px;
+  font-family: serif;
+}
+
+.poem-analysis-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--theme-primary);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--theme-primary);
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.poem-analysis {
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: left;
+  padding: 12px;
+  background: var(--theme-light);
+  border-radius: 8px;
+  color: var(--text-main);
+  animation: fadeIn 0.3s;
+}
+
+.poem-refresh-btn {
+  margin-top: 12px;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 20px;
+  background: var(--theme-light);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* ============================
+   生活常识
+   ============================ */
+.life-tip-content {
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px 8px;
+  color: var(--text-main);
+}
+
+.life-tip-refresh-btn {
+  margin-top: 8px;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 20px;
+  background: var(--theme-light);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* ============================
+   笑话大全
+   ============================ */
+.joke-content {
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px 8px;
+  color: var(--text-main);
+}
+
+.joke-refresh-btn {
+  margin-top: 8px;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 20px;
+  background: var(--theme-light);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* === 动画 === */
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
 }

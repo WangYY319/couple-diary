@@ -776,7 +776,7 @@ const Cloud = {
       role: v.role,
       timestamp: v.timestamp,
       duration: v.duration,
-      read: v.read
+      readBy: v.readBy || {}
     }));
     try {
       await fetch(this._url('voices_list'), {
@@ -815,10 +815,24 @@ const Cloud = {
             blob,
             timestamp: meta.timestamp,
             duration: meta.duration,
-            read: false // 对方的录音标记为未读
+            readBy: meta.readBy || {} // 保留云端已读状态
           });
           await VoiceRecord.saveAll();
           newVoices = true;
+        }
+      } else {
+        // 已有的录音：合并云端 readBy 状态
+        const local = VoiceRecord.voices.find(v => v.id === meta.id);
+        if (local && meta.readBy) {
+          if (!local.readBy) local.readBy = {};
+          let changed = false;
+          for (const role of ['TAO', 'YAN']) {
+            if (meta.readBy[role] && !local.readBy[role]) {
+              local.readBy[role] = true;
+              changed = true;
+            }
+          }
+          if (changed) await VoiceRecord.saveAll();
         }
       }
     }
@@ -919,8 +933,14 @@ const App = {
     VoiceRecord.init();
     LoveRain.init();
     HistoryView.render();
+    HistoryHint.render();
     RandomQA.init();
     EnglishVocab.init();
+    FormulaCard.init();
+    PoemCard.init();
+    LifeTip.init();
+    Joke.init();
+    HotNews.init();
   },
 
   showPairScreen() {
@@ -998,6 +1018,16 @@ const App = {
     entry.style.display = 'flex';
     entry.classList.remove('hidden');
     showToast('已解除配对，打卡记录已保留');
+  },
+
+  // 左上角日历图标点击：如果在历史模式返回今天，否则跳转到日历
+  onNavLeftClick() {
+    if (this.isHistory) {
+      this.exitHistory();
+      showToast('已返回今天');
+    } else {
+      TabNav.switch(2); // 跳转到打卡页（含日历）
+    }
   },
 
   enterApp() {
@@ -1579,11 +1609,13 @@ const Cards = {
     const data = this.getDayData();
     const display = document.getElementById('nightTextDisplay');
     const area = document.getElementById('nightArea');
+    const reveal = document.getElementById('nightReveal');
     if (!display) return;
 
     const theme = document.documentElement.getAttribute('data-theme');
     const myRole = App.currentRole ? App.currentRole.toLowerCase() : null;
     const myDone = myRole ? data.night[myRole] : false;
+    const bothDone = data.night.tao && data.night.yan;
 
     // 根据主题显示对应文字
     const nightText = theme === 'blue' ? '姐姐晚安💤' : '弟弟晚安💤';
@@ -1609,6 +1641,18 @@ const Cards = {
       `;
     } else {
       if (infoEl) infoEl.remove();
+    }
+
+    // 双方都打卡后，浮现文字
+    if (reveal) {
+      if (bothDone) {
+        reveal.innerHTML = `<div class="night-reveal-text">🌙 今夜我们互道晚安，好梦相伴 💕</div>`;
+        reveal.style.display = 'block';
+        reveal.classList.add('reveal-show');
+      } else {
+        reveal.style.display = 'none';
+        reveal.classList.remove('reveal-show');
+      }
     }
   },
 
@@ -2527,14 +2571,21 @@ const TabNav = {
         setTimeout(() => btn.classList.remove('tab-clicked'), 400);
       }
     });
-    // 切换到历史页时重新渲染
-    if (tabIndex === 3) HistoryView.render();
-    // 切换到打卡页时刷新爱心状态
+    // 切换到娱乐页时初始化各模块
+    if (tabIndex === 3) {
+      EnglishVocab.render();
+      HotNews.init();
+      FormulaCard.init();
+      PoemCard.init();
+      LifeTip.init();
+      Joke.init();
+    }
+    // 切换到记录页时刷新爱心状态
     if (tabIndex === 1) { Cards.renderGreet(); Photos.render(); }
-    // 切换到总览页时刷新日历
-    if (tabIndex === 2) { Calendar.render(); RandomQA.render(); EnglishVocab.render(); }
-    // 切换到首页时更新角色显示和录音
-    if (tabIndex === 0) { this.updateRoleDisplay(); VoiceRecord.render(); }
+    // 切换到打卡页时刷新日历、问答、语音、历史提示
+    if (tabIndex === 2) { Calendar.render(); RandomQA.render(); VoiceRecord.render(); HistoryHint.render(); Cards.renderNight(); }
+    // 切换到首页时更新角色显示
+    if (tabIndex === 0) { this.updateRoleDisplay(); }
   },
 
   updateRoleDisplay() {
@@ -2989,7 +3040,7 @@ const VoiceRecord = {
         // 清除旧数据再保存全部
         store.clear();
         this.voices.forEach((v, i) => {
-          store.put({ role: v.role, blob: v.blob, timestamp: v.timestamp, duration: v.duration, read: v.read }, v.id);
+          store.put({ role: v.role, blob: v.blob, timestamp: v.timestamp, duration: v.duration, readBy: v.readBy || {} }, v.id);
         });
         tx.oncomplete = () => resolve();
         tx.onerror = () => resolve();
@@ -3014,6 +3065,11 @@ const VoiceRecord = {
               r2.onerror = () => r(null);
             });
             if (data) {
+              // 向后兼容：旧数据用 read (boolean)，迁移为 readBy
+              if (data.read && !data.readBy) {
+                data.readBy = { TAO: true, YAN: true };
+                delete data.read;
+              }
               this.voices.push({ id: key, ...data });
             }
           }
@@ -3032,22 +3088,53 @@ const VoiceRecord = {
       list.innerHTML = '<div class="voice-empty">还没有语音留言，快来录一段吧 🎤</div>';
       return;
     }
-    list.innerHTML = this.voices.map((v, i) => {
-      const url = URL.createObjectURL(v.blob);
-      const roleColor = v.role === 'TAO' ? 'tao' : 'yan';
-      const roleName = v.role;
-      const time = new Date(v.timestamp);
-      const timeStr = `${String(time.getHours()).padStart(2,'0')}:${String(time.getMinutes()).padStart(2,'0')}`;
-      const unreadDot = v.read ? '' : '<span class="voice-unread-dot"></span>';
-      const playingClass = i === this._playingIndex ? ' playing' : '';
-      return `<div class="voice-item ${roleColor}${playingClass}" onclick="VoiceRecord.play(${i})">
-        <span class="voice-role-tag ${roleColor}">${roleName}</span>
-        <span class="voice-duration">${v.duration}s</span>
-        <span class="voice-time">${timeStr}</span>
-        ${unreadDot}
-        <span class="voice-play-icon">▶</span>
-      </div>`;
-    }).join('');
+    // 按日期分组，最新的在前
+    const sorted = [...this.voices].sort((a, b) => b.timestamp - a.timestamp);
+    const myRole = App.currentRole;
+    const otherRole = myRole === 'TAO' ? 'YAN' : 'TAO';
+
+    // 按日期分组
+    const groups = {};
+    sorted.forEach(v => {
+      const d = new Date(v.timestamp);
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(v);
+    });
+
+    let html = '';
+    for (const [dateKey, items] of Object.entries(groups)) {
+      const d = new Date(dateKey);
+      const today = todayStr();
+      const yesterday = new Date(Date.now() - 86400000);
+      const yKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+      let dateLabel = `${d.getMonth()+1}月${d.getDate()}日`;
+      if (dateKey === today) dateLabel = '今天';
+      else if (dateKey === yKey) dateLabel = '昨天';
+
+      html += `<div class="voice-date-group"><div class="voice-date-label">${dateLabel}</div>`;
+      items.forEach(v => {
+        const idx = this.voices.indexOf(v);
+        const roleColor = v.role === 'TAO' ? 'tao' : 'yan';
+        const time = new Date(v.timestamp);
+        const timeStr = `${String(time.getHours()).padStart(2,'0')}:${String(time.getMinutes()).padStart(2,'0')}`;
+        // 绿点：对方发的且当前角色还没听过
+        const heardByMe = v.readBy && v.readBy[myRole];
+        const unreadDot = (v.role === otherRole && !heardByMe) ? '<span class="voice-unread-dot"></span>' : '';
+        const playingClass = idx === this._playingIndex ? ' playing' : '';
+        const isMine = v.role === myRole;
+        const bubbleSide = isMine ? 'mine' : 'theirs';
+        html += `<div class="voice-bubble ${roleColor} ${bubbleSide}${playingClass}" onclick="VoiceRecord.play(${idx})">
+          <span class="voice-role-tag ${roleColor}">${v.role}</span>
+          <span class="voice-duration">${v.duration}s</span>
+          <span class="voice-time">${timeStr}</span>
+          ${unreadDot}
+          <span class="voice-play-icon">▶</span>
+        </div>`;
+      });
+      html += '</div>';
+    }
+    list.innerHTML = html;
   },
 
   play(index) {
@@ -3056,10 +3143,14 @@ const VoiceRecord = {
       showToast('语音数据异常，无法播放');
       return;
     }
-    // 标记已读
-    if (!v.read) {
-      v.read = true;
+    // 标记当前角色已听
+    if (!v.readBy) v.readBy = {};
+    const myRole = App.currentRole;
+    if (!v.readBy[myRole]) {
+      v.readBy[myRole] = true;
       this.saveAll();
+      // 云同步已读状态
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.syncVoices();
     }
 
     // 如果正在播放同一条，暂停
@@ -3784,6 +3875,26 @@ const HistoryView = {
   }
 };
 
+// ====== 历史统计缩略提示模块 ======
+const HistoryHint = {
+  render() {
+    const el = document.getElementById('historyHintText');
+    if (!el) return;
+    const allDays = Store.getAllDays();
+    const dates = Object.keys(allDays).sort();
+    const totalDays = dates.length;
+    let wordsCount = 0, wishCount = 0;
+    for (const ds of dates) {
+      const d = allDays[ds];
+      if (d.words && d.words.tao) wordsCount++;
+      if (d.words && d.words.yan) wordsCount++;
+      if (d.wish && d.wish.tao) wishCount++;
+      if (d.wish && d.wish.yan) wishCount++;
+    }
+    el.textContent = `📅 累计 ${totalDays} 天 · 💬 语录 ${wordsCount} 条 · 🌟 愿望 ${wishCount} 条`;
+  }
+};
+
 // ====== 随机问答模块 ======
 const RandomQA = {
   // 二选一题库：简单无脑的爱好类问题
@@ -4455,3 +4566,600 @@ const EnglishVocab = {
 
 // ====== 启动 ======
 document.addEventListener('DOMContentLoaded', () => App.init());
+/* ============================
+   新增模块（追加至 app.js 末尾）
+   - FormulaCard  数理化公式
+   - PoemCard      古诗赏析
+   - LifeTip       生活常识
+   - Joke          笑话大全
+   - HotNews       热点新闻
+   依赖：Store / todayStr / showToast（均已在 app.js 中定义）
+   ============================ */
+
+// ====== 数理化公式模块 ======
+const FormulaCard = {
+  // 公式数据：按 数学 / 物理 / 化学 分类，高中及以下常用公式
+  DATA: [
+    // ---------- 数学 ----------
+    { id: 'math_gougu', category: '数学', name: '勾股定理', expression: 'a² + b² = c²', usage: '已知直角三角形任意两边，求第三边长度。', principle: '直角三角形中，两直角边的平方和等于斜边的平方，是几何学最基础的定理。' },
+    { id: 'math_root', category: '数学', name: '二次方程求根公式', expression: 'x = (-b ± √(b²-4ac)) / 2a', usage: '求解一元二次方程 ax² + bx + c = 0（a≠0）的根。', principle: '由配方法推导而来；判别式 Δ=b²-4ac 决定根的个数：Δ>0 两实根，Δ=0 一实根，Δ<0 无实根。' },
+    { id: 'math_circle_area', category: '数学', name: '圆的面积', expression: 'S = πr²', usage: '已知半径 r 求圆的面积。', principle: '将圆等分为无数小扇形拼成近似长方形推导而得，π 为圆周率（约 3.14159）。' },
+    { id: 'math_circle_peri', category: '数学', name: '圆的周长', expression: 'C = 2πr', usage: '已知半径 r 求圆的周长。', principle: '圆周率 π 是周长与直径的比值，是一个无理数。' },
+    { id: 'math_tri_area', category: '数学', name: '三角形面积', expression: 'S = ½ × a × h', usage: '已知底边 a 和对应高 h 求三角形面积。', principle: '三角形面积等于与它等底等高的平行四边形面积的一半。' },
+    { id: 'math_sine', category: '数学', name: '正弦定理', expression: 'a/sinA = b/sinB = c/sinC = 2R', usage: '在任意三角形中，已知边角关系求未知边或角。', principle: '三角形任意一边与其对角正弦之比相等，且等于外接圆直径 2R。' },
+    { id: 'math_cosine', category: '数学', name: '余弦定理', expression: 'c² = a² + b² - 2ab·cosC', usage: '已知两边及夹角求第三边，或已知三边求角。', principle: '勾股定理的推广；当 C=90° 时 cosC=0，退化为勾股定理。' },
+    { id: 'math_arith_sum', category: '数学', name: '等差数列求和', expression: 'Sn = n(a₁ + aₙ) / 2', usage: '求等差数列前 n 项的和。', principle: '将数列首尾配对，每对之和相等，共有 n/2 对。' },
+    { id: 'math_geom_sum', category: '数学', name: '等比数列求和', expression: 'Sn = a₁(1 - qⁿ) / (1 - q)', usage: '求公比 q≠1 的等比数列前 n 项的和。', principle: '利用错位相减法推导；q 为公比，a₁ 为首项。' },
+    { id: 'math_linear', category: '数学', name: '一元一次方程', expression: 'ax + b = 0 → x = -b/a', usage: '求解最简单的一元一次方程（a≠0）。', principle: '通过移项并把未知数系数化为 1，即可求得未知数的值。' },
+
+    // ---------- 物理 ----------
+    { id: 'phy_newton2', category: '物理', name: '牛顿第二定律', expression: 'F = ma', usage: '已知质量和加速度求合外力，或已知力求加速度。', principle: '物体加速度与所受合外力成正比，与质量成反比，方向与合力方向相同。' },
+    { id: 'phy_ohm', category: '物理', name: '欧姆定律', expression: 'I = U / R', usage: '已知电压和电阻求电流。', principle: '导体中的电流与两端电压成正比，与电阻成反比。' },
+    { id: 'phy_kinetic', category: '物理', name: '动能', expression: 'Ek = ½mv²', usage: '计算物体由于运动而具有的动能。', principle: '动能与质量成正比，与速度的平方成正比。' },
+    { id: 'phy_potential', category: '物理', name: '重力势能', expression: 'Ep = mgh', usage: '计算物体相对某参考面的重力势能。', principle: '物体由于被举高而具有的能量；h 为相对参考面的高度，g 为重力加速度。' },
+    { id: 'phy_work', category: '物理', name: '功', expression: 'W = Fs cosθ', usage: '计算恒力对物体所做的功。', principle: '功等于力、位移及两者夹角余弦的乘积；θ 为力与位移方向的夹角。' },
+    { id: 'phy_power', category: '物理', name: '功率', expression: 'P = W / t = Fv', usage: '计算做功的快慢。', principle: '功率等于单位时间内所做的功；匀速运动时也等于力与速度的乘积。' },
+    { id: 'phy_hooke', category: '物理', name: '胡克定律', expression: 'F = kx', usage: '计算弹簧弹力或形变量。', principle: '在弹性限度内，弹力与形变量成正比；k 为弹簧的劲度系数。' },
+    { id: 'phy_gravity', category: '物理', name: '万有引力定律', expression: 'F = G·m₁m₂ / r²', usage: '计算两个质点间的万有引力。', principle: '任意两个有质量的物体间存在引力，与质量乘积成正比，与距离平方成反比。' },
+    { id: 'phy_joule', category: '物理', name: '焦耳定律', expression: 'Q = I²Rt', usage: '计算电流通过导体产生的热量。', principle: '电流通过导体产生的热量与电流平方、电阻和通电时间成正比。' },
+    { id: 'phy_buoyancy', category: '物理', name: '浮力', expression: 'F浮 = ρ液·g·V排', usage: '计算浸在液体中的物体所受浮力。', principle: '浮力等于物体排开液体所受的重力；ρ液 为液体密度，V排 为排开液体的体积。' },
+
+    // ---------- 化学 ----------
+    { id: 'chem_balance', category: '化学', name: '化学方程式配平', expression: 'aA + bB → cC + dD', usage: '书写并配平化学反应方程式。', principle: '遵循质量守恒定律，反应前后各元素的原子种类和数目不变。' },
+    { id: 'chem_mole', category: '化学', name: '摩尔质量公式', expression: 'n = m / M', usage: '在物质的量、质量和摩尔质量之间换算。', principle: '物质的量等于质量除以摩尔质量；n 单位为 mol，M 单位为 g/mol。' },
+    { id: 'chem_gas', category: '化学', name: '理想气体状态方程', expression: 'PV = nRT', usage: '计算理想气体的压强、体积、温度等关系。', principle: '理想气体的压强与体积乘积等于物质的量、气体常数 R 与热力学温度 T 的乘积。' },
+    { id: 'chem_ph', category: '化学', name: 'pH 计算', expression: 'pH = -lg[H⁺]', usage: '计算溶液的酸碱度。', principle: 'pH 为氢离子浓度的负对数；pH<7 为酸性，pH=7 为中性，pH>7 为碱性。' },
+    { id: 'chem_massfrac', category: '化学', name: '溶质质量分数', expression: 'ω = (m质 / m液) × 100%', usage: '计算溶液中溶质的质量分数。', principle: '溶质质量分数等于溶质质量与溶液总质量之比。' }
+  ],
+
+  _currentCat: null,
+
+  // 渲染分类按钮（数学 / 物理 / 化学）
+  init() {
+    const detail = document.getElementById('formulaDetail');
+    if (detail) detail.style.display = 'none';
+    const row = document.getElementById('formulaCategoryRow');
+    if (!row) return;
+    row.style.display = '';
+    const cats = ['数学', '物理', '化学'];
+    let html = '';
+    cats.forEach(cat => {
+      html += `<button class="formula-cat-btn" onclick="FormulaCard.showCategory('${cat}')">${cat}</button>`;
+    });
+    row.innerHTML = html;
+  },
+
+  // 显示某分类下的公式列表
+  showCategory(cat) {
+    this._currentCat = cat;
+    const detail = document.getElementById('formulaDetail');
+    if (detail) detail.style.display = 'none';
+    const row = document.getElementById('formulaCategoryRow');
+    if (!row) return;
+    row.style.display = '';
+    const list = this.DATA.filter(f => f.category === cat);
+    let html = `<button class="formula-cat-btn formula-back-cat-btn" onclick="FormulaCard.init()">← 返回分类</button>`;
+    list.forEach(f => {
+      html += `<div class="formula-item" onclick="FormulaCard.showDetail('${f.id}')">
+        <span class="formula-item-name">${f.name}</span>
+        <span class="formula-item-expr">${f.expression}</span>
+      </div>`;
+    });
+    row.innerHTML = html;
+  },
+
+  // 显示某条公式的详情
+  showDetail(id) {
+    const f = this.DATA.find(x => x.id === id);
+    if (!f) return;
+    const row = document.getElementById('formulaCategoryRow');
+    if (row) row.style.display = 'none';
+    const detail = document.getElementById('formulaDetail');
+    if (!detail) return;
+    detail.style.display = '';
+    const nameEl = document.getElementById('formulaName');
+    const exprEl = document.getElementById('formulaExpression');
+    const usageEl = document.getElementById('formulaUsage');
+    const prinEl = document.getElementById('formulaPrinciple');
+    if (nameEl) nameEl.textContent = f.name;
+    if (exprEl) exprEl.textContent = f.expression;
+    if (usageEl) usageEl.textContent = '用途：' + f.usage;
+    if (prinEl) prinEl.textContent = '原理：' + f.principle;
+  },
+
+  // 从详情返回公式列表
+  backToList() {
+    const detail = document.getElementById('formulaDetail');
+    if (detail) detail.style.display = 'none';
+    const row = document.getElementById('formulaCategoryRow');
+    if (row) row.style.display = '';
+    if (!this._currentCat) this.init();
+  }
+};
+
+// ====== 古诗赏析模块 ======
+const PoemCard = {
+  // 唐诗宋词精选（唐诗三百首 / 宋词三百首），通俗易懂的赏析
+  POEMS: [
+    { title: '静夜思', author: '李白', dynasty: '唐', text: '床前明月光，疑是地上霜。\n举头望明月，低头思故乡。', analysis: '诗人由月光联想到秋霜，引发浓浓的思乡之情。语言朴实无华，却道尽了游子的心声，是思乡诗中最经典的作品。' },
+    { title: '春晓', author: '孟浩然', dynasty: '唐', text: '春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。', analysis: '描写春日清晨被鸟鸣唤醒的惬意，又由昨夜风雨联想到落花，含蓄地表达了对春光易逝的淡淡惋惜。' },
+    { title: '登鹳雀楼', author: '王之涣', dynasty: '唐', text: '白日依山尽，黄河入海流。\n欲穷千里目，更上一层楼。', analysis: '前两句写壮阔的自然景象，后两句由景入理，鼓励人们不断攀登、开拓眼界，气魄宏大，寓意深远。' },
+    { title: '望庐山瀑布', author: '李白', dynasty: '唐', text: '日照香炉生紫烟，遥看瀑布挂前川。\n飞流直下三千尺，疑是银河落九天。', analysis: '用极度夸张的手法描写瀑布的壮观，将飞瀑比作从天而降的银河，想象力惊人，气势磅礴。' },
+    { title: '早发白帝城', author: '李白', dynasty: '唐', text: '朝辞白帝彩云间，千里江陵一日还。\n两岸猿声啼不住，轻舟已过万重山。', analysis: '写于诗人遇赦东归途中。全诗节奏轻快，"轻舟"二字既是写实，也暗含心情的轻松愉悦。' },
+    { title: '绝句', author: '杜甫', dynasty: '唐', text: '两个黄鹂鸣翠柳，一行白鹭上青天。\n窗含西岭千秋雪，门泊东吴万里船。', analysis: '四句写四景，黄绿白蓝色彩分明，动静相宜，勾勒出一幅开阔明媚的春日画卷。' },
+    { title: '春夜喜雨', author: '杜甫', dynasty: '唐', text: '好雨知时节，当春乃发生。\n随风潜入夜，润物细无声。', analysis: '以拟人手法赞美春雨仿佛懂得时节，在夜里悄无声息地滋润万物，"润物细无声"成为千古名句。' },
+    { title: '望岳', author: '杜甫', dynasty: '唐', text: '岱宗夫如何？齐鲁青未了。\n造化钟神秀，阴阳割昏晓。\n会当凌绝顶，一览众山小。', analysis: '描写泰山的雄伟壮丽，结尾抒发攀登绝顶、俯视一切的壮志豪情，是青年杜甫意气风发的代表作。' },
+    { title: '江雪', author: '柳宗元', dynasty: '唐', text: '千山鸟飞绝，万径人踪灭。\n孤舟蓑笠翁，独钓寒江雪。', analysis: '描绘大雪中万物沉寂、唯有一翁独钓的画面，表现了诗人孤高傲世、不随流俗的品格。' },
+    { title: '悯农', author: '李绅', dynasty: '唐', text: '锄禾日当午，汗滴禾下土。\n谁知盘中餐，粒粒皆辛苦。', analysis: '以朴素的语言再现农民烈日下劳作的艰辛，劝诫人们珍惜粮食，家喻户晓，影响深远。' },
+    { title: '枫桥夜泊', author: '张继', dynasty: '唐', text: '月落乌啼霜满天，江枫渔火对愁眠。\n姑苏城外寒山寺，夜半钟声到客船。', analysis: '通过夜泊时的月落、乌啼、渔火和寒山寺钟声，营造出凄清幽远的意境，衬托出旅人的愁思。' },
+    { title: '游子吟', author: '孟郊', dynasty: '唐', text: '慈母手中线，游子身上衣。\n临行密密缝，意恐迟迟归。\n谁言寸草心，报得三春晖。', analysis: '以临行缝衣的细节歌颂母爱，"谁言寸草心，报得三春晖"将子女比作小草、母爱比作春光，成为感恩母爱的千古名句。' },
+    { title: '黄鹤楼', author: '崔颢', dynasty: '唐', text: '昔人已乘黄鹤去，此地空余黄鹤楼。\n黄鹤一去不复返，白云千载空悠悠。\n晴川历历汉阳树，芳草萋萋鹦鹉洲。\n日暮乡关何处是？烟波江上使人愁。', analysis: '由仙人乘鹤的传说起笔，抒发物是人非之感，结尾以日暮乡愁收束，被誉为唐代七律第一。' },
+    { title: '出塞', author: '王昌龄', dynasty: '唐', text: '秦时明月汉时关，万里长征人未还。\n但使龙城飞将在，不教胡马度阴山。', analysis: '首句将秦汉明月关山融于一体，时空辽阔，表达了对良将的期盼和期盼边境安宁的愿望。' },
+    { title: '凉州词', author: '王翰', dynasty: '唐', text: '葡萄美酒夜光杯，欲饮琵琶马上催。\n醉卧沙场君莫笑，古来征战几人回。', analysis: '以豪迈笔调写边塞将士饮酒的场景，"醉卧沙场"既显旷达又透悲壮，豪情与苍凉并存。' },
+    { title: '回乡偶书', author: '贺知章', dynasty: '唐', text: '少小离家老大回，乡音无改鬓毛衰。\n儿童相见不相识，笑问客从何处来。', analysis: '写久客回乡的感慨，以儿童天真的问话反衬岁月流逝、物是人非，质朴而动人心弦。' },
+    { title: '咏柳', author: '贺知章', dynasty: '唐', text: '碧玉妆成一树高，万条垂下绿丝绦。\n不知细叶谁裁出，二月春风似剪刀。', analysis: '以新颖的比喻赞美春柳，将春风比作剪刀裁出细细柳叶，想象奇巧，生机盎然。' },
+    { title: '九月九日忆山东兄弟', author: '王维', dynasty: '唐', text: '独在异乡为异客，每逢佳节倍思亲。\n遥知兄弟登高处，遍插茱萸少一人。', analysis: '写游子重阳佳节的思亲之情，"每逢佳节倍思亲"道尽天下游子的共同心声，情真意切。' },
+    { title: '鹿柴', author: '王维', dynasty: '唐', text: '空山不见人，但闻人语响。\n返景入深林，复照青苔上。', analysis: '以人语和夕阳反衬空山的幽静，以动写静，体现了王维"诗中有画"的禅意境界。' },
+    { title: '相思', author: '王维', dynasty: '唐', text: '红豆生南国，春来发几枝。\n愿君多采撷，此物最相思。', analysis: '借红豆寄托相思之情，语言明白如话却情深意长，常被用作赠答怀人之作。' },
+    { title: '鸟鸣涧', author: '王维', dynasty: '唐', text: '人闲桂花落，夜静春山空。\n月出惊山鸟，时鸣春涧中。', analysis: '以花落、月出、鸟鸣衬托春夜山涧的宁静，动静相映，意境清幽空灵。' },
+    { title: '赋得古原草送别', author: '白居易', dynasty: '唐', text: '离离原上草，一岁一枯荣。\n野火烧不尽，春风吹又生。', analysis: '赞美野草顽强的生命力，"野火烧不尽，春风吹又生"流传千古，蕴含着坚韧不拔的精神。' },
+    { title: '池上', author: '白居易', dynasty: '唐', text: '小娃撑小艇，偷采白莲回。\n不解藏踪迹，浮萍一道开。', analysis: '生动描写小孩偷采莲蓬后不知隐藏踪迹的天真情景，充满童趣与生活气息。' },
+    { title: '忆江南', author: '白居易', dynasty: '唐', text: '江南好，风景旧曾谙。\n日出江花红胜火，春来江水绿如蓝。\n能不忆江南？', analysis: '以鲜明的色彩描绘江南春景，红花绿水对比强烈，表达了对江南的深切怀念。' },
+    { title: '水调歌头', author: '苏轼', dynasty: '宋', text: '明月几时有？把酒问青天。\n不知天上宫阙，今夕是何年。\n我欲乘风归去，又恐琼楼玉宇，高处不胜寒。\n起舞弄清影，何似在人间。\n转朱阁，低绮户，照无眠。\n不应有恨，何事长向别时圆？\n人有悲欢离合，月有阴晴圆缺，此事古难全。\n但愿人长久，千里共婵娟。', analysis: '中秋望月怀人之作。由问月到悟理，最终以"但愿人长久，千里共婵娟"寄寓美好祝愿，旷达而深情。' },
+    { title: '念奴娇·赤壁怀古', author: '苏轼', dynasty: '宋', text: '大江东去，浪淘尽，千古风流人物。\n故垒西边，人道是，三国周郎赤壁。\n乱石穿空，惊涛拍岸，卷起千堆雪。\n江山如画，一时多少豪杰。\n遥想公瑾当年，小乔初嫁了，雄姿英发。\n羽扇纶巾，谈笑间，樯橹灰飞烟灭。\n故国神游，多情应笑我，早生华发。\n人生如梦，一尊还酹江月。', analysis: '借赤壁古迹怀古抒怀，将壮丽江山与人生感慨融为一体，气势磅礴，是豪放词的巅峰之作。' },
+    { title: '江城子·密州出猎', author: '苏轼', dynasty: '宋', text: '老夫聊发少年狂，左牵黄，右擎苍。\n锦帽貂裘，千骑卷平冈。\n为报倾城随太守，亲射虎，看孙郎。\n酒酣胸胆尚开张，鬓微霜，又何妨！\n持节云中，何日遣冯唐？\n会挽雕弓如满月，西北望，射天狼。', analysis: '写狩猎的盛大场面，抒发抗敌报国的壮志豪情，是苏轼第一首豪放词，气概非凡。' },
+    { title: '声声慢', author: '李清照', dynasty: '宋', text: '寻寻觅觅，冷冷清清，凄凄惨惨戚戚。\n乍暖还寒时候，最难将息。\n三杯两盏淡酒，怎敌他、晚来风急！\n雁过也，正伤心，却是旧时相识。\n满地黄花堆积，憔悴损，如今有谁堪摘？\n守着窗儿，独自怎生得黑！\n梧桐更兼细雨，到黄昏、点点滴滴。\n这次第，怎一个愁字了得！', analysis: '以十四个叠字开篇，层层渲染愁绪，将国破家亡、孤独漂泊之苦写得淋漓尽致，是婉约词的杰作。' },
+    { title: '如梦令', author: '李清照', dynasty: '宋', text: '昨夜雨疏风骤，浓睡不消残酒。\n试问卷帘人，却道海棠依旧。\n知否，知否？应是绿肥红瘦。', analysis: '通过晨起对话写出对春花凋零的惋惜，"绿肥红瘦"四字新颖传神，尽显词人细腻的情怀。' },
+    { title: '满江红', author: '岳飞', dynasty: '宋', text: '怒发冲冠，凭栏处、潇潇雨歇。\n抬望眼，仰天长啸，壮怀激烈。\n三十功名尘与土，八千里路云和月。\n莫等闲，白了少年头，空悲切。\n靖康耻，犹未雪。臣子恨，何时灭！\n驾长车，踏破贺兰山缺。\n壮志饥餐胡虏肉，笑谈渴饮匈奴血。\n待从头、收拾旧山河，朝天阙。', analysis: '抒发精忠报国、收复河山的壮志，慷慨悲壮，"莫等闲，白了少年头"激励了无数后人奋发图强。' },
+    { title: '破阵子', author: '辛弃疾', dynasty: '宋', text: '醉里挑灯看剑，梦回吹角连营。\n八百里分麾下炙，五十弦翻塞外声，沙场秋点兵。\n马作的卢飞快，弓如霹雳弦惊。\n了却君王天下事，赢得生前身后名。\n可怜白发生！', analysis: '追忆军旅生活，抒发建功立业的抱负，结尾"可怜白发生"陡然转折，道尽壮志难酬的悲愤。' },
+    { title: '青玉案·元夕', author: '辛弃疾', dynasty: '宋', text: '东风夜放花千树，更吹落、星如雨。\n宝马雕车香满路。\n凤箫声动，玉壶光转，一夜鱼龙舞。\n蛾儿雪柳黄金缕，笑语盈盈暗香去。\n众里寻他千百度，蓦然回首，那人却在，灯火阑珊处。', analysis: '写元宵灯节的繁华热闹，结尾"蓦然回首"境界顿开，寄托了不随流俗的高洁情怀，耐人寻味。' },
+    { title: '浣溪沙', author: '晏殊', dynasty: '宋', text: '一曲新词酒一杯，去年天气旧亭台。\n夕阳西下几时回？\n无可奈何花落去，似曾相识燕归来。\n小园香径独徘徊。', analysis: '由春景引发对时光流逝的惆怅，"无可奈何花落去"对仗工整，蕴含着对人生无常的哲理思考。' },
+    { title: '蝶恋花', author: '柳永', dynasty: '宋', text: '伫倚危楼风细细，望极春愁，黯黯生天际。\n草色烟光残照里，无言谁会凭阑意。\n拟把疏狂图一醉，对酒当歌，强乐还无味。\n衣带渐宽终不悔，为伊消得人憔悴。', analysis: '抒写相思之苦，"衣带渐宽终不悔，为伊消得人憔悴"成为执着爱情的千古名句，深情而不悔。' },
+    { title: '雨霖铃', author: '柳永', dynasty: '宋', text: '寒蝉凄切，对长亭晚，骤雨初歇。\n都门帐饮无绪，留恋处，兰舟催发。\n执手相看泪眼，竟无语凝噎。\n念去去，千里烟波，暮霭沉沉楚天阔。\n多情自古伤离别，更那堪，冷落清秋节！\n今宵酒醒何处？杨柳岸，晓风残月。\n此去经年，应是良辰好景虚设。\n便纵有千种风情，更与何人说？', analysis: '写离别的凄婉缠绵，"杨柳岸晓风残月"为千古名句，将离愁别绪渲染到了极致。' },
+    { title: '虞美人', author: '李煜', dynasty: '五代', text: '春花秋月何时了？往事知多少。\n小楼昨夜又东风，故国不堪回首月明中。\n雕栏玉砌应犹在，只是朱颜改。\n问君能有几多愁？恰似一江春水向东流。', analysis: '以春水东流喻愁之深广，将亡国之痛写得滔滔不绝、真挚深沉，是词史上不朽的名作。' }
+  ],
+
+  _currentIndex: 0,
+
+  // 日期种子伪随机洗牌（与 RandomQA 保持一致）
+  _seededShuffle(arr, seed) {
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+    const rng = () => { h = (h * 9301 + 49297) % 233280; return h / 233280; };
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  },
+
+  // 每天固定一首（日期种子），同一天打开结果一致
+  init() {
+    const dateStr = todayStr();
+    const cached = Store.get(`poem_${dateStr}`, -1);
+    if (cached >= 0 && cached < this.POEMS.length) {
+      this._currentIndex = cached;
+    } else {
+      const indices = this._seededShuffle(
+        this.POEMS.map((_, i) => i),
+        dateStr
+      );
+      this._currentIndex = indices[0];
+      Store.set(`poem_${dateStr}`, this._currentIndex);
+    }
+    this._resetAnalysis();
+    this._renderPoem(this._currentIndex);
+  },
+
+  // 手动换一首（随机且不重复当前）
+  refresh() {
+    if (this.POEMS.length <= 1) {
+      this._currentIndex = 0;
+    } else {
+      let idx;
+      do {
+        idx = Math.floor(Math.random() * this.POEMS.length);
+      } while (idx === this._currentIndex);
+      this._currentIndex = idx;
+    }
+    this._resetAnalysis();
+    this._renderPoem(this._currentIndex);
+    showToast('为你换了一首新诗 📜');
+  },
+
+  // 显示 / 隐藏赏析
+  toggleAnalysis() {
+    const analysis = document.getElementById('poemAnalysis');
+    const btn = document.getElementById('poemAnalysisBtn');
+    if (!analysis) return;
+    const isHidden = analysis.style.display === 'none';
+    analysis.style.display = isHidden ? '' : 'none';
+    if (btn) btn.textContent = isHidden ? '📖 收起赏析' : '📖 查看赏析';
+  },
+
+  _renderPoem(idx) {
+    const poem = this.POEMS[idx];
+    if (!poem) return;
+    const titleEl = document.getElementById('poemTitle');
+    const authorEl = document.getElementById('poemAuthor');
+    const textEl = document.getElementById('poemText');
+    const analysisEl = document.getElementById('poemAnalysis');
+    if (titleEl) titleEl.textContent = poem.title;
+    if (authorEl) authorEl.textContent = `${poem.dynasty} · ${poem.author}`;
+    if (textEl) textEl.innerHTML = poem.text.replace(/\n/g, '<br>');
+    if (analysisEl) analysisEl.textContent = poem.analysis;
+  },
+
+  _resetAnalysis() {
+    const analysis = document.getElementById('poemAnalysis');
+    if (analysis) analysis.style.display = 'none';
+    const btn = document.getElementById('poemAnalysisBtn');
+    if (btn) btn.textContent = '📖 查看赏析';
+  }
+};
+
+// ====== 生活常识模块 ======
+const LifeTip = {
+  // 50+ 条简短生活小常识（每条不超过 30 字）
+  TIPS: [
+    '切洋葱时嚼口香糖可有效防止流泪',
+    '用盐水浸泡草莓可延长保鲜时间',
+    '生姜擦拭刀具可去除鱼腥味',
+    '煮饭时加几滴醋，米饭更洁白松软',
+    '用牙膏擦拭银饰可使其恢复光泽',
+    '煮饺子时加少许盐可防止粘连',
+    '茶叶受潮晒干后可做冰箱除味剂',
+    '热水瓶用醋浸泡可轻松去除水垢',
+    '新鞋磨脚处涂白酒可使其软化',
+    '滴眼药水时微微张嘴可减少眨眼',
+    '冰箱里放一卷卫生纸可吸附异味',
+    '用淘米水洗手可使皮肤光滑细嫩',
+    '核桃在盐水中煮片刻更易剥壳',
+    '用吹风机加热标签更容易撕下',
+    '炒鸡蛋加少量温水会更加蓬松',
+    '煮面条时加少许油可防止溢锅',
+    '用醋擦玻璃会更加干净明亮',
+    '过期牛奶可用来擦拭皮质沙发',
+    '用洋葱擦拭刀叉可去除锈迹',
+    '吃火锅后喝杯酸奶有助保护肠胃',
+    '用盐搓洗桃子可轻松去除绒毛',
+    '香蕉根部包保鲜膜可延缓成熟',
+    '切辣椒后用食醋洗手可去辣味',
+    '用啤酒擦拭植物叶片更加翠绿',
+    '旧丝袜擦皮鞋可使鞋面更光亮',
+    '煮饭时加几滴柠檬汁米饭更香',
+    '用面包片清理碎玻璃更加安全',
+    '热水加醋泡脚有助于改善睡眠',
+    '生姜涂抹脚底可帮助去除脚臭',
+    '苹果和土豆放一起可防土豆发芽',
+    '白醋加水喷洒可有效驱赶蚂蚁',
+    '用茶叶水浇花可使花朵更茂盛',
+    '新床单用盐水浸泡清洗不易褪色',
+    '煮海带时加几滴醋容易煮烂',
+    '衣服墨迹用牛奶搓洗可去除',
+    '用酒精擦拭手机屏幕可杀菌消毒',
+    '洗衣机用白醋空转可清洁内筒',
+    '切开的苹果泡盐水不易变色',
+    '炒藕丝时边炒边加水可防变黑',
+    '用小苏打刷牙有助于美白牙齿',
+    '花瓶里加少许糖鲜花更持久',
+    '蚊子叮咬后涂肥皂水可止痒',
+    '用食盐清洁砧板可杀菌除味',
+    '煎鱼前用生姜擦锅底可防粘锅',
+    '用吸管喝饮料有助于保护牙齿',
+    '大蒜捣碎后放十分钟再吃更健康',
+    '煮粥时加几滴油可防止溢锅',
+    '柠檬汁加小苏打可除冰箱异味',
+    '剥大蒜前泡水几分钟更易剥皮',
+    '米饭夹生时用筷子戳孔再焖一会',
+    '用保鲜膜包住香蕉柄可保鲜更久',
+    '炖肉时加几片橘子皮可去腥提鲜'
+  ],
+
+  _currentIndex: 0,
+
+  _seededShuffle(arr, seed) {
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+    const rng = () => { h = (h * 9301 + 49297) % 233280; return h / 233280; };
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  },
+
+  // 每天固定一条（日期种子）
+  init() {
+    const dateStr = todayStr();
+    const cached = Store.get(`lifetip_${dateStr}`, -1);
+    if (cached >= 0 && cached < this.TIPS.length) {
+      this._currentIndex = cached;
+    } else {
+      const indices = this._seededShuffle(
+        this.TIPS.map((_, i) => i),
+        dateStr
+      );
+      this._currentIndex = indices[0];
+      Store.set(`lifetip_${dateStr}`, this._currentIndex);
+    }
+    this._render();
+  },
+
+  // 随机换一条（不重复当前）
+  refresh() {
+    if (this.TIPS.length <= 1) {
+      this._currentIndex = 0;
+    } else {
+      let idx;
+      do {
+        idx = Math.floor(Math.random() * this.TIPS.length);
+      } while (idx === this._currentIndex);
+      this._currentIndex = idx;
+    }
+    this._render();
+  },
+
+  _render() {
+    const el = document.getElementById('lifeTipContent');
+    if (!el) return;
+    el.textContent = this.TIPS[this._currentIndex];
+  }
+};
+
+// ====== 笑话大全模块 ======
+const Joke = {
+  // 30+ 条短笑话（每条不超过 30 字）
+  JOKES: [
+    '为什么企鹅只有肚子是白的？因为手短洗不到后背。',
+    '我不是胖，我只是瘦得不太明显。',
+    '鱼说：我哭了你看不见，因为我在水里。',
+    '我数学不好，但数钱从来没出过错。',
+    '0对8说：胖就胖呗，还系什么腰带。',
+    '蜘蛛侠为什么能爬墙？因为他没脚臭。',
+    '为什么海最蓝？因为鱼在里面吐泡泡。',
+    '老师：早起的鸟儿有虫吃。学生：早起的虫被鸟吃。',
+    '手机最怕什么？手滑。',
+    '我不是在发呆，我是在用意念思考人生。',
+    '鸡蛋去茶馆喝茶，结果变成了茶叶蛋。',
+    '为什么电脑会感冒？因为它的窗口开着。',
+    '为什么猪看不到天空？因为脖子太短。',
+    '一只包子走着走着饿了，就把自己吃了。',
+    '我不是懒，我只是在节能模式下运行。',
+    '从前有只羊，吃了片草就走了，因为草没味。',
+    '猪八戒照镜子，里外不是人。',
+    '为什么北极熊不吃企鹅？因为碰不到面。',
+    '老师：1+1等于几？小明：不知道。老师：回家问家长。',
+    '为什么雪人没鼻子？因为它化了。',
+    '程序员为什么喜欢黑暗？因为光会引来bug。',
+    '一天地球对月亮说：你老围着我转，烦不烦？',
+    '为什么猫喜欢盒子？因为它是纸老虎。',
+    '小明：老师我要请假！老师：理由？小明：我奶奶结婚。',
+    '有一天小明走着走着，就走到了终点。',
+    '为什么蚂蚁不掉进河里？因为会游泳。',
+    '老师问谁发明了电灯，小明说爱迪生。那他发明了啥？',
+    '一只螃蟹走着走着，咦，怎么横着走。',
+    '从前有个人叫小蔡，被扔进火锅变成了菜。',
+    '小明问爸爸：为什么别人爸爸那么有钱？爸爸：因为他爸有钱。',
+    '一天有个鸡蛋去松花江游泳，变成了皮蛋。',
+    '老师说考试不能作弊，小明说：我这叫参考。'
+  ],
+
+  _currentIndex: 0,
+
+  _seededShuffle(arr, seed) {
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+    const rng = () => { h = (h * 9301 + 49297) % 233280; return h / 233280; };
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  },
+
+  // 每天固定一个（日期种子）
+  init() {
+    const dateStr = todayStr();
+    const cached = Store.get(`joke_${dateStr}`, -1);
+    if (cached >= 0 && cached < this.JOKES.length) {
+      this._currentIndex = cached;
+    } else {
+      const indices = this._seededShuffle(
+        this.JOKES.map((_, i) => i),
+        dateStr
+      );
+      this._currentIndex = indices[0];
+      Store.set(`joke_${dateStr}`, this._currentIndex);
+    }
+    this._render();
+  },
+
+  // 随机换一个（不重复当前）
+  refresh() {
+    if (this.JOKES.length <= 1) {
+      this._currentIndex = 0;
+    } else {
+      let idx;
+      do {
+        idx = Math.floor(Math.random() * this.JOKES.length);
+      } while (idx === this._currentIndex);
+      this._currentIndex = idx;
+    }
+    this._render();
+  },
+
+  _render() {
+    const el = document.getElementById('jokeContent');
+    if (!el) return;
+    el.textContent = this.JOKES[this._currentIndex];
+  }
+};
+
+// ====== 热点新闻模块 ======
+const HotNews = {
+  _items: [],
+  _offset: 0,
+  _isPaused: false,
+  _scrollTimer: null,
+  _loading: false,
+
+  // 尝试获取热点新闻：tenapi → vvhan → 兜底提示
+  async init() {
+    this._stopScroll();
+    if (this._loading) return;
+    this._loading = true;
+    try {
+      let items = await this._tryTenapi();
+      if (!items || items.length === 0) {
+        items = await this._tryVvhan();
+      }
+      if (!items || items.length === 0) {
+        this._showFallback();
+        return;
+      }
+      // 若有分类信息，优先展示政治时事与科技类，其余补齐
+      items = this._prioritize(items);
+      this._items = items.slice(0, 10).map((it, i) => ({
+        rank: i + 1,
+        title: it.title || '未知',
+        hot: it.hot || ''
+      }));
+      this._offset = 0;
+      this._isPaused = false;
+      this._updatePauseBtn();
+      const pauseBtn = document.getElementById('hotnewsPauseBtn');
+      if (pauseBtn) pauseBtn.style.display = '';
+      this._render();
+      this._startScroll();
+    } finally {
+      this._loading = false;
+    }
+  },
+
+  // 带超时的 JSON 请求
+  async _fetchJson(url, timeout) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout || 5000);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      clearTimeout(timer);
+      return null;
+    }
+  },
+
+  // 第一数据源：tenapi.cn 头条热榜
+  async _tryTenapi() {
+    try {
+      const data = await this._fetchJson('https://tenapi.cn/v2/toutiaohot');
+      if (!data || !Array.isArray(data.data)) return [];
+      return data.data
+        .map(it => ({
+          title: it.name || it.title || '',
+          hot: it.hot || '',
+          category: it.category || it.tag || it.type || ''
+        }))
+        .filter(it => it.title);
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // 第二数据源：vvhan 微博热搜
+  async _tryVvhan() {
+    try {
+      const data = await this._fetchJson('https://api.vvhan.com/api/hotlist/wbHot');
+      if (!data || !Array.isArray(data.data)) return [];
+      return data.data
+        .map(it => ({
+          title: it.title || it.name || '',
+          hot: it.hot || '',
+          category: ''
+        }))
+        .filter(it => it.title);
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // 优先排列政治时事与科技类（若存在分类字段）
+  _prioritize(items) {
+    const hasCat = items.some(it => it.category);
+    if (!hasCat) return items;
+    const keywords = ['政治', '时事', '时政', '科技'];
+    const priority = items.filter(it => {
+      const cat = it.category || '';
+      return keywords.some(k => cat.includes(k));
+    });
+    const rest = items.filter(it => !priority.includes(it));
+    return [...priority, ...rest];
+  },
+
+  // 渲染当前窗口的 5 条
+  _render() {
+    const container = document.getElementById('hotnewsContainer');
+    if (!container || this._items.length === 0) return;
+    const n = this._items.length;
+    const visible = Math.min(5, n);
+    let html = '';
+    for (let i = 0; i < visible; i++) {
+      const item = this._items[(this._offset + i) % n];
+      html += `<div class="hotnews-item">
+        <span class="hotnews-rank">${item.rank}</span>
+        <span class="hotnews-title">${item.title}</span>
+        ${item.hot ? `<span class="hotnews-hot">🔥 ${item.hot}</span>` : ''}
+      </div>`;
+    }
+    container.innerHTML = html;
+  },
+
+  // 每 3 秒滚动一次，循环展示全部条目
+  _startScroll() {
+    this._stopScroll();
+    if (this._isPaused || this._items.length === 0) return;
+    this._scrollTimer = setInterval(() => {
+      this._offset = (this._offset + 1) % this._items.length;
+      this._render();
+    }, 3000);
+  },
+
+  _stopScroll() {
+    if (this._scrollTimer) {
+      clearInterval(this._scrollTimer);
+      this._scrollTimer = null;
+    }
+  },
+
+  // 暂停 / 继续自动滚动
+  togglePause() {
+    this._isPaused = !this._isPaused;
+    if (this._isPaused) {
+      this._stopScroll();
+    } else {
+      this._startScroll();
+    }
+    this._updatePauseBtn();
+  },
+
+  _updatePauseBtn() {
+    const btn = document.getElementById('hotnewsPauseBtn');
+    if (!btn) return;
+    btn.textContent = this._isPaused ? '▶️' : '⏸️';
+  },
+
+  _showFallback() {
+    const container = document.getElementById('hotnewsContainer');
+    if (container) {
+      container.innerHTML = '<div class="hotnews-placeholder">暂无法获取热点新闻</div>';
+    }
+    const btn = document.getElementById('hotnewsPauseBtn');
+    if (btn) btn.style.display = 'none';
+  }
+};
