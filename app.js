@@ -907,21 +907,48 @@ const CloudSync = {
     await this.set('online_duration', localData);
   },
 
-  // 同步信件
+  // 同步信件：双向合并
   async syncLetters() {
     if (!Cloud.pairCode) return;
     const cloudLetters = await this.get('letters');
-    if (!cloudLetters || !Array.isArray(cloudLetters)) return;
+    if (!cloudLetters || !Array.isArray(cloudLetters)) {
+      // 云端没有，推送本地
+      if (LetterBox.letters.length > 0) {
+        await this.set('letters', LetterBox.letters.map(LetterBox._serialize));
+      }
+      return;
+    }
 
-    const localIds = new Set(LetterBox.letters.map(l => l.id));
-    let newCount = 0;
+    let changed = false;
+    const localMap = new Map(LetterBox.letters.map(l => [l.id, l]));
+
+    // 1. 合并云端信件到本地（新增的 + 已读状态合并的）
     cloudLetters.forEach(cl => {
-      if (!localIds.has(cl.id)) {
-        LetterBox.letters.push(cl);
-        newCount++;
+      const local = localMap.get(cl.id);
+      if (!local) {
+        // 新信件
+        LetterBox.letters.push(LetterBox._deserialize(cl));
+        changed = true;
+      } else {
+        // 已有信件：合并 readBy 状态
+        if (!local.readBy) local.readBy = {};
+        if (cl.readBy) {
+          let readChanged = false;
+          for (const role of ['TAO', 'YAN']) {
+            if (cl.readBy[role] && !local.readBy[role]) {
+              local.readBy[role] = true;
+              readChanged = true;
+            }
+          }
+          if (readChanged) changed = true;
+        }
       }
     });
-    if (newCount > 0) {
+
+    // 2. 推送合并后的本地数据回云端
+    await this.set('letters', LetterBox.letters.map(LetterBox._serialize));
+
+    if (changed) {
       await LetterBox.saveAll();
       LetterBox.updateBadges();
     }
@@ -5938,7 +5965,25 @@ const LetterBox = {
       const tx = db.transaction(this.DB_STORE, 'readonly');
       const store = tx.objectStore(this.DB_STORE);
       const req = store.getAll();
-      req.onsuccess = () => { this.letters = req.result || []; resolve(this.letters); };
+      req.onsuccess = () => {
+        this.letters = req.result || [];
+        // 向后兼容：旧数据用 read (boolean)，迁移为 readBy
+        let migrated = false;
+        this.letters.forEach(l => {
+          if (!l.readBy) {
+            l.readBy = {};
+            if (l.read) {
+              // 旧的 read=true 表示已被查看，两个角色都标记为已读
+              l.readBy = { TAO: true, YAN: true };
+            }
+            migrated = true;
+          }
+        });
+        if (migrated) {
+          this.saveAll();
+        }
+        resolve(this.letters);
+      };
       req.onerror = () => reject(req.error);
     });
   },
@@ -6019,7 +6064,7 @@ const LetterBox = {
       content: content,
       date: this._todayStr(),
       timestamp: Date.now(),
-      read: false
+      readBy: {} // 各角色独立记录已读状态：{ TAO: true, YAN: false }
     };
 
     this.letters.push(letter);
@@ -6029,10 +6074,7 @@ const LetterBox = {
     // 同步到云端
     try {
       if (typeof CloudSync !== 'undefined' && CloudSync.set) {
-        CloudSync.set('letters', this.letters.map(l => ({
-          id: l.id, from: l.from, to: l.to, content: l.content,
-          date: l.date, timestamp: l.timestamp, read: l.read
-        })));
+        CloudSync.set('letters', this.letters.map(l => this._serialize(l)));
       }
     } catch (e) { console.warn('cloud sync failed', e); }
 
@@ -6094,15 +6136,26 @@ const LetterBox = {
       }, index * 300);
     });
 
-    // 标记对方角色已查看
+    // 标记当前查看角色已读（角色独立记录）
     const viewerRole = (typeof App !== 'undefined' && App.currentRole) ? App.currentRole : 'TAO';
+    let readChanged = false;
     sorted.forEach(letter => {
-      if (letter.to === viewerRole && !letter.read) {
-        letter.read = true;
+      if (!letter.readBy) letter.readBy = {};
+      if (!letter.readBy[viewerRole]) {
+        letter.readBy[viewerRole] = true;
+        readChanged = true;
       }
     });
-    this.saveAll();
-    this.updateBadges();
+    if (readChanged) {
+      this.saveAll();
+      this.updateBadges();
+      // 同步已读状态到云端
+      try {
+        if (typeof CloudSync !== 'undefined' && CloudSync.set) {
+          CloudSync.set('letters', this.letters.map(l => this._serialize(l)));
+        }
+      } catch (e) { console.warn('cloud sync read status failed', e); }
+    }
   },
 
   closeMailbox() {
@@ -6144,8 +6197,8 @@ const LetterBox = {
     ['TAO', 'YAN'].forEach(role => {
       const badge = document.getElementById('mailboxBadge' + role);
       if (!badge) return;
-      // 显示发送给该角色的未读信件数
-      const unread = this.letters.filter(l => l.to === role && !l.read).length;
+      // 显示发送给该角色且该角色尚未查看的未读信件数
+      const unread = this.letters.filter(l => l.to === role && (!l.readBy || !l.readBy[role])).length;
       if (unread > 0) {
         badge.style.display = 'flex';
         badge.textContent = unread > 9 ? '9+' : String(unread);
@@ -6198,5 +6251,31 @@ const LetterBox = {
     if (typeof todayStr === 'function') return todayStr();
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  },
+
+  // 序列化信件（用于云端传输）
+  _serialize(l) {
+    return {
+      id: l.id,
+      from: l.from,
+      to: l.to,
+      content: l.content,
+      date: l.date,
+      timestamp: l.timestamp,
+      readBy: l.readBy || {}
+    };
+  },
+
+  // 反序列化信件（从云端恢复到本地）
+  _deserialize(cl) {
+    return {
+      id: cl.id,
+      from: cl.from,
+      to: cl.to,
+      content: cl.content || '',
+      date: cl.date || '',
+      timestamp: cl.timestamp || 0,
+      readBy: cl.readBy || {}
+    };
   }
 };
