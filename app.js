@@ -1566,7 +1566,6 @@ const Calendar = {
     const totalNeeded = firstDay + daysInMonth;
     const hasOverflow = totalNeeded > TOTAL_CELLS;
     const overflowCount = hasOverflow ? totalNeeded - TOTAL_CELLS : 0;
-    const prevMonthDays = new Date(year, month, 0).getDate();
     const leadingCount = firstDay - overflowCount;
 
     let html = '';
@@ -1574,7 +1573,7 @@ const Calendar = {
       html += `<div class="cal-dow">${d}</div>`;
     });
 
-    // 溢出日：月末几天前置到首行（当月需要6行时，将超出部分移到开头）
+    // 溢出日：月末几天前置到首行（保持5行，不显示上月日期）
     if (hasOverflow) {
       for (let i = 0; i < overflowCount; i++) {
         const d = daysInMonth - overflowCount + 1 + i;
@@ -1590,10 +1589,9 @@ const Calendar = {
       }
     }
 
-    // 前置空白：上月末尾日期
+    // 前置空白：透明空格（不显示上月日期）
     for (let i = 0; i < leadingCount; i++) {
-      const d = prevMonthDays - leadingCount + 1 + i;
-      html += `<div class="cal-day other-month">${d}</div>`;
+      html += '<div class="cal-day empty"></div>';
     }
 
     // 当月日期（如有溢出则不显示末尾几天，已前置）
@@ -1612,11 +1610,11 @@ const Calendar = {
       html += `<div class="cal-day ${isToday ? 'today' : ''} ${pastClass} ${bothChecked} ${hasData}" data-date="${ds}">${d}</div>`;
     }
 
-    // 后置空白：下月开头日期
+    // 后置空白：透明空格（不显示下月日期）
     const usedCells = overflowCount + leadingCount + displayDays;
     const trailingCount = TOTAL_CELLS - usedCells;
     for (let i = 0; i < trailingCount; i++) {
-      html += `<div class="cal-day other-month">${i + 1}</div>`;
+      html += '<div class="cal-day empty"></div>';
     }
 
     container.innerHTML = html;
@@ -3453,36 +3451,36 @@ const DetailMenu = {
   // 各tab的板块配置
   TAB_SECTIONS: {
     0: [
-      { icon: '🎭', name: '角色选择', selector: '.role-card' },
-      { icon: '💌', name: '甜蜜语录', selector: '.sweet-text-card, .card:nth-child(2)' },
-      { icon: '🎵', name: '音乐播放', selector: '.music-card, .card:nth-child(3)' },
-      { icon: '📊', name: '本周数透', selector: '.data-pivot-card, .card:nth-child(4)' }
+      { icon: '🎭', name: '角色信息', selector: '.role-card' },
+      { icon: '💌', name: '甜蜜语录', selector: '.sweet-text-card' },
+      { icon: '🎵', name: '音乐播放', selector: '.music-card' },
+      { icon: '📊', name: '本周数透', selector: '.data-pivot-card' }
     ],
     1: [
-      { icon: '❤️', name: '发射爱心', selector: '#card-greet, .card:nth-child(1)' },
-      { icon: '📷', name: '相处照片', selector: '.photo-card, .card:nth-child(2)' },
-      { icon: '✉️', name: '投递信件', selector: '#card-letter, .card:nth-child(3)' }
+      { icon: '❤️', name: '发射爱心', selector: '#card-greet' },
+      { icon: '📷', name: '相处照片', selector: '.photo-card' },
+      { icon: '✉️', name: '投递信件', selector: '#card-letter' }
     ],
     2: [
       { icon: '📅', name: '日历', selector: '.calendar-card' },
-      { icon: '💬', name: '打卡语录', selector: '#card-words, .card:nth-child(2)' },
-      { icon: '🌟', name: '打卡愿望', selector: '#card-wish, .card:nth-child(3)' },
-      { icon: '🎲', name: '随机问答', selector: '.quiz-card, .card:nth-child(4)' },
-      { icon: '🎤', name: '语音留言', selector: '.record-card, .card:nth-child(5)' },
-      { icon: '✨', name: '打卡晚安', selector: '#card-night, .card:nth-child(6)' }
+      { icon: '💬', name: '打卡语录', selector: '#card-words' },
+      { icon: '🌟', name: '打卡愿望', selector: '#card-wish' },
+      { icon: '🎲', name: '随机问答', selector: '.quiz-card' },
+      { icon: '🎤', name: '语音留言', selector: '.record-card' },
+      { icon: '✨', name: '打卡晚安', selector: '#card-night' }
     ],
     3: [
-      { icon: '🍅', name: '番茄管理', selector: '.pomodoro-card, .card:nth-child(1)' },
-      { icon: '📚', name: '英语刷词', selector: '.vocab-card, .card:nth-child(2)' },
-      { icon: '💪', name: '运动健身', selector: '.exercise-card, .card:nth-child(3)' },
-      { icon: '📰', name: '热点新闻', selector: '.hotnews-card, .card:nth-child(4)' },
-      { icon: '🔬', name: '数理化', selector: '.formula-card, .card:nth-child(5)' },
-      { icon: '📜', name: '唐宋诗词', selector: '.poem-card, .card:nth-child(6)' },
-      { icon: '🏛️', name: '历史文化', selector: '.history-card, .card:nth-child(7)' },
-      { icon: '🗺️', name: '中国地理', selector: '.geo-card, .card:nth-child(8)' },
-      { icon: '💡', name: '生活技巧', selector: '.life-tip-card, .card:nth-child(9)' },
-      { icon: '😄', name: '笑话大全', selector: '.joke-card, .card:nth-child(10)' },
-      { icon: '📍', name: '地标打卡', selector: '.landmark-card, .card:nth-child(11)' }
+      { icon: '🍅', name: '番茄管理', selector: '.pomodoro-card' },
+      { icon: '📚', name: '英语刷词', selector: '.vocab-card' },
+      { icon: '💪', name: '运动健身', selector: '.exercise-card' },
+      { icon: '📰', name: '热点新闻', selector: '.hotnews-card' },
+      { icon: '🔬', name: '数理化', selector: '.formula-card' },
+      { icon: '📜', name: '唐宋诗词', selector: '.poem-card' },
+      { icon: '🏛️', name: '历史文化', selector: '.history-card' },
+      { icon: '🗺️', name: '中国地理', selector: '.geo-card' },
+      { icon: '💡', name: '生活技巧', selector: '.life-tip-card' },
+      { icon: '😄', name: '笑话大全', selector: '.joke-card' },
+      { icon: '📍', name: '地标打卡', selector: '.landmark-card' }
     ]
   },
 
@@ -5072,8 +5070,33 @@ const LoveRain = {
         clearTimeout(clickTimer);
         clickTimer = null;
         this.start();
+      } else {
+        // 单击触发字母逐一跳动
+        this._playNavLetterBounce();
       }
     });
+  },
+
+  // 导航标题字母逐一跳动
+  _playNavLetterBounce() {
+    const titleEl = document.getElementById('navTitle');
+    if (!titleEl) return;
+    // 如果正在播放动画则跳过
+    if (titleEl.dataset.bouncing === '1') return;
+    titleEl.dataset.bouncing = '1';
+
+    const originalHTML = titleEl.innerHTML;
+    const letters = ['T', 'A', 'O', 'Y', 'A', 'N'];
+    titleEl.innerHTML = letters.map((ch, i) => {
+      const color = i < 3 ? '#1b7fe3' : '#e8296a';
+      return `<span class="nav-letter" style="color:${color};-webkit-text-fill-color:${color};animation-delay:${i * 0.08}s">${ch}</span>` +
+        (i === 2 ? '<span class="heart"> ❤️ </span>' : '');
+    }).join('');
+
+    setTimeout(() => {
+      titleEl.innerHTML = originalHTML;
+      titleEl.dataset.bouncing = '';
+    }, 1400);
   },
 
   start() {

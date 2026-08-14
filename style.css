@@ -519,15 +519,15 @@ html, body {
 
 /* === 卡片通用 === */
 .card {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-  border: 2px solid transparent;
-  transition: border-color 0.2s;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  transition: border-color 0.2s, box-shadow 0.2s;
   position: relative;
   overflow: visible;
 }
@@ -552,6 +552,8 @@ html, body {
   font-size: 14px; font-weight: 700;
   margin-bottom: 10px;
   display: flex; align-items: center; gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .card-title .icon { font-size: 18px; }
@@ -2735,7 +2737,7 @@ html, body {
 
 /* 内容区底部留白给导航栏 */
 .content {
-  padding-bottom: 92px !important;
+  padding-bottom: 76px !important;
 }
 
 /* Tab 页面底部提示 */
@@ -2743,7 +2745,7 @@ html, body {
   text-align: center;
   font-size: 12px;
   color: #bbb;
-  padding: 16px 0 8px;
+  padding: 8px 0 4px;
   letter-spacing: 1px;
 }
 
@@ -3348,6 +3350,19 @@ html, body {
   animation: heartBeat 0.4s ease-in-out infinite;
 }
 
+/* 导航标题字母逐一跳动 */
+.nav-letter {
+  display: inline-block;
+  animation: navLetterBounce 0.6s ease-out both;
+}
+
+@keyframes navLetterBounce {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-16px) scale(1.25); }
+  60% { transform: translateY(4px) scale(0.9); }
+  100% { transform: translateY(0) scale(1); }
+}
+
 @keyframes musicWave {
   0%, 100% { transform: translate(-50%, -50%) translateY(0); }
   25% { transform: translate(-50%, -50%) translateY(-3px) scale(1.02); }
@@ -3419,12 +3434,13 @@ html, body {
    首页（Tab 0）所有卡片统一毛玻璃效果
    ============================ */
 #tab-0 .card {
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.08),
+    0 4px 18px rgba(0, 0, 0, 0.07),
+    0 0 0 1px rgba(0, 0, 0, 0.03),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
@@ -5646,7 +5662,7 @@ html, body {
 
 .landmark-bubble {
   position: relative;
-  padding: 8px 4px;
+  padding: 8px 4px 10px;
   border-radius: 10px;
   background: rgba(255,255,255,0.6);
   border: 2px solid transparent;
@@ -5658,6 +5674,7 @@ html, body {
   transition: all 0.2s;
   user-select: none;
   -webkit-user-select: none;
+  overflow: visible;
 }
 
 .landmark-bubble:hover { background: rgba(255,255,255,0.9); }
@@ -5668,25 +5685,26 @@ html, body {
 .landmark-dots {
   display: flex;
   justify-content: center;
-  gap: 3px;
-  margin-top: 3px;
+  gap: 4px;
+  margin-top: 4px;
+  height: 7px;
 }
 
 .landmark-dot {
-  width: 5px;
-  height: 5px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   display: inline-block;
 }
 
 .landmark-dot.tao {
   background: #1b7fe3;
-  box-shadow: 0 0 4px rgba(27,127,227,0.4);
+  box-shadow: 0 0 5px rgba(27,127,227,0.5);
 }
 
 .landmark-dot.yan {
   background: #e8296a;
-  box-shadow: 0 0 4px rgba(232,41,106,0.4);
+  box-shadow: 0 0 5px rgba(232,41,106,0.5);
 }
 
 /* TAO 打卡 → 左侧边框高亮 */
