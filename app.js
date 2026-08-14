@@ -4994,7 +4994,6 @@ const PoemCard = {
     const cached = Store.get(`poem_${dateStr}`, null);
     if (cached && cached.source === 'api') {
       this._currentPoem = cached.poem;
-      this._resetAnalysis();
       this._renderPoemObj(this._currentPoem);
       return;
     }
@@ -5015,7 +5014,6 @@ const PoemCard = {
             analysis: data.origin && data.origin.translate ? data.origin.translate : '品读古诗词之美，感受古人智慧。'
           };
           Store.set(`poem_${dateStr}`, { source: 'api', poem: this._currentPoem });
-          this._resetAnalysis();
           this._renderPoemObj(this._currentPoem);
           return;
         }
@@ -5034,7 +5032,6 @@ const PoemCard = {
       Store.set(`poem_local_${dateStr}`, this._currentIndex);
     }
     this._currentPoem = null;
-    this._resetAnalysis();
     this._renderPoem(this._currentIndex);
   },
 
@@ -5056,7 +5053,6 @@ const PoemCard = {
             text: data.origin && data.origin.content ? data.origin.content.join('\n') : data.content,
             analysis: data.origin && data.origin.translate ? data.origin.translate : '品读古诗词之美，感受古人智慧。'
           };
-          this._resetAnalysis();
           this._renderPoemObj(this._currentPoem);
           showToast('为你换了一首新诗 📜');
           return;
@@ -5074,19 +5070,8 @@ const PoemCard = {
       this._currentIndex = idx;
     }
     this._currentPoem = null;
-    this._resetAnalysis();
     this._renderPoem(this._currentIndex);
     showToast('为你换了一首新诗 📜');
-  },
-
-  // 显示 / 隐藏解读
-  toggleAnalysis() {
-    const analysis = document.getElementById('poemAnalysis');
-    const btn = document.getElementById('poemAnalysisBtn');
-    if (!analysis) return;
-    const isHidden = analysis.style.display === 'none';
-    analysis.style.display = isHidden ? '' : 'none';
-    if (btn) btn.textContent = isHidden ? '📖 收起解读' : '📖 查看解读';
   },
 
   _renderPoem(idx) {
@@ -5100,18 +5085,9 @@ const PoemCard = {
     const titleEl = document.getElementById('poemTitle');
     const authorEl = document.getElementById('poemAuthor');
     const textEl = document.getElementById('poemText');
-    const analysisEl = document.getElementById('poemAnalysis');
     if (titleEl) titleEl.textContent = poem.title;
     if (authorEl) authorEl.textContent = `${poem.dynasty ? poem.dynasty + ' · ' : ''}${poem.author}`;
     if (textEl) textEl.innerHTML = poem.text.replace(/\n/g, '<br>');
-    if (analysisEl) analysisEl.textContent = poem.analysis;
-  },
-
-  _resetAnalysis() {
-    const analysis = document.getElementById('poemAnalysis');
-    if (analysis) analysis.style.display = 'none';
-    const btn = document.getElementById('poemAnalysisBtn');
-    if (btn) btn.textContent = '📖 查看解读';
   }
 };
 
