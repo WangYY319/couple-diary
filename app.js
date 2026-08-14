@@ -6174,7 +6174,7 @@ const FormulaCard = {
     row.innerHTML = html;
   },
 
-  // 渲染常识（数学/物理/化学各一条，每日更新）
+  // 渲染常识（数学/物理/化学各一条，每日更新，点击展开详情）
   _renderKnowledge() {
     const container = document.getElementById('formulaKnowledgeContent');
     if (!container) return;
@@ -6185,13 +6185,21 @@ const FormulaCard = {
       const list = this.KNOWLEDGE.filter(k => k.category === cat);
       const idx = (seed + this._knowledgeOffset) % list.length;
       const k = list[idx];
-      html += `<div class="formula-knowledge-item">
-        <div class="formula-knowledge-cat">${k.category}</div>
-        <div class="formula-knowledge-title">${k.title}</div>
-        <div class="formula-knowledge-text">${k.text}</div>
+      html += `<div class="formula-knowledge-item" onclick="FormulaCard._toggleKnowledgeDetail(this)">
+        <div class="formula-knowledge-header">
+          <span class="formula-knowledge-cat">${k.category}</span>
+          <span class="formula-knowledge-title">${k.title}</span>
+          <span class="formula-knowledge-arrow">▾</span>
+        </div>
+        <div class="formula-knowledge-detail">${k.text}</div>
       </div>`;
     });
     container.innerHTML = html;
+  },
+
+  // 点击展开/折叠常识详情
+  _toggleKnowledgeDetail(el) {
+    el.classList.toggle('expanded');
   },
 
   // 刷新：根据当前类型刷新内容
@@ -6694,14 +6702,14 @@ const PoemCard = {
 
   _renderPoemObj(poem) {
     if (!poem) return;
-    const cardTitleEl = document.getElementById('poemCardTitle');
     const titleEl = document.getElementById('poemTitle');
     const authorEl = document.getElementById('poemAuthor');
     const textEl = document.getElementById('poemText');
-    // 抬头显示诗词名称（如：静夜思）
-    if (cardTitleEl) cardTitleEl.textContent = poem.title || '唐宋诗词';
-    // 隐藏内容区诗名（已移至抬头显示）
-    if (titleEl) titleEl.style.display = 'none';
+    // 卡片抬头保持板块名称"唐宋诗词"，诗词名称显示在内容区
+    if (titleEl) {
+      titleEl.style.display = '';
+      titleEl.textContent = poem.title || '';
+    }
     // 作者旁注明朝代，如：〔唐〕李白
     if (authorEl) authorEl.textContent = `〔${poem.dynasty || ''}〕${poem.author || '佚名'}`;
     if (textEl) textEl.innerHTML = poem.text.replace(/\n/g, '<br>');
@@ -8121,6 +8129,9 @@ const LandmarkCheckin = {
     });
   },
 
+  // 直辖市列表（不展开城市，仅支持打卡）
+  MUNICIPALITIES: ['北京', '上海', '天津', '重庆'],
+
   // 绑定单击/双击事件（区分展开和打卡）
   _bindBubbleEvents(el, key, provIdx, isCity) {
     let clickTimer = null;
@@ -8134,8 +8145,10 @@ const LandmarkCheckin = {
       } else {
         clickTimer = setTimeout(() => {
           clickTimer = null;
-          // 单击 → 展开（仅省级）
+          // 单击 → 展开（仅省级，且非直辖市）
           if (!isCity && provIdx !== null) {
+            const provName = this.PROVINCES[provIdx].name;
+            if (this.MUNICIPALITIES.includes(provName)) return; // 直辖市不展开
             this._toggleExpand(provIdx);
           }
         }, 280);

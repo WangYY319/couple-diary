@@ -4893,26 +4893,53 @@ html, body {
   border-radius: 10px;
   background: var(--theme-light);
   transition: all 0.2s;
+  cursor: pointer;
+}
+
+.formula-knowledge-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .formula-knowledge-cat {
   font-size: 12px;
   font-weight: 700;
   color: var(--theme-primary);
-  margin-bottom: 4px;
+  flex-shrink: 0;
 }
 
 .formula-knowledge-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-main);
-  margin-bottom: 6px;
+  flex: 1;
 }
 
-.formula-knowledge-text {
+.formula-knowledge-arrow {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.3s;
+  flex-shrink: 0;
+}
+
+.formula-knowledge-item.expanded .formula-knowledge-arrow {
+  transform: rotate(180deg);
+}
+
+.formula-knowledge-detail {
   font-size: 12px;
   line-height: 1.7;
   color: var(--text-main);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding-top 0.3s ease;
+  padding-top: 0;
+}
+
+.formula-knowledge-item.expanded .formula-knowledge-detail {
+  max-height: 200px;
+  padding-top: 8px;
 }
 
 /* 刷新按钮 */
@@ -5148,9 +5175,9 @@ html, body {
 
 .poem-card { position: relative; padding-bottom: 40px; min-height: auto; }
 
-/* 诗词卡片标题居中，与左侧板块标题区分 */
-.poem-card .card-title {
-  justify-content: center;
+/* 诗词内容区标题居中 */
+.poem-title {
+  text-align: center;
 }
 
 /* 已阅标记（通用） */
