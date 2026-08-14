@@ -312,6 +312,7 @@ const Cloud = {
       if (!App.isHistory) {
         this.heartbeat();
         this.syncToday();
+        this.syncPhotos();
       }
     }, 30000); // 30 秒
   },
@@ -427,6 +428,244 @@ const Cloud = {
       if (typeof RandomQA !== 'undefined') RandomQA.render();
       if (typeof EnglishVocab !== 'undefined') EnglishVocab.render();
     }
+  },
+
+  // ====== 文件分块同步（图片、音乐等二进制文件） ======
+  CHUNK_SIZE: 30000, // 每块 30KB（base64后约40KB，在 mantledb 限制内）
+
+  // Blob → base64 字符串
+  _blobToBase64(blob) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  },
+
+  // base64 → Blob
+  _base64ToBlob(b64, mime) {
+    const byteChars = atob(b64);
+    const byteArrays = [];
+    for (let i = 0; i < byteChars.length; i += 512) {
+      const slice = byteChars.slice(i, i + 512);
+      const byteNumbers = new Array(slice.length);
+      for (let j = 0; j < slice.length; j++) byteNumbers[j] = slice.charCodeAt(j);
+      byteArrays.push(new Uint8Array(byteNumbers));
+    }
+    return new Blob(byteArrays, { type: mime || 'application/octet-stream' });
+  },
+
+  // 上传文件（分块）到云端
+  async uploadFile(blob, path, onProgress) {
+    if (!this.pairCode) return null;
+    const b64 = await this._blobToBase64(blob);
+    if (!b64) return null;
+
+    const chunks = [];
+    for (let i = 0; i < b64.length; i += this.CHUNK_SIZE) {
+      chunks.push(b64.slice(i, i + this.CHUNK_SIZE));
+    }
+
+    // 存储元数据
+    const meta = {
+      totalChunks: chunks.length,
+      mime: blob.type || 'application/octet-stream',
+      size: blob.size,
+      uploadedAt: Date.now()
+    };
+    try {
+      await fetch(this._url(`${path}/meta`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(meta)
+      });
+    } catch (e) { return null; }
+
+    // 分块上传
+    for (let i = 0; i < chunks.length; i++) {
+      try {
+        await fetch(this._url(`${path}/chunk_${i}`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: chunks[i] })
+        });
+        if (onProgress) onProgress(Math.round((i + 1) / chunks.length * 100));
+      } catch (e) { return null; }
+    }
+
+    return path;
+  },
+
+  // 下载文件（分块）从云端
+  async downloadFile(path) {
+    if (!this.pairCode) return null;
+
+    // 读取元数据
+    let meta;
+    try {
+      const r = await fetch(this._url(`${path}/meta`));
+      if (!r.ok) return null;
+      meta = await r.json();
+    } catch (e) { return null; }
+
+    if (!meta || !meta.totalChunks) return null;
+
+    // 分块下载并拼接
+    let b64 = '';
+    for (let i = 0; i < meta.totalChunks; i++) {
+      try {
+        const r = await fetch(this._url(`${path}/chunk_${i}`));
+        if (!r.ok) return null;
+        const chunk = await r.json();
+        if (chunk && chunk.data) b64 += chunk.data;
+        else return null;
+      } catch (e) { return null; }
+    }
+
+    return this._base64ToBlob(b64, meta.mime);
+  },
+
+  // 删除云端文件
+  async deleteFile(path) {
+    if (!this.pairCode) return;
+    try {
+      // 读取元数据获取块数
+      const r = await fetch(this._url(`${path}/meta`));
+      if (r.ok) {
+        const meta = await r.json();
+        if (meta && meta.totalChunks) {
+          for (let i = 0; i < meta.totalChunks; i++) {
+            fetch(this._url(`${path}/chunk_${i}`), { method: 'DELETE' }).catch(() => {});
+          }
+        }
+      }
+      fetch(this._url(`${path}/meta`), { method: 'DELETE' }).catch(() => {});
+    } catch (e) { /* ignore */ }
+  },
+
+  // ====== 照片云同步 ======
+
+  // 上传照片列表到云端
+  async pushPhotoList() {
+    if (!this.pairCode) return;
+    const photoIds = Photos.photos.map(p => p.id);
+    try {
+      await fetch(this._url('photos_list'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(photoIds)
+      });
+    } catch (e) { /* ignore */ }
+  },
+
+  // 从云端同步照片
+  async syncPhotos() {
+    if (!this.pairCode) return;
+
+    // 获取云端照片列表
+    let remoteIds;
+    try {
+      const r = await fetch(this._url('photos_list'));
+      if (!r.ok) return;
+      remoteIds = await r.json();
+    } catch (e) { return; }
+
+    if (!remoteIds || !Array.isArray(remoteIds)) return;
+
+    const localIds = Photos.photos.map(p => p.id);
+    let newPhotos = false;
+
+    // 下载本地没有的照片
+    for (const id of remoteIds) {
+      if (!localIds.includes(id)) {
+        const blob = await this.downloadFile(`photos/${id}`);
+        if (blob) {
+          Photos.photos.push({ id, blob });
+          // 保存到本地 IndexedDB
+          await Photos._put(id, blob);
+          newPhotos = true;
+        }
+      }
+    }
+
+    // 上传本地有但云端没有的照片
+    for (const id of localIds) {
+      if (!remoteIds.includes(id)) {
+        const photo = Photos.photos.find(p => p.id === id);
+        if (photo) {
+          await this.uploadFile(photo.blob, `photos/${id}`);
+        }
+      }
+    }
+
+    // 更新云端照片列表
+    await this.pushPhotoList();
+
+    if (newPhotos) {
+      Photos.render();
+      showToast('对方上传了新照片 📸');
+    }
+  },
+
+  // ====== 音乐云同步 ======
+
+  async pushMusic(blob, name) {
+    if (!this.pairCode) return;
+    try {
+      // 先上传文件
+      await this.uploadFile(blob, 'music/file');
+      // 再存储音乐信息
+      await fetch(this._url('music_info'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, size: blob.size, type: blob.type, uploadedAt: Date.now() })
+      });
+    } catch (e) { /* ignore */ }
+  },
+
+  async pullMusic() {
+    if (!this.pairCode) return null;
+    try {
+      // 先检查是否有云端音乐
+      const r = await fetch(this._url('music_info'));
+      if (!r.ok) return null;
+      const info = await r.json();
+      if (!info || !info.name) return null;
+
+      // 检查是否和本地已有的一样
+      const savedLocal = Store.get('cloudMusicAt', 0);
+      if (savedLocal && info.uploadedAt && info.uploadedAt <= savedLocal) return null;
+
+      // 下载音乐文件
+      const blob = await this.downloadFile('music/file');
+      if (!blob) return null;
+
+      Store.set('cloudMusicAt', info.uploadedAt || Date.now());
+      return { blob, name: info.name };
+    } catch (e) { return null; }
+  },
+
+  // ====== 背景图云同步 ======
+
+  async pushBackground(blob) {
+    if (!this.pairCode) return;
+    try {
+      await this.uploadFile(blob, 'background/file');
+      Store.set('cloudBgAt', Date.now());
+    } catch (e) { /* ignore */ }
+  },
+
+  async pullBackground() {
+    if (!this.pairCode) return null;
+    try {
+      const localAt = Store.get('cloudBgAt', 0);
+      // 下载背景图
+      const blob = await this.downloadFile('background/file');
+      if (!blob) return null;
+      Store.set('cloudBgAt', Date.now());
+      return blob;
+    } catch (e) { return null; }
   }
 };
 
@@ -540,6 +779,7 @@ const App = {
     Cloud.heartbeat();
     Cloud.syncAll().then(() => {
       Cloud.syncQuizVocab();
+      Cloud.syncPhotos();
       Cloud.startPolling();
       showToast('已配对成功，开始你们的日记吧 💕');
     });
@@ -1819,6 +2059,19 @@ const Background = {
   async load() {
     const blob = await this.getBlob();
     if (!blob) {
+      // 尝试从云端拉取背景图
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+        const cloudBlob = await Cloud.pullBackground();
+        if (cloudBlob) {
+          await this.save(cloudBlob);
+          if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+          this.objectUrl = URL.createObjectURL(cloudBlob);
+          this.apply(this.objectUrl);
+          Setting.updatePreview(this.objectUrl);
+          showToast('已同步对方的背景图 🖼️');
+          return;
+        }
+      }
       this.clear();
       return;
     }
@@ -1826,6 +2079,18 @@ const Background = {
     this.objectUrl = URL.createObjectURL(blob);
     this.apply(this.objectUrl);
     Setting.updatePreview(this.objectUrl);
+    // 后台尝试从云端拉取更新的背景图
+    if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+      Cloud.pullBackground().then(async (cloudBlob) => {
+        if (cloudBlob) {
+          await this.save(cloudBlob);
+          if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+          this.objectUrl = URL.createObjectURL(cloudBlob);
+          this.apply(this.objectUrl);
+          Setting.updatePreview(this.objectUrl);
+        }
+      });
+    }
   },
 
   apply(url) {
@@ -2013,7 +2278,11 @@ const Setting = {
       const blob = await Background.processImage(file);
       await Background.save(blob);
       await Background.load();
-      showToast('背景图已更换 💕');
+      showToast('背景图已更换 💕 正在同步给对方...');
+      // 云同步背景图
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+        Cloud.pushBackground(blob);
+      }
     } catch (e) {
       showToast('图片处理失败，请重试');
     }
@@ -2024,6 +2293,10 @@ const Setting = {
     await Background.remove();
     Background.clear();
     showToast('已恢复默认背景');
+    // 云同步删除背景图
+    if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+      Cloud.deleteFile('background/file');
+    }
   },
 
   updatePreview(url) {
@@ -2184,16 +2457,45 @@ const MusicPlayer = {
         document.getElementById('musicPlayerArea').style.display = 'block';
         document.getElementById('musicTitle').textContent = saved.name || '已保存的音乐';
         document.getElementById('musicUrlInput').value = '';
+        // 后台尝试从云端拉取对方的音乐
+        this._tryPullCloudMusic();
         return;
       }
     } catch (e) { /* 静默忽略 */ }
 
-    // 回退到 URL 链接恢复
-    const savedUrl = Store.get('musicUrl', '');
-    if (savedUrl) {
-      document.getElementById('musicUrlInput').value = savedUrl;
-      this.loadMusic(true);
+    // 尝试从云端拉取音乐
+    const cloudMusic = await this._tryPullCloudMusic();
+    if (!cloudMusic) {
+      // 回退到 URL 链接恢复
+      const savedUrl = Store.get('musicUrl', '');
+      if (savedUrl) {
+        document.getElementById('musicUrlInput').value = savedUrl;
+        this.loadMusic(true);
+      }
     }
+  },
+
+  async _tryPullCloudMusic() {
+    if (typeof Cloud === 'undefined' || !Cloud.pairCode) return false;
+    try {
+      const result = await Cloud.pullMusic();
+      if (result && result.blob) {
+        // 保存到本地
+        await this._saveMusic(result.blob, result.name);
+        // 播放
+        if (this._fileUrl) URL.revokeObjectURL(this._fileUrl);
+        const url = URL.createObjectURL(result.blob);
+        this._fileUrl = url;
+        this.audio.src = url;
+        this.audio.load();
+        document.getElementById('musicPlayerArea').style.display = 'block';
+        document.getElementById('musicTitle').textContent = result.name || '对方分享的音乐';
+        document.getElementById('musicUrlInput').value = '';
+        showToast('已同步对方分享的音乐 🎵');
+        return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
   },
 
   loadMusic(silent = false) {
@@ -2261,6 +2563,11 @@ const MusicPlayer = {
     try {
       await this._saveMusic(file, fileName);
       Store.set('musicUrl', ''); // 清除 URL 模式
+      // 云同步音乐给对方
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+        showToast(`已导入：${fileName} 🎵 正在同步给对方...`);
+        Cloud.pushMusic(file, fileName);
+      }
     } catch (e) {
       // 保存失败不影响当前播放
     }
@@ -2722,6 +3029,7 @@ const Photos = {
     const files = input.files;
     if (!files || files.length === 0) return;
     let success = 0;
+    const newPhotos = [];
     for (const file of files) {
       if (!file.type.startsWith('image/')) continue;
       if (file.size > 10 * 1024 * 1024) {
@@ -2733,6 +3041,7 @@ const Photos = {
         const id = uid();
         await this._put(id, blob);
         this.photos.push({ id, blob });
+        newPhotos.push({ id, blob });
         success++;
       } catch (e) {
         console.error('Photo upload error', e);
@@ -2740,8 +3049,16 @@ const Photos = {
     }
     input.value = '';
     if (success > 0) {
-      showToast(`已上传 ${success} 张照片 📸`);
+      showToast(`已上传 ${success} 张照片 📸 正在同步给对方...`);
       this.render();
+      // 云同步新照片
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+        for (const p of newPhotos) {
+          Cloud.uploadFile(p.blob, `photos/${p.id}`).then(() => {
+            Cloud.pushPhotoList();
+          });
+        }
+      }
     }
   },
 
@@ -2830,6 +3147,10 @@ const Photos = {
         this.photos = this.photos.filter(p => p.id !== id);
         this.render();
         showToast('已删除照片');
+        // 云同步删除
+        if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+          Cloud.deleteFile(`photos/${id}`).then(() => Cloud.pushPhotoList());
+        }
       };
     } catch (e) {
       showToast('删除失败');
