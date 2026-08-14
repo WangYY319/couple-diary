@@ -4048,7 +4048,10 @@ html, body {
    ============================ */
 .poem-content {
   text-align: center;
-  padding: 12px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px 8px;
+  color: var(--text-main);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4074,7 +4077,6 @@ html, body {
   font-size: 16px;
   line-height: 2.1;
   white-space: pre-line;
-  margin-bottom: 16px;
   font-family: 'Songti SC', 'SimSun', serif;
   text-align: center;
 }
@@ -4103,6 +4105,30 @@ html, body {
 }
 
 .poem-card { position: relative; padding-bottom: 48px; }
+
+/* 已阅标记 */
+.poem-read-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.poem-read-badge .read-tag {
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+
+.poem-read-badge .read-tag.tao { color: #1b7fe3; }
+.poem-read-badge .read-tag.yan { color: #e8296a; }
 
 .poem-refresh-btn {
   position: absolute;

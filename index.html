@@ -490,12 +490,13 @@
       </div>
 
       <!-- 古诗 -->
-      <div class="card poem-card">
+      <div class="card poem-card" id="poemCard" ondblclick="PoemCard.markRead()">
         <div class="card-title"><span class="icon">📜</span> <span id="poemCardTitle">古诗</span></div>
         <div class="poem-content" id="poemContent">
           <div class="poem-author" id="poemAuthor"></div>
           <div class="poem-text" id="poemText"></div>
         </div>
+        <div class="poem-read-badge" id="poemReadBadge"></div>
         <button class="poem-refresh-btn" onclick="PoemCard.refresh()" title="换一首">🔄</button>
       </div>
 

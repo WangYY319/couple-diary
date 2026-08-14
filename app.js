@@ -5412,6 +5412,41 @@ const PoemCard = {
     if (cardTitleEl) cardTitleEl.textContent = poem.title || '古诗';
     if (authorEl) authorEl.textContent = `${poem.dynasty ? poem.dynasty + ' · ' : ''}${poem.author}`;
     if (textEl) textEl.innerHTML = poem.text.replace(/\n/g, '<br>');
+    this._renderReadBadge();
+  },
+
+  // 双击标记已阅
+  markRead() {
+    const role = Store.get('role', null);
+    if (!role) return;
+    const dateStr = todayStr();
+    const key = `poem_read_${dateStr}`;
+    let readBy = Store.get(key, {});
+    if (!readBy || typeof readBy !== 'object') readBy = {};
+    if (readBy[role]) {
+      // 已标记过，不重复
+      return;
+    }
+    readBy[role] = true;
+    Store.set(key, readBy);
+    this._renderReadBadge();
+    showToast(`${role} 已阅 📜`);
+  },
+
+  // 渲染已阅标记
+  _renderReadBadge() {
+    const badgeEl = document.getElementById('poemReadBadge');
+    if (!badgeEl) return;
+    const dateStr = todayStr();
+    const readBy = Store.get(`poem_read_${dateStr}`, {});
+    let html = '';
+    if (readBy && readBy.TAO) {
+      html += '<span class="read-tag tao">TAO已阅</span>';
+    }
+    if (readBy && readBy.YAN) {
+      html += '<span class="read-tag yan">YAN已阅</span>';
+    }
+    badgeEl.innerHTML = html;
   }
 };
 
