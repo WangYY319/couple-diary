@@ -411,10 +411,11 @@ const Cloud = {
         this.syncToday();
         this.syncPhotos();
         this.syncVoices();
-        // 同步在线时长和信件
+        // 同步在线时长、信件和头像
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
+          CloudSync.syncAvatars();
         }
         // 刷新IP地址（拉取对方最新IP）
         if (typeof IPAddress !== 'undefined') {
@@ -959,6 +960,25 @@ const CloudSync = {
       await LetterBox.saveAll();
       LetterBox.updateBadges();
     }
+  },
+
+  // 同步头像：拉取云端头像，推送本地头像
+  async syncAvatars() {
+    if (!Cloud.pairCode) return;
+    for (const role of ['TAO', 'YAN']) {
+      const localAvatar = Store.get('avatar_' + role, null);
+      const localTime = localAvatar ? (localAvatar.updated || 0) : 0;
+      const remoteAvatar = await this.get('avatar_' + role);
+
+      if (remoteAvatar && remoteAvatar.updated && remoteAvatar.updated > localTime) {
+        // 云端更新 → 覆盖本地
+        Store.set('avatar_' + role, remoteAvatar);
+        if (typeof AvatarPicker !== 'undefined') AvatarPicker._renderRole(role);
+      } else if (localAvatar && localAvatar.updated && (!remoteAvatar || localAvatar.updated > (remoteAvatar.updated || 0))) {
+        // 本地更新 → 推送云端
+        await this.set('avatar_' + role, localAvatar);
+      }
+    }
   }
 };
 
@@ -1033,6 +1053,7 @@ const App = {
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
+          CloudSync.syncAvatars();
         }
       }
     });
@@ -1115,10 +1136,11 @@ const App = {
       Cloud.syncPhotos();
       Cloud.syncVoices();
       Cloud.startPolling();
-      // 同步在线时长和信件
+      // 同步在线时长、信件和头像
       if (typeof CloudSync !== 'undefined') {
         CloudSync.syncOnlineDuration();
         CloudSync.syncLetters();
+        CloudSync.syncAvatars();
       }
       // IP地址显示已移除
       showToast('已配对成功，开始你们的日记吧 💕');
@@ -1187,6 +1209,7 @@ const App = {
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
+          CloudSync.syncAvatars();
         }
         // IP地址显示已移除
       });
@@ -3309,7 +3332,8 @@ const AvatarPicker = {
       Store.set('avatar_' + this._currentRole, {
         dataUrl: this._tempDataUrl,
         zoom: this._tempZoom,
-        pos: this._tempPos
+        pos: this._tempPos,
+        updated: Date.now()
       });
     } else {
       Store.remove('avatar_' + this._currentRole);
@@ -3317,6 +3341,10 @@ const AvatarPicker = {
     this._renderRole(this._currentRole);
     this.close();
     Toast.show('头像已更新');
+    // 同步到云端，让对方也能看到
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.syncAvatars();
+    }
   },
 
   _renderRole(role) {
