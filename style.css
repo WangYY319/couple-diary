@@ -3933,10 +3933,14 @@ html, body {
   max-width: 90%;
 }
 
+.poem-card { position: relative; padding-bottom: 48px; }
+
 .poem-refresh-btn {
-  margin-top: 12px;
-  width: 36px;
-  height: 36px;
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -3945,9 +3949,10 @@ html, body {
   border-radius: 50%;
   background: var(--theme-light);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   transition: all 0.3s ease;
   box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  z-index: 2;
 }
 
 .poem-refresh-btn:hover {
@@ -3967,10 +3972,14 @@ html, body {
   color: var(--text-main);
 }
 
+.life-tip-card { position: relative; padding-bottom: 48px; }
+
 .life-tip-refresh-btn {
-  margin-top: 8px;
-  width: 36px;
-  height: 36px;
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -3979,9 +3988,10 @@ html, body {
   border-radius: 50%;
   background: var(--theme-light);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   transition: all 0.3s ease;
   box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  z-index: 2;
 }
 
 .life-tip-refresh-btn:hover {
@@ -4001,10 +4011,14 @@ html, body {
   color: var(--text-main);
 }
 
+.joke-card { position: relative; padding-bottom: 48px; }
+
 .joke-refresh-btn {
-  margin-top: 8px;
-  width: 36px;
-  height: 36px;
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -4013,9 +4027,10 @@ html, body {
   border-radius: 50%;
   background: var(--theme-light);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   transition: all 0.3s ease;
   box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  z-index: 2;
 }
 
 .joke-refresh-btn:hover {
