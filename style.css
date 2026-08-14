@@ -4461,54 +4461,121 @@ html, body {
 
 .voice-bubble {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
   padding: 8px 12px;
   border-radius: 16px;
   margin: 4px 0;
-  background: var(--theme-light);
-  cursor: pointer;
+  background: rgba(255,255,255,0.7);
+  cursor: default;
   transition: all 0.2s;
   font-size: 13px;
+  max-width: 75%;
+  position: relative;
 }
 
-.voice-bubble.mine {
+/* 对称布局：TAO靠左，YAN靠右 */
+.voice-bubble.left {
+  align-self: flex-start;
+  margin-right: auto;
+  border-left: 3px solid #1b7fe3;
+  border-radius: 16px 16px 16px 4px;
+}
+
+.voice-bubble.right {
   align-self: flex-end;
   margin-left: auto;
-  max-width: 80%;
-}
-
-.voice-bubble.theirs {
-  align-self: flex-start;
-  max-width: 80%;
+  border-right: 3px solid #e8296a;
+  border-radius: 16px 16px 4px 16px;
+  text-align: right;
 }
 
 .voice-bubble.tao {
-  border-left: 3px solid #1b7fe3;
+  background: linear-gradient(135deg, rgba(27,127,227,0.08), rgba(27,127,227,0.03));
 }
 
 .voice-bubble.yan {
-  border-left: 3px solid #e8296a;
+  background: linear-gradient(135deg, rgba(232,41,106,0.08), rgba(232,41,106,0.03));
 }
 
-.voice-bubble.playing {
-  background: rgba(var(--theme-rgb), 0.12);
+.voice-bubble-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.voice-bubble.playing .voice-role-tag {
-  background: rgba(var(--theme-rgb), 0.18);
-  color: var(--theme-primary);
-  font-weight: 700;
+.voice-bubble.right .voice-bubble-header {
+  justify-content: flex-end;
 }
 
-.voice-bubble.playing .voice-duration,
-.voice-bubble.playing .voice-time {
-  color: var(--text-main);
-  opacity: 1;
+.voice-bubble-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: transform 0.15s;
 }
 
-.voice-bubble.playing .voice-play-icon {
-  color: var(--theme-primary);
+.voice-bubble.right .voice-bubble-body {
+  flex-direction: row-reverse;
+}
+
+.voice-bubble-body:active {
+  transform: scale(0.97);
+}
+
+/* 播放进度条 */
+.voice-progress-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.08);
+  overflow: hidden;
+  min-width: 60px;
+}
+
+.voice-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--theme-primary);
+  transition: width 0.1s linear;
+}
+
+.voice-bubble.tao .voice-progress-fill { background: #1b7fe3; }
+.voice-bubble.yan .voice-progress-fill { background: #e8296a; }
+
+/* 播放按钮：只有播放按钮有颜色变化 */
+.voice-play-icon {
+  font-size: 16px;
+  color: #999;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.04);
+  transition: all 0.2s;
+}
+
+.voice-play-icon.active {
+  color: #fff;
+  animation: voicePulse 1.2s ease-in-out infinite;
+}
+
+.voice-bubble.tao .voice-play-icon.active {
+  background: #1b7fe3;
+}
+
+.voice-bubble.yan .voice-play-icon.active {
+  background: #e8296a;
+}
+
+@keyframes voicePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--theme-rgb), 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(var(--theme-rgb), 0); }
 }
 
 .voice-unread-dot {
@@ -4532,12 +4599,15 @@ html, body {
 .voice-duration,
 .voice-time {
   font-size: 11px;
-  color: #555;
-  opacity: 1;
+  color: #888;
 }
 
-.voice-play-icon {
-  margin-left: auto;
+.voice-date-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 8px 0 4px;
+  font-weight: 600;
 }
 
 /* ============================

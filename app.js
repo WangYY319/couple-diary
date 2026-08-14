@@ -4278,6 +4278,8 @@ const VoiceRecord = {
   voices: [],
   currentAudio: null,
   _playingIndex: -1,
+  _playProgress: 0,
+  _progressTimer: null,
 
   init() {
     // 从 IndexedDB 加载录音列表
@@ -4505,15 +4507,26 @@ const VoiceRecord = {
         // 绿点：对方发的且当前角色还没听过
         const heardByMe = v.readBy && v.readBy[myRole];
         const unreadDot = (v.role === otherRole && !heardByMe) ? '<span class="voice-unread-dot"></span>' : '';
-        const playingClass = idx === this._playingIndex ? ' playing' : '';
-        const isMine = v.role === myRole;
-        const bubbleSide = isMine ? 'mine' : 'theirs';
-        html += `<div class="voice-bubble ${roleColor} ${bubbleSide}${playingClass}" onclick="VoiceRecord.play(${idx})">
-          <span class="voice-role-tag ${roleColor}">${v.role}</span>
-          <span class="voice-duration">${v.duration}s</span>
-          <span class="voice-time">${timeStr}</span>
-          ${unreadDot}
-          <span class="voice-play-icon">▶</span>
+        const isPlaying = idx === this._playingIndex;
+        // 对称：TAO靠左，YAN靠右（模拟对话框）
+        const bubbleSide = v.role === 'TAO' ? 'left' : 'right';
+        // 播放进度条
+        let progressBar = '';
+        if (isPlaying) {
+          const progress = this._playProgress || 0;
+          progressBar = `<div class="voice-progress-bar"><div class="voice-progress-fill" style="width:${progress}%"></div></div>`;
+        }
+        html += `<div class="voice-bubble ${roleColor} ${bubbleSide}${isPlaying ? ' playing' : ''}">
+          <div class="voice-bubble-header">
+            <span class="voice-role-tag ${roleColor}">${v.role}</span>
+            <span class="voice-duration">${v.duration}s</span>
+            <span class="voice-time">${timeStr}</span>
+            ${unreadDot}
+          </div>
+          <div class="voice-bubble-body" onclick="VoiceRecord.play(${idx})">
+            ${progressBar}
+            <span class="voice-play-icon${isPlaying ? ' active' : ''}">${isPlaying ? '⏸' : '▶'}</span>
+          </div>
         </div>`;
       });
       html += '</div>';
@@ -4542,6 +4555,8 @@ const VoiceRecord = {
       this.currentAudio.pause();
       this.currentAudio = null;
       this._playingIndex = -1;
+      this._playProgress = 0;
+      this._stopProgressTimer();
       this.render();
       return;
     }
@@ -4551,6 +4566,8 @@ const VoiceRecord = {
       this.currentAudio.pause();
       this.currentAudio = null;
     }
+    this._stopProgressTimer();
+    this._playProgress = 0;
 
     this._playingIndex = index;
     this.render();
@@ -4564,12 +4581,15 @@ const VoiceRecord = {
     audio.preload = 'auto';
 
     audio.addEventListener('canplay', () => {
-      audio.play().catch((err) => {
+      audio.play().then(() => {
+        this._startProgressTimer();
+      }).catch((err) => {
         console.error('Play failed:', err);
         showToast('播放失败，请重试');
         URL.revokeObjectURL(url);
         this.currentAudio = null;
         this._playingIndex = -1;
+        this._playProgress = 0;
         this.render();
       });
     });
@@ -4580,6 +4600,8 @@ const VoiceRecord = {
       URL.revokeObjectURL(url);
       this.currentAudio = null;
       this._playingIndex = -1;
+      this._playProgress = 0;
+      this._stopProgressTimer();
       this.render();
     });
 
@@ -4587,13 +4609,36 @@ const VoiceRecord = {
       URL.revokeObjectURL(url);
       this.currentAudio = null;
       this._playingIndex = -1;
+      this._playProgress = 0;
+      this._stopProgressTimer();
       this.render();
     });
 
     // 强制加载
     audio.load();
     this.currentAudio = audio;
-    showToast(`播放 ${v.role} 的语音 (${v.duration}秒)`);
+  },
+
+  // 进度计时器：实时更新播放进度条
+  _startProgressTimer() {
+    this._stopProgressTimer();
+    this._progressTimer = setInterval(() => {
+      if (this.currentAudio && this.currentAudio.duration) {
+        this._playProgress = Math.min(100, (this.currentAudio.currentTime / this.currentAudio.duration) * 100);
+        // 只更新进度条宽度，不重新渲染整个列表
+        const fill = document.querySelector('.voice-bubble.playing .voice-progress-fill');
+        if (fill) {
+          fill.style.width = this._playProgress + '%';
+        }
+      }
+    }, 100);
+  },
+
+  _stopProgressTimer() {
+    if (this._progressTimer) {
+      clearInterval(this._progressTimer);
+      this._progressTimer = null;
+    }
   },
 
   async clearAll() {
