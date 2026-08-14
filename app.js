@@ -941,6 +941,11 @@ const App = {
     LifeTip.init();
     Joke.init();
     HotNews.init();
+    // 首页在线状态刷新
+    if (Cloud.isPaired()) {
+      Setting.refreshStatus();
+      Setting.startStatusPolling();
+    }
   },
 
   showPairScreen() {
@@ -2402,8 +2407,9 @@ const Setting = {
     }
   },
 
-  // 设置某个角色的在线状态指示
+  // 设置某个角色的在线状态指示（设置面板 + 首页）
   setStatusDot(role, online) {
+    // 设置面板
     document.querySelectorAll('.status-item').forEach(item => {
       const name = item.getAttribute('data-role');
       if (name !== role) return;
@@ -2415,6 +2421,14 @@ const Setting = {
         text.className = 'status-text ' + (online ? 'online' : 'offline');
       }
     });
+    // 首页角色卡
+    const homeDot = document.getElementById('homeDot' + role);
+    const homeText = document.getElementById('homeText' + role);
+    if (homeDot) homeDot.className = 'home-status-dot ' + (online ? 'on' : 'off');
+    if (homeText) {
+      homeText.textContent = online ? '在线' : '离线';
+      homeText.className = 'home-status-text ' + (online ? 'online' : 'offline');
+    }
   },
 
   // 状态轮询定时器
@@ -2584,8 +2598,14 @@ const TabNav = {
     if (tabIndex === 1) { Cards.renderGreet(); Photos.render(); }
     // 切换到打卡页时刷新日历、问答、语音、历史提示
     if (tabIndex === 2) { Calendar.render(); RandomQA.render(); VoiceRecord.render(); HistoryHint.render(); Cards.renderNight(); }
-    // 切换到首页时更新角色显示
-    if (tabIndex === 0) { this.updateRoleDisplay(); }
+    // 切换到首页时更新角色显示和在线状态
+    if (tabIndex === 0) {
+      this.updateRoleDisplay();
+      Setting.refreshStatus();
+      Setting.startStatusPolling();
+    } else {
+      Setting.stopStatusPolling();
+    }
   },
 
   updateRoleDisplay() {

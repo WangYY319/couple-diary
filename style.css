@@ -3831,3 +3831,75 @@ html, body {
   50% { transform: scale(1.3); opacity: 0.6; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* ====== 首页在线状态 ====== */
+.home-status-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.home-status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--theme-light);
+  flex: 1;
+  font-size: 13px;
+  transition: all 0.3s;
+}
+
+.home-status-item[data-role="TAO"] {
+  border-left: 3px solid #1b7fe3;
+}
+
+.home-status-item[data-role="YAN"] {
+  border-left: 3px solid #e8296a;
+}
+
+.home-status-emoji {
+  font-size: 18px;
+}
+
+.home-status-name {
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.home-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: auto;
+  transition: all 0.3s;
+}
+
+.home-status-dot.on {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.home-status-dot.off {
+  background: #ccc;
+}
+
+.home-status-text {
+  font-size: 11px;
+  min-width: 28px;
+}
+
+.home-status-text.online {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.home-status-text.offline {
+  color: #999;
+}
