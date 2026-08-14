@@ -1,5 +1,5 @@
 /* TAO & YAN 相处日记 - Service Worker */
-const CACHE_NAME = 'couple-pwa-v39';
+const CACHE_NAME = 'couple-pwa-v40';
 const URLS_TO_CACHE = [
   './',
   './index.html',
@@ -46,6 +46,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // CSS/JS 使用"stale-while-revalidate"策略：先返回缓存(快)，后台同步更新
+  if (event.request.destination === 'style' || event.request.destination === 'script') {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.match(event.request).then((cached) => {
+          const fetchPromise = fetch(event.request).then((response) => {
+            if (response && response.status === 200 && response.type === 'basic') {
+              cache.put(event.request, response.clone()).catch(() => {});
+            }
+            return response;
+          }).catch(() => cached);
+          // 返回缓存版本(如果有)，否则等待网络请求
+          return cached || fetchPromise;
+        });
+      })
+    );
+    return;
+  }
+
   // 其他资源用"缓存优先"策略
   event.respondWith(
     caches.match(event.request).then((cached) => {
@@ -56,7 +75,7 @@ self.addEventListener('fetch', (event) => {
           cache.put(event.request, cloned).catch(() => {});
         });
         return response;
-      }).catch(() => cached);
+      }).catch(() => cached)
     })
   );
 });
