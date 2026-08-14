@@ -411,6 +411,11 @@ const Cloud = {
         this.syncToday();
         this.syncPhotos();
         this.syncVoices();
+        // 同步在线时长和信件
+        if (typeof CloudSync !== 'undefined') {
+          CloudSync.syncOnlineDuration();
+          CloudSync.syncLetters();
+        }
       }
     }, 30000); // 30 秒
   },
@@ -854,6 +859,75 @@ const Cloud = {
   }
 };
 
+// ====== 通用云端键值同步模块 ======
+// 基于 Cloud 模块的 mantledb 基础设施，提供任意 key-value 的云端存取
+const CloudSync = {
+  // 通用写入：将数据存到云端的 custom/{key} 路径
+  async set(key, value) {
+    if (!Cloud.pairCode) return;
+    try {
+      await fetch(Cloud._url(`custom/${key}`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(value)
+      });
+    } catch (e) { /* 静默失败 */ }
+  },
+
+  // 通用读取：从云端的 custom/{key} 路径取数据
+  async get(key) {
+    if (!Cloud.pairCode) return null;
+    try {
+      const r = await fetch(Cloud._url(`custom/${key}`));
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (e) { return null; }
+  },
+
+  // 同步在线时长：合并双方数据
+  async syncOnlineDuration() {
+    if (!Cloud.pairCode) return;
+    const today = OnlineDuration._todayStr();
+    const localData = Store.get('online_duration', {});
+    const localToday = localData[today] || { tao: 0, yan: 0 };
+
+    // 拉取云端数据
+    const remoteData = await this.get('online_duration');
+    if (remoteData && remoteData[today]) {
+      // 合并：取双方各自的最大值（各自角色的时间不会同时被两人写入）
+      const remoteToday = remoteData[today];
+      localToday.tao = Math.max(localToday.tao || 0, remoteToday.tao || 0);
+      localToday.yan = Math.max(localToday.yan || 0, remoteToday.yan || 0);
+      localData[today] = localToday;
+      Store.set('online_duration', localData);
+      OnlineDuration.refresh();
+    }
+
+    // 推送合并后的数据
+    await this.set('online_duration', localData);
+  },
+
+  // 同步信件
+  async syncLetters() {
+    if (!Cloud.pairCode) return;
+    const cloudLetters = await this.get('letters');
+    if (!cloudLetters || !Array.isArray(cloudLetters)) return;
+
+    const localIds = new Set(LetterBox.letters.map(l => l.id));
+    let newCount = 0;
+    cloudLetters.forEach(cl => {
+      if (!localIds.has(cl.id)) {
+        LetterBox.letters.push(cl);
+        newCount++;
+      }
+    });
+    if (newCount > 0) {
+      await LetterBox.saveAll();
+      LetterBox.updateBadges();
+    }
+  }
+};
+
 // ====== 应用核心 ======
 const App = {
   currentRole: null,
@@ -995,6 +1069,11 @@ const App = {
       Cloud.syncPhotos();
       Cloud.syncVoices();
       Cloud.startPolling();
+      // 同步在线时长和信件
+      if (typeof CloudSync !== 'undefined') {
+        CloudSync.syncOnlineDuration();
+        CloudSync.syncLetters();
+      }
       showToast('已配对成功，开始你们的日记吧 💕');
     });
   },
@@ -1053,7 +1132,14 @@ const App = {
     // 进入时同步（仅当本地有数据时才拉取云端，避免拉回已清除的旧数据）
     if (Cloud.isPaired()) {
       Cloud.heartbeat();
-      Cloud.syncAll().then(() => Cloud.startPolling());
+      Cloud.syncAll().then(() => {
+        Cloud.startPolling();
+        // 同步在线时长和信件
+        if (typeof CloudSync !== 'undefined') {
+          CloudSync.syncOnlineDuration();
+          CloudSync.syncLetters();
+        }
+      });
     }
   },
 
@@ -2654,8 +2740,8 @@ const OnlineDuration = {
     data[today][key] = (data[today][key] || 0) + 60;
     Store.set('online_duration', data);
     this.refresh();
-    // 同步到云端
-    CloudSync.set('online_duration', data);
+    // 同步到云端（合并双方数据）
+    CloudSync.syncOnlineDuration();
   },
 
   refresh() {
@@ -6102,22 +6188,7 @@ const LetterBox = {
   // 云端同步
   async syncFromCloud() {
     try {
-      if (typeof CloudSync === 'undefined' || !CloudSync.get) return;
-      const cloudLetters = await CloudSync.get('letters');
-      if (!cloudLetters || !Array.isArray(cloudLetters)) return;
-      const localIds = new Set(this.letters.map(l => l.id));
-      let newCount = 0;
-      cloudLetters.forEach(cl => {
-        if (!localIds.has(cl.id)) {
-          this.letters.push(cl);
-          newCount++;
-        }
-      });
-      if (newCount > 0) {
-        await this.saveAll();
-        this.updateBadges();
-        showToast('收到 ' + newCount + ' 封新信件 ✉️');
-      }
+      await CloudSync.syncLetters();
     } catch (e) {
       console.warn('LetterBox sync failed', e);
     }
