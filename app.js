@@ -1052,6 +1052,7 @@ const App = {
     Joke.init();
     HotNews.init();
     LetterBox.init();
+    ExerciseTime.init();
     // 首页在线时长统计
     OnlineDuration.refresh();
     // 首页在线状态刷新
@@ -2806,6 +2807,129 @@ const OnlineDuration = {
   _todayStr() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+};
+
+// ====== 运动健身模块 ======
+const ExerciseTime = {
+  _todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  },
+
+  init() {
+    this.refresh();
+  },
+
+  // 获取某天某角色的运动时间（分钟），null 表示未填写
+  getDay(dateStr, role) {
+    const data = Store.get('exercise_time', {});
+    const day = data[dateStr];
+    if (!day) return null;
+    const key = role.toLowerCase();
+    return day[key] != null ? day[key] : null;
+  },
+
+  // 保存运动时间（一旦保存不可更改）
+  setDay(dateStr, role, minutes) {
+    const data = Store.get('exercise_time', {});
+    if (!data[dateStr]) data[dateStr] = {};
+    const key = role.toLowerCase();
+    // 如果已存在值，不允许覆盖
+    if (data[dateStr][key] != null) return false;
+    data[dateStr][key] = minutes;
+    Store.set('exercise_time', data);
+    return true;
+  },
+
+  // 刷新显示
+  refresh() {
+    const today = this._todayStr();
+    ['TAO', 'YAN'].forEach(role => {
+      const el = document.getElementById('exercise' + role);
+      const timeEl = document.getElementById('exerciseTime' + role);
+      if (!el || !timeEl) return;
+      const minutes = this.getDay(today, role);
+      if (minutes != null) {
+        timeEl.textContent = minutes + ' 分钟';
+        el.classList.add('locked');
+      } else {
+        timeEl.textContent = '—';
+        el.classList.remove('locked');
+      }
+    });
+  },
+
+  // 双击编辑
+  edit(role) {
+    const today = this._todayStr();
+    // 如果已填写，不允许编辑
+    const existing = this.getDay(today, role);
+    if (existing != null) {
+      showToast('已填写运动时间，不可更改 🔒');
+      return;
+    }
+    this._showModal(role);
+  },
+
+  _showModal(role) {
+    // 移除已有弹窗
+    const old = document.getElementById('exerciseModalOverlay');
+    if (old) old.remove();
+
+    const emoji = role === 'TAO' ? '🐱' : '🐶';
+    const overlay = document.createElement('div');
+    overlay.id = 'exerciseModalOverlay';
+    overlay.className = 'exercise-modal-overlay';
+    overlay.innerHTML = `
+      <div class="exercise-modal" onclick="event.stopPropagation()">
+        <div class="exercise-modal-title">${emoji} ${role} 运动时间</div>
+        <input type="number" class="exercise-modal-input" id="exerciseModalInput"
+               placeholder="输入分钟数" min="0" max="600" autocomplete="off" />
+        <div class="exercise-modal-unit">分钟</div>
+        <div class="exercise-modal-buttons">
+          <button class="exercise-modal-btn cancel" onclick="ExerciseTime._closeModal()">取消</button>
+          <button class="exercise-modal-btn confirm" onclick="ExerciseTime._confirm('${role}')">确认</button>
+        </div>
+      </div>
+    `;
+    overlay.addEventListener('click', () => this._closeModal());
+    document.body.appendChild(overlay);
+
+    // 自动聚焦
+    const input = document.getElementById('exerciseModalInput');
+    if (input) {
+      setTimeout(() => input.focus(), 100);
+      // 回车确认
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') this._confirm(role);
+        if (e.key === 'Escape') this._closeModal();
+      });
+    }
+  },
+
+  _confirm(role) {
+    const input = document.getElementById('exerciseModalInput');
+    if (!input) return;
+    const val = parseInt(input.value, 10);
+    if (isNaN(val) || val < 0 || val > 600) {
+      showToast('请输入 0-600 之间的数字');
+      return;
+    }
+    const today = this._todayStr();
+    const ok = this.setDay(today, role, val);
+    if (ok) {
+      showToast(`${role} 运动时间已记录：${val} 分钟 💪`);
+    } else {
+      showToast('已填写，不可更改 🔒');
+    }
+    this._closeModal();
+    this.refresh();
+  },
+
+  _closeModal() {
+    const overlay = document.getElementById('exerciseModalOverlay');
+    if (overlay) overlay.remove();
   }
 };
 

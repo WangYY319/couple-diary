@@ -3416,6 +3416,176 @@ html, body {
 }
 
 /* ============================
+   运动健身卡片
+   ============================ */
+.exercise-card {
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(34, 197, 94, 0.05));
+}
+
+.exercise-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.exercise-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  user-select: none;
+}
+
+.exercise-item:active {
+  transform: scale(0.98);
+}
+
+.exercise-item.tao-exercise {
+  border-left: 3px solid #1b7fe3;
+}
+
+.exercise-item.yan-exercise {
+  border-left: 3px solid #e8296a;
+}
+
+.exercise-item.locked {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.exercise-item.locked:active {
+  transform: none;
+}
+
+.exercise-emoji {
+  font-size: 20px;
+}
+
+.exercise-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #666;
+}
+
+.exercise-time {
+  margin-left: auto;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--theme-accent);
+}
+
+.exercise-item.tao-exercise .exercise-time { color: #1b7fe3; }
+.exercise-item.yan-exercise .exercise-time { color: #e8296a; }
+
+.exercise-item.locked .exercise-time::after {
+  content: ' 🔒';
+  font-size: 12px;
+}
+
+.exercise-divider {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  opacity: 0.5;
+}
+
+.exercise-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  opacity: 0.7;
+}
+
+/* 运动健身编辑弹窗 */
+.exercise-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+
+.exercise-modal {
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px 24px 20px;
+  width: 280px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+
+.exercise-modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.exercise-modal-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 18px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.exercise-modal-input:focus {
+  border-color: var(--theme-accent);
+}
+
+.exercise-modal-unit {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.exercise-modal-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.exercise-modal-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.exercise-modal-btn.cancel {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.exercise-modal-btn.confirm {
+  background: var(--theme-accent);
+  color: #fff;
+}
+
+.exercise-modal-btn:active {
+  opacity: 0.7;
+}
+
+/* ============================
    英语刷词卡片
    ============================ */
 .vocab-card {
