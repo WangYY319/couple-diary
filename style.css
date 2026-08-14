@@ -1685,7 +1685,21 @@ html, body {
 .card {
   animation: cardSlideIn 0.5s ease-out backwards;
 }
-#card-greet { animation-delay: 0.05s; }
+#card-greet {
+  animation-delay: 0.05s;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+#card-letter {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
 #card-words { animation-delay: 0.15s; }
 #card-wish { animation-delay: 0.25s; }
 #card-night { animation-delay: 0.35s; }
@@ -2845,43 +2859,45 @@ html, body {
 /* 随机文案 */
 .sweet-text-card {
   text-align: center;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  padding: 10px;
+  width: 52%;
+  margin: 0 auto 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 .sweet-text-display {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--theme-accent);
-  line-height: 1.7;
-  padding: 20px 16px;
-  min-height: 68px;
+  line-height: 1.8;
+  padding: 18px 12px;
+  min-height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(255, 200, 220, 0.18), rgba(200, 220, 255, 0.18));
-  border-radius: 16px;
-  margin-bottom: 12px;
-  transition: opacity 0.3s;
+  background: linear-gradient(135deg, rgba(255, 200, 220, 0.12), rgba(200, 220, 255, 0.12));
+  border-radius: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.3s ease;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+}
+
+.sweet-text-display:hover {
+  background: linear-gradient(135deg, rgba(255, 200, 220, 0.22), rgba(200, 220, 255, 0.22));
+  transform: scale(1.02);
+}
+
+.sweet-text-display:active {
+  transform: scale(0.98);
 }
 
 .sweet-text-display.fading { opacity: 0; }
-
-.sweet-refresh-btn {
-  padding: 10px 26px;
-  border: 2px solid var(--theme-primary);
-  border-radius: 20px;
-  background: transparent;
-  color: var(--theme-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.sweet-refresh-btn:active {
-  transform: scale(0.94);
-  background: var(--theme-primary);
-  color: #fff;
-}
 
 /* ============================
    语音留言 / 录音功能
