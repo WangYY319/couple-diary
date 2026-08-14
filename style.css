@@ -2452,30 +2452,24 @@ html, body {
 }
 
 /* IP地址显示 */
-.role-ip-row {
+.ip-display-row {
   display: flex;
   justify-content: center;
-  gap: 20px;
-  margin-top: -4px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
   margin-bottom: 4px;
 }
 
-.role-ip-item {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.ip-label {
+.ip-text {
   font-size: 10px;
-  width: 14px;
-  text-align: center;
-}
-
-.ip-address {
-  font-size: 10px;
-  color: #aaa;
+  color: #999;
   white-space: nowrap;
+}
+
+.ip-sep {
+  font-size: 10px;
+  color: #ccc;
 }
 
 /* ============================

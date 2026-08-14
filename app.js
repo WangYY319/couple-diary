@@ -3093,44 +3093,74 @@ const IPAddress = {
 
   async refresh() {
     if (!App.currentRole) return;
-    // 获取自己的IP并显示
     const myRole = App.currentRole;
     const myIpEl = document.getElementById('ip' + myRole);
-    let myCity = '未知';
+    let myCity = '';
     try {
       const data = await this._fetchIPInfo();
-      myCity = data.city || '未知';
-      if (myIpEl) myIpEl.textContent = myCity;
-      // 上报到云端
-      await CloudSync.set('ip_' + myRole, { city: myCity, ip: data.ip, updated: Date.now() });
+      myCity = data.city || '';
+      if (myIpEl) myIpEl.textContent = 'IP:' + (myCity || '未知');
+      await CloudSync.set('ip_' + myRole, { city: myCity, updated: Date.now() });
     } catch (e) {
-      if (myIpEl) myIpEl.textContent = '获取失败';
+      if (myIpEl) myIpEl.textContent = 'IP:获取失败';
     }
-    // 拉取对方IP
     await this._pullOtherIP();
   },
 
   async _fetchIPInfo() {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    // 主API：ipinfo.io
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const res = await fetch('https://ipinfo.io/json?token=50d64f8415a53e', {
         signal: controller.signal,
         cache: 'no-cache'
       });
       clearTimeout(timeoutId);
-      if (!res.ok) throw new Error('IP fetch failed');
-      const data = await res.json();
-      return {
-        ip: data.ip || '',
-        city: data.city || '未知',
-        region: data.region || '',
-        country: data.country || ''
-      };
-    } catch (e) {
-      clearTimeout(timeoutId);
-      throw e;
-    }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.city) {
+          return { city: data.city, ip: data.ip || '' };
+        }
+      }
+    } catch (e) { /* 继续尝试备用API */ }
+
+    // 备用API 1：ip-api.com
+    try {
+      const controller2 = new AbortController();
+      const timeoutId2 = setTimeout(() => controller2.abort(), 5000);
+      const res2 = await fetch('http://ip-api.com/json/?lang=zh-CN&fields=status,city,query', {
+        signal: controller2.signal,
+        cache: 'no-cache'
+      });
+      clearTimeout(timeoutId2);
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2.status === 'success' && data2.city) {
+          return { city: data2.city, ip: data2.query || '' };
+        }
+      }
+    } catch (e) { /* 继续尝试备用API */ }
+
+    // 备用API 2：myip.ipip.net 文本接口
+    try {
+      const controller3 = new AbortController();
+      const timeoutId3 = setTimeout(() => controller3.abort(), 5000);
+      const res3 = await fetch('https://myip.ipip.net', {
+        signal: controller3.signal,
+        cache: 'no-cache'
+      });
+      clearTimeout(timeoutId3);
+      if (res3.ok) {
+        const text = await res3.text();
+        const match = text.match(/来自[：:]\s*([^\s]+)\s/);
+        if (match && match[1]) {
+          return { city: match[1], ip: '' };
+        }
+      }
+    } catch (e) { /* 全部失败 */ }
+
+    throw new Error('All IP APIs failed');
   },
 
   async _pullOtherIP() {
@@ -3140,18 +3170,17 @@ const IPAddress = {
     try {
       const data = await CloudSync.get('ip_' + otherRole);
       if (data && data.city) {
-        // 检查数据是否过期（超过5分钟视为离线）
         const age = Date.now() - (data.updated || 0);
         if (age < 300000) {
-          otherIpEl.textContent = data.city;
+          otherIpEl.textContent = 'IP:' + data.city;
         } else {
-          otherIpEl.textContent = '离线';
+          otherIpEl.textContent = 'IP:离线';
         }
       } else {
-        otherIpEl.textContent = '未知';
+        otherIpEl.textContent = 'IP:未知';
       }
     } catch (e) {
-      otherIpEl.textContent = '未知';
+      otherIpEl.textContent = 'IP:未知';
     }
   }
 };
