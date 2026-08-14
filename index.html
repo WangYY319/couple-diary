@@ -137,9 +137,9 @@
 
   <!-- 顶部导航栏 -->
   <header class="nav-bar">
-    <div class="nav-left" id="navLeftBtn" onclick="App.onNavLeftClick()" title="点击查看日历 / 返回今天">
-      <span class="nav-date-icon">📅</span>
-      <div class="nav-left-text">
+    <div class="nav-left" id="navLeftBtn">
+      <span class="nav-detail-icon" id="navDetailIcon" onclick="DetailMenu.toggle()" title="点击查看板块详情">☰</span>
+      <div class="nav-left-text" id="navDateWrap" onclick="App.onDateClick()" title="点击查看日历 / 返回今天">
         <span class="date" id="navDate">--</span>
       </div>
       <span class="back-today-hint" id="backTodayHint" style="display:none">⏎ 今天</span>
@@ -149,6 +149,15 @@
       <button class="nav-btn" id="settingBtn" onclick="Setting.open()" aria-label="设置">⚙️</button>
     </div>
   </header>
+
+  <!-- 板块详情菜单 -->
+  <div class="detail-menu" id="detailMenu" style="display:none">
+    <div class="detail-menu-header">
+      <span class="detail-menu-title" id="detailMenuTitle">板块导航</span>
+      <span class="detail-menu-close" onclick="DetailMenu.toggle()">✕</span>
+    </div>
+    <div class="detail-menu-list" id="detailMenuList"></div>
+  </div>
 
   <!-- 内容区 -->
   <main class="content" id="content">

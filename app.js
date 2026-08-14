@@ -1146,8 +1146,8 @@ const App = {
     showToast('已解除配对，打卡记录已保留');
   },
 
-  // 左上角日历图标点击：如果在历史模式返回今天，否则跳转到日历
-  onNavLeftClick() {
+  // 左上角日期点击：如果在历史模式返回今天，否则跳转到日历
+  onDateClick() {
     if (this.isHistory) {
       this.exitHistory();
       showToast('已返回今天');
@@ -2841,6 +2841,8 @@ const TabNav = {
     } else {
       Setting.stopStatusPolling();
     }
+    // 切换tab时关闭详情菜单
+    DetailMenu.close();
   },
 
   updateRoleDisplay() {
@@ -2854,6 +2856,151 @@ const TabNav = {
       if (pillYAN) pillYAN.classList.add('active');
     }
     OnlineDuration.start();
+  },
+
+  // 切换tab时关闭详情菜单
+  onTabSwitched() {
+    DetailMenu.close();
+  }
+};
+
+// ====== 板块详情菜单模块 ======
+const DetailMenu = {
+  _isOpen: false,
+
+  // 各tab的板块配置
+  TAB_SECTIONS: {
+    0: [
+      { icon: '🎭', name: '角色选择', selector: '.role-card' },
+      { icon: '💌', name: '今日甜蜜', selector: '.sweet-card, .card:nth-child(2)' },
+      { icon: '🎵', name: '音乐播放', selector: '.music-card, .card:nth-child(3)' }
+    ],
+    1: [
+      { icon: '❤️', name: '爱心打卡', selector: '.greet-card, .card:nth-child(1)' },
+      { icon: '📷', name: '我们的照片', selector: '.photo-card, .card:nth-child(2)' },
+      { icon: '✉️', name: '投递信件', selector: '.letter-card, .card:nth-child(3)' }
+    ],
+    2: [
+      { icon: '📅', name: '日历', selector: '.calendar-card' },
+      { icon: '💬', name: '打卡语录', selector: '.word-card, .card:nth-child(2)' },
+      { icon: '🌟', name: '打卡愿望', selector: '.wish-card, .card:nth-child(3)' },
+      { icon: '🎲', name: '随机问答', selector: '.quiz-card, .card:nth-child(4)' },
+      { icon: '🎤', name: '语音留言', selector: '.voice-card, .card:nth-child(5)' },
+      { icon: '🌙', name: '打卡晚安', selector: '.night-card, .card:nth-child(6)' }
+    ],
+    3: [
+      { icon: '💪', name: '运动健身', selector: '.exercise-card, .card:nth-child(1)' },
+      { icon: '📚', name: '英语刷词', selector: '.english-card, .card:nth-child(2)' },
+      { icon: '📰', name: '热点新闻', selector: '.hotnews-card, .card:nth-child(3)' },
+      { icon: '🔬', name: '数理化公式', selector: '.formula-card, .card:nth-child(4)' },
+      { icon: '📜', name: '古诗', selector: '.poem-card, .card:nth-child(5)' },
+      { icon: '🏛️', name: '历史文化', selector: '.history-card, .card:nth-child(6)' },
+      { icon: '🗺️', name: '中国地理', selector: '.geo-card, .card:nth-child(7)' },
+      { icon: '💡', name: '生活技巧', selector: '.life-tip-card, .card:nth-child(8)' },
+      { icon: '😄', name: '笑话大全', selector: '.joke-card, .card:nth-child(9)' }
+    ]
+  },
+
+  toggle() {
+    if (this._isOpen) {
+      this.close();
+    } else {
+      this.open();
+    }
+  },
+
+  open() {
+    const currentTab = TabNav.currentTab;
+    const sections = this.TAB_SECTIONS[currentTab] || [];
+    if (sections.length === 0) return;
+
+    // 更新标题
+    const tabNames = ['首页状态', '记录主角', '每日打卡', '娱乐浏览'];
+    const titleEl = document.getElementById('detailMenuTitle');
+    if (titleEl) titleEl.textContent = tabNames[currentTab] + ' · 板块导航';
+
+    // 渲染列表
+    const listEl = document.getElementById('detailMenuList');
+    if (listEl) {
+      let html = '';
+      sections.forEach((sec, idx) => {
+        html += `<div class="detail-menu-item" onclick="DetailMenu.scrollTo(${idx})">
+          <span class="item-icon">${sec.icon}</span>
+          <span class="item-name">${sec.name}</span>
+          <span class="item-arrow">›</span>
+        </div>`;
+      });
+      listEl.innerHTML = html;
+    }
+
+    // 显示菜单
+    const menuEl = document.getElementById('detailMenu');
+    if (menuEl) menuEl.style.display = '';
+
+    // 高亮图标
+    const iconEl = document.getElementById('navDetailIcon');
+    if (iconEl) iconEl.classList.add('active');
+
+    this._isOpen = true;
+  },
+
+  close() {
+    const menuEl = document.getElementById('detailMenu');
+    if (menuEl) menuEl.style.display = 'none';
+
+    const iconEl = document.getElementById('navDetailIcon');
+    if (iconEl) iconEl.classList.remove('active');
+
+    this._isOpen = false;
+  },
+
+  scrollTo(sectionIdx) {
+    const currentTab = TabNav.currentTab;
+    const sections = this.TAB_SECTIONS[currentTab] || [];
+    const sec = sections[sectionIdx];
+    if (!sec) return;
+
+    // 找到目标卡片
+    const tabEl = document.getElementById('tab-' + currentTab);
+    if (!tabEl) return;
+
+    // 先尝试class选择器，再按nth-child兜底
+    let target = tabEl.querySelector(sec.selector);
+    if (!target) {
+      // 尝试只取选择器的class部分
+      const classMatch = sec.selector.match(/\.([\w-]+)/);
+      if (classMatch) {
+        target = tabEl.querySelector('.' + classMatch[1]);
+      }
+    }
+    if (!target) {
+      // 按顺序找card
+      const cards = tabEl.querySelectorAll('.card');
+      target = cards[sectionIdx];
+    }
+
+    if (target) {
+      // 关闭菜单
+      this.close();
+      // 滚动到目标位置
+      const content = document.getElementById('content');
+      if (content) {
+        const rect = target.getBoundingClientRect();
+        const contentRect = content.getBoundingClientRect();
+        const scrollOffset = rect.top - contentRect.top + content.scrollTop - 10;
+        content.scrollTo({ top: scrollOffset, behavior: 'smooth' });
+      }
+      // 短暂高亮目标
+      target.style.transition = 'box-shadow 0.3s';
+      const originalShadow = target.style.boxShadow;
+      target.style.boxShadow = '0 0 0 3px var(--theme-accent)';
+      setTimeout(() => {
+        target.style.boxShadow = originalShadow;
+      }, 1500);
+    } else {
+      showToast('未找到该板块');
+      this.close();
+    }
   }
 };
 
