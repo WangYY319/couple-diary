@@ -2737,7 +2737,7 @@ html, body {
 
 /* 内容区底部留白给导航栏 */
 .content {
-  padding-bottom: 76px !important;
+  padding-bottom: 38px !important;
 }
 
 /* Tab 页面底部提示 */
@@ -2745,7 +2745,7 @@ html, body {
   text-align: center;
   font-size: 12px;
   color: #bbb;
-  padding: 8px 0 4px;
+  padding: 4px 0 2px;
   letter-spacing: 1px;
 }
 
@@ -3367,6 +3367,66 @@ html, body {
   0%, 100% { transform: translate(-50%, -50%) translateY(0); }
   25% { transform: translate(-50%, -50%) translateY(-3px) scale(1.02); }
   75% { transform: translate(-50%, -50%) translateY(2px) scale(0.98); }
+}
+
+/* ============================
+   音乐播放全局效果
+   ============================ */
+/* 所有卡片边框波纹波动 */
+body.music-active .card {
+  animation: cardRipple 2.5s ease-in-out infinite;
+}
+
+@keyframes cardRipple {
+  0%, 100% {
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+  50% {
+    box-shadow: 0 4px 18px rgba(var(--theme-rgb), 0.12), 0 0 0 1.5px rgba(var(--theme-rgb), 0.15);
+  }
+}
+
+/* Tab0 卡片波纹 */
+body.music-active #tab-0 .card {
+  animation: cardRippleTab0 2.5s ease-in-out infinite;
+}
+
+@keyframes cardRippleTab0 {
+  0%, 100% {
+    box-shadow: 0 4px 18px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.5);
+  }
+  50% {
+    box-shadow: 0 6px 24px rgba(var(--theme-rgb), 0.12), 0 0 0 1.5px rgba(var(--theme-rgb), 0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+  }
+}
+
+/* 所有猫狗图标左右摇晃 */
+body.music-active .lock-icon-btn,
+body.music-active .role-avatar-placeholder,
+body.music-active .quiz-stat-emoji,
+body.music-active .pomodoro-stat-icon,
+body.music-active .vocab-stat-emoji,
+body.music-active .exercise-emoji,
+body.music-active .status-emoji,
+body.music-active .entry-btn .emoji,
+body.music-active .pair-role-btn .emoji,
+body.music-active .setting-role-btn .emoji,
+body.music-active .pivot-leg-tao,
+body.music-active .pivot-leg-yan {
+  animation: petSway 2s ease-in-out infinite;
+}
+
+body.music-active .pivot-leg-tao { animation-delay: 0.3s; }
+body.music-active .pivot-leg-yan { animation-delay: 0.6s; }
+body.music-active .quiz-stat-emoji:first-child { animation-delay: 0.2s; }
+body.music-active .pomodoro-stat-icon:first-child { animation-delay: 0.4s; }
+body.music-active .vocab-stat-emoji:first-child { animation-delay: 0.3s; }
+body.music-active .exercise-emoji:first-child { animation-delay: 0.5s; }
+
+@keyframes petSway {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
 }
 
 @keyframes musicNote {
