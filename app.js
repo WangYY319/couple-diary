@@ -5723,66 +5723,35 @@ const LifeTip = {
     return a;
   },
 
-  // 每天固定一条：先试 60s API tip，失败用本地日期种子
+  // 每天固定一条：本地日期种子轮换，确保每日不同
   async init() {
     const dateStr = todayStr();
     const cached = Store.get(`lifetip_${dateStr}`, null);
-    if (cached !== null) {
-      if (cached.source === 'api' && cached.text) {
-        this._currentText = cached.text;
-        this._render();
-        return;
-      }
-      if (cached.source === 'local' && cached.index >= 0) {
-        this._currentIndex = cached.index;
-        this._render();
-        return;
-      }
+    if (cached !== null && cached.source === 'local' && cached.index >= 0) {
+      this._currentIndex = cached.index;
+      this._render();
+      return;
     }
-    // 尝试 60s API
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch('https://60s.viki.moe/v2/60s', { signal: controller.signal });
-      clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.data && data.data.tip) {
-          this._currentText = data.data.tip;
-          Store.set(`lifetip_${dateStr}`, { source: 'api', text: this._currentText });
-          this._render();
-          return;
-        }
-      }
-    } catch (e) { /* fall through */ }
-    // 本地兜底
+    // 使用日期种子打乱顺序，每天取不同的一条
     const indices = this._seededShuffle(
       this.TIPS.map((_, i) => i),
       dateStr
     );
-    this._currentIndex = indices[0];
+    // 取打乱后的第一条，避免和昨天重复
+    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const yesterdayCache = Store.get(`lifetip_${yesterdayStr}`, null);
+    let yesterdayIndex = -1;
+    if (yesterdayCache && yesterdayCache.source === 'local' && yesterdayCache.index >= 0) {
+      yesterdayIndex = yesterdayCache.index;
+    }
+    // 选第一个不等于昨天的
+    this._currentIndex = indices.find(i => i !== yesterdayIndex) ?? indices[0];
     Store.set(`lifetip_${dateStr}`, { source: 'local', index: this._currentIndex });
     this._render();
   },
 
   // 随机换一条（不重复当前）
   async refresh() {
-    // 尝试 60s API 获取新 tip
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch('https://60s.viki.moe/v2/60s', { signal: controller.signal });
-      clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.data && data.data.tip && data.data.tip !== this._currentText) {
-          this._currentText = data.data.tip;
-          this._render();
-          return;
-        }
-      }
-    } catch (e) { /* fall through */ }
-    // 本地随机
     if (this.TIPS.length <= 1) {
       this._currentIndex = 0;
     } else {
@@ -5792,18 +5761,17 @@ const LifeTip = {
       } while (idx === this._currentIndex);
       this._currentIndex = idx;
     }
-    this._currentText = null;
+    // 更新今天的缓存
+    const dateStr = todayStr();
+    Store.set(`lifetip_${dateStr}`, { source: 'local', index: this._currentIndex });
     this._render();
+    showToast('已换一条新技巧 💡');
   },
 
   _render() {
     const el = document.getElementById('lifeTipContent');
     if (!el) return;
-    if (this._currentText) {
-      el.textContent = this._currentText;
-    } else {
-      el.textContent = this.TIPS[this._currentIndex];
-    }
+    el.textContent = this.TIPS[this._currentIndex] || this.TIPS[0];
   }
 };
 
