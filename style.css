@@ -2437,6 +2437,33 @@ html, body {
   opacity: 0.7;
 }
 
+/* IP地址显示 */
+.role-ip-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: -4px;
+  margin-bottom: 4px;
+}
+
+.role-ip-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ip-label {
+  font-size: 10px;
+  width: 14px;
+  text-align: center;
+}
+
+.ip-address {
+  font-size: 10px;
+  color: #aaa;
+  white-space: nowrap;
+}
+
 /* ============================
    首页：数据透视（周维度柱状图）
    ============================ */

@@ -416,6 +416,10 @@ const Cloud = {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
         }
+        // 刷新IP地址（拉取对方最新IP）
+        if (typeof IPAddress !== 'undefined') {
+          IPAddress._pullOtherIP();
+        }
       }
     }, 30000); // 30 秒
   },
@@ -1114,6 +1118,10 @@ const App = {
         CloudSync.syncOnlineDuration();
         CloudSync.syncLetters();
       }
+      // 初始化IP地址显示
+      if (typeof IPAddress !== 'undefined') {
+        IPAddress.init();
+      }
       showToast('已配对成功，开始你们的日记吧 💕');
     });
   },
@@ -1180,6 +1188,10 @@ const App = {
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
+        }
+        // 初始化IP地址显示
+        if (typeof IPAddress !== 'undefined') {
+          IPAddress.init();
         }
       });
     }
@@ -3066,6 +3078,81 @@ const OnlineDuration = {
   _todayStr() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+};
+
+// ====== IP地址显示模块 ======
+const IPAddress = {
+  _initialized: false,
+
+  async init() {
+    if (this._initialized) return;
+    this._initialized = true;
+    await this.refresh();
+  },
+
+  async refresh() {
+    if (!App.currentRole) return;
+    // 获取自己的IP并显示
+    const myRole = App.currentRole;
+    const myIpEl = document.getElementById('ip' + myRole);
+    let myCity = '未知';
+    try {
+      const data = await this._fetchIPInfo();
+      myCity = data.city || '未知';
+      if (myIpEl) myIpEl.textContent = myCity;
+      // 上报到云端
+      await CloudSync.set('ip_' + myRole, { city: myCity, ip: data.ip, updated: Date.now() });
+    } catch (e) {
+      if (myIpEl) myIpEl.textContent = '获取失败';
+    }
+    // 拉取对方IP
+    await this._pullOtherIP();
+  },
+
+  async _fetchIPInfo() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const res = await fetch('https://ipinfo.io/json?token=50d64f8415a53e', {
+        signal: controller.signal,
+        cache: 'no-cache'
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error('IP fetch failed');
+      const data = await res.json();
+      return {
+        ip: data.ip || '',
+        city: data.city || '未知',
+        region: data.region || '',
+        country: data.country || ''
+      };
+    } catch (e) {
+      clearTimeout(timeoutId);
+      throw e;
+    }
+  },
+
+  async _pullOtherIP() {
+    const otherRole = App.currentRole === 'TAO' ? 'YAN' : 'TAO';
+    const otherIpEl = document.getElementById('ip' + otherRole);
+    if (!otherIpEl) return;
+    try {
+      const data = await CloudSync.get('ip_' + otherRole);
+      if (data && data.city) {
+        // 检查数据是否过期（超过5分钟视为离线）
+        const age = Date.now() - (data.updated || 0);
+        if (age < 300000) {
+          otherIpEl.textContent = data.city;
+        } else {
+          otherIpEl.textContent = '离线';
+        }
+      } else {
+        otherIpEl.textContent = '未知';
+      }
+    } catch (e) {
+      otherIpEl.textContent = '未知';
+    }
   }
 };
 
