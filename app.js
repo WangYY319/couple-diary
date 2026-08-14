@@ -2756,12 +2756,23 @@ const VoiceRecord = {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.audioChunks = [];
-      this.mediaRecorder = new MediaRecorder(stream);
+
+      // 检测支持的录音格式（iOS Safari 不支持 webm）
+      const mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+        : MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+        : '';
+
+      this.mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
       this.mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) this.audioChunks.push(e.data);
       };
       this.mediaRecorder.onstop = () => {
-        const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        const recordedType = this.mediaRecorder.mimeType || 'audio/webm';
+        const blob = new Blob(this.audioChunks, { type: recordedType });
         this.saveRecording(blob);
         stream.getTracks().forEach(t => t.stop());
       };
@@ -2930,11 +2941,23 @@ const VoiceRecord = {
 
   play(index) {
     const v = this.voices[index];
-    if (!v) return;
+    if (!v || !v.blob) {
+      showToast('语音数据异常，无法播放');
+      return;
+    }
     // 标记已读
     if (!v.read) {
       v.read = true;
       this.saveAll();
+    }
+
+    // 如果正在播放同一条，暂停
+    if (this._playingIndex === index && this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio = null;
+      this._playingIndex = -1;
+      this.render();
+      return;
     }
 
     // 停止之前的播放
@@ -2946,15 +2969,44 @@ const VoiceRecord = {
     this._playingIndex = index;
     this.render();
 
-    const url = URL.createObjectURL(v.blob);
-    const audio = new Audio(url);
-    audio.play();
-    this.currentAudio = audio;
-    audio.onended = () => {
+    // 确保 blob 有正确的 MIME type
+    const mime = v.blob.type || 'audio/webm';
+    const blob = v.blob.type ? v.blob : new Blob([v.blob], { type: 'audio/webm' });
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio();
+    audio.src = url;
+    audio.preload = 'auto';
+
+    audio.addEventListener('canplay', () => {
+      audio.play().catch((err) => {
+        console.error('Play failed:', err);
+        showToast('播放失败，请重试');
+        URL.revokeObjectURL(url);
+        this.currentAudio = null;
+        this._playingIndex = -1;
+        this.render();
+      });
+    });
+
+    audio.addEventListener('error', (e) => {
+      console.error('Audio error:', e, 'MIME:', mime, 'Size:', blob.size);
+      showToast(`播放失败，格式可能不兼容 (${mime})`);
+      URL.revokeObjectURL(url);
       this.currentAudio = null;
       this._playingIndex = -1;
       this.render();
-    };
+    });
+
+    audio.addEventListener('ended', () => {
+      URL.revokeObjectURL(url);
+      this.currentAudio = null;
+      this._playingIndex = -1;
+      this.render();
+    });
+
+    // 强制加载
+    audio.load();
+    this.currentAudio = audio;
     showToast(`播放 ${v.role} 的语音 (${v.duration}秒)`);
   },
 
