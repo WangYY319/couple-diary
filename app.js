@@ -1062,6 +1062,8 @@ const App = {
     DataPivot.render();
     // 首页在线时长统计
     OnlineDuration.refresh();
+    // 渲染角色头像
+    AvatarPicker.renderAll();
     // 首页在线状态刷新
     if (Cloud.isPaired()) {
       Setting.refreshStatus();
@@ -2802,6 +2804,12 @@ const Setting = {
     // 首页角色卡（合并后的角色对按钮）
     const pairDot = document.getElementById('homeDot' + role);
     if (pairDot) pairDot.className = 'role-pair-dot ' + (online ? 'on' : 'off');
+    // 在线时长统计：更新online/offline状态文字
+    const odStatus = document.getElementById('odStatus' + role);
+    if (odStatus) {
+      odStatus.textContent = online ? 'online' : 'offline';
+      odStatus.className = 'od-status ' + (online ? 'online' : 'offline');
+    }
     // 在线时长统计：更新对方是否在线
     OnlineDuration.refresh();
   },
@@ -3016,26 +3024,26 @@ const DetailMenu = {
   TAB_SECTIONS: {
     0: [
       { icon: '🎭', name: '角色选择', selector: '.role-card' },
-      { icon: '💌', name: '甜蜜语录', selector: '.sweet-card, .card:nth-child(2)' },
+      { icon: '💌', name: '甜蜜语录', selector: '.sweet-text-card, .card:nth-child(2)' },
       { icon: '🎵', name: '音乐播放', selector: '.music-card, .card:nth-child(3)' },
-      { icon: '📊', name: '本周数据透视', selector: '.data-pivot-card' }
+      { icon: '📊', name: '本周数据透视', selector: '.data-pivot-card, .card:nth-child(4)' }
     ],
     1: [
-      { icon: '❤️', name: '爱心打卡', selector: '.greet-card, .card:nth-child(1)' },
+      { icon: '❤️', name: '爱心打卡', selector: '#card-greet, .card:nth-child(1)' },
       { icon: '📷', name: '我们的照片', selector: '.photo-card, .card:nth-child(2)' },
-      { icon: '✉️', name: '投递信件', selector: '.letter-card, .card:nth-child(3)' }
+      { icon: '✉️', name: '投递信件', selector: '#card-letter, .card:nth-child(3)' }
     ],
     2: [
       { icon: '📅', name: '日历', selector: '.calendar-card' },
-      { icon: '💬', name: '打卡语录', selector: '.word-card, .card:nth-child(2)' },
-      { icon: '🌟', name: '打卡愿望', selector: '.wish-card, .card:nth-child(3)' },
+      { icon: '💬', name: '打卡语录', selector: '#card-words, .card:nth-child(2)' },
+      { icon: '🌟', name: '打卡愿望', selector: '#card-wish, .card:nth-child(3)' },
       { icon: '🎲', name: '随机问答', selector: '.quiz-card, .card:nth-child(4)' },
-      { icon: '🎤', name: '语音留言', selector: '.voice-card, .card:nth-child(5)' },
-      { icon: '✨', name: '打卡晚安', selector: '.night-card, .card:nth-child(6)' }
+      { icon: '🎤', name: '语音留言', selector: '.record-card, .card:nth-child(5)' },
+      { icon: '✨', name: '打卡晚安', selector: '#card-night, .card:nth-child(6)' }
     ],
     3: [
       { icon: '💪', name: '运动健身', selector: '.exercise-card, .card:nth-child(1)' },
-      { icon: '📚', name: '英语刷词', selector: '.english-card, .card:nth-child(2)' },
+      { icon: '📚', name: '英语刷词', selector: '.vocab-card, .card:nth-child(2)' },
       { icon: '📰', name: '热点新闻', selector: '.hotnews-card, .card:nth-child(3)' },
       { icon: '🔬', name: '数理化公式', selector: '.formula-card, .card:nth-child(4)' },
       { icon: '📜', name: '唐宋诗词', selector: '.poem-card, .card:nth-child(5)' },
@@ -3197,8 +3205,8 @@ const OnlineDuration = {
       const bar = document.getElementById('odBar' + role);
       const time = document.getElementById('odTime' + role);
       if (bar) {
-        // 满值为2小时(120分钟)
-        const percent = Math.min(100, (minutes / 120) * 100);
+        // 满值为8小时(480分钟)
+        const percent = Math.min(100, (minutes / 480) * 100);
         bar.style.width = percent + '%';
       }
       if (time) time.textContent = displayTime;
@@ -3208,6 +3216,131 @@ const OnlineDuration = {
   _todayStr() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+};
+
+// ====== 头像选择器模块 ======
+const AvatarPicker = {
+  _currentRole: null,
+  _tempDataUrl: null,
+  _tempZoom: 100,
+  _tempPos: 50,
+  _EMOJI: { TAO: '🐱', YAN: '🐶' },
+
+  open(role) {
+    this._currentRole = role;
+    this._tempDataUrl = null;
+    this._tempZoom = 100;
+    this._tempPos = 50;
+    document.getElementById('avatarPickerTitle').textContent = '设置' + role + '头像';
+    document.getElementById('avatarPickerEmoji').textContent = this._EMOJI[role] || '🐱';
+    const existing = Store.get('avatar_' + role, null);
+    const img = document.getElementById('avatarPickerImg');
+    const emoji = document.getElementById('avatarPickerEmoji');
+    if (existing && existing.dataUrl) {
+      this._tempDataUrl = existing.dataUrl;
+      this._tempZoom = existing.zoom || 100;
+      this._tempPos = existing.pos || 50;
+      img.src = existing.dataUrl;
+      img.style.display = 'block';
+      emoji.style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      emoji.style.display = 'block';
+    }
+    document.getElementById('avatarPickerZoom').value = this._tempZoom;
+    document.getElementById('avatarPickerPos').value = this._tempPos;
+    this._applyPreview();
+    document.getElementById('avatarPickerOverlay').style.display = 'flex';
+  },
+
+  close() {
+    document.getElementById('avatarPickerOverlay').style.display = 'none';
+    this._currentRole = null;
+    this._tempDataUrl = null;
+  },
+
+  onFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this._tempDataUrl = e.target.result;
+      const img = document.getElementById('avatarPickerImg');
+      img.src = this._tempDataUrl;
+      img.style.display = 'block';
+      document.getElementById('avatarPickerEmoji').style.display = 'none';
+      this._applyPreview();
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  },
+
+  updateZoom(val) {
+    this._tempZoom = parseInt(val);
+    this._applyPreview();
+  },
+
+  updatePos(val) {
+    this._tempPos = parseInt(val);
+    this._applyPreview();
+  },
+
+  _applyPreview() {
+    const img = document.getElementById('avatarPickerImg');
+    if (!this._tempDataUrl) return;
+    const scale = this._tempZoom / 100;
+    const posX = this._tempPos;
+    img.style.transform = `scale(${scale})`;
+    img.style.transformOrigin = `${posX}% 50%`;
+  },
+
+  remove() {
+    this._tempDataUrl = null;
+    const img = document.getElementById('avatarPickerImg');
+    img.style.display = 'none';
+    img.src = '';
+    document.getElementById('avatarPickerEmoji').style.display = 'block';
+  },
+
+  save() {
+    if (!this._currentRole) return;
+    if (this._tempDataUrl) {
+      Store.set('avatar_' + this._currentRole, {
+        dataUrl: this._tempDataUrl,
+        zoom: this._tempZoom,
+        pos: this._tempPos
+      });
+    } else {
+      Store.remove('avatar_' + this._currentRole);
+    }
+    this._renderRole(this._currentRole);
+    this.close();
+    Toast.show('头像已更新');
+  },
+
+  _renderRole(role) {
+    const data = Store.get('avatar_' + role, null);
+    const img = document.getElementById('avatarImg' + role);
+    const placeholder = document.getElementById('avatarPlaceholder' + role);
+    if (data && data.dataUrl) {
+      img.src = data.dataUrl;
+      const scale = (data.zoom || 100) / 100;
+      const posX = data.pos || 50;
+      img.style.transform = `scale(${scale})`;
+      img.style.transformOrigin = `${posX}% 50%`;
+      img.style.display = 'block';
+      placeholder.style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      img.src = '';
+      placeholder.textContent = this._EMOJI[role] || '🐱';
+      placeholder.style.display = 'block';
+    }
+  },
+
+  renderAll() {
+    ['TAO', 'YAN'].forEach(role => this._renderRole(role));
   }
 };
 
