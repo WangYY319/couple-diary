@@ -411,11 +411,13 @@ const Cloud = {
         this.syncToday();
         this.syncPhotos();
         this.syncVoices();
-        // 同步在线时长、信件和头像
+        // 同步在线时长、信件、头像、运动时间、背景透明度
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
           CloudSync.syncAvatars();
+          CloudSync.syncExerciseTime();
+          CloudSync.syncBgOpacity();
         }
         // 刷新IP地址（拉取对方最新IP）
         if (typeof IPAddress !== 'undefined') {
@@ -979,6 +981,59 @@ const CloudSync = {
         await this.set('avatar_' + role, localAvatar);
       }
     }
+  },
+
+  // 同步运动时间：合并双方数据
+  async syncExerciseTime() {
+    if (!Cloud.pairCode) return;
+    const localData = Store.get('exercise_time', {});
+    const remoteData = await this.get('exercise_time');
+
+    if (!remoteData || typeof remoteData !== 'object') {
+      // 云端没有，推送本地
+      if (Object.keys(localData).length > 0) {
+        await this.set('exercise_time', localData);
+      }
+      return;
+    }
+
+    let changed = false;
+    // 合并：对每个日期，取双方各自角色的值（不可覆盖）
+    for (const dateStr of new Set([...Object.keys(localData), ...Object.keys(remoteData)])) {
+      if (!localData[dateStr]) {
+        localData[dateStr] = {};
+        changed = true;
+      }
+      for (const role of ['tao', 'yan']) {
+        if (localData[dateStr][role] == null && remoteData[dateStr] && remoteData[dateStr][role] != null) {
+          localData[dateStr][role] = remoteData[dateStr][role];
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      Store.set('exercise_time', localData);
+      if (typeof ExerciseTime !== 'undefined') ExerciseTime.refresh();
+    }
+    // 推送合并后的数据
+    await this.set('exercise_time', localData);
+  },
+
+  // 同步背景透明度设置
+  async syncBgOpacity() {
+    if (!Cloud.pairCode) return;
+    const localOpacity = Store.get('bgOpacity', 100);
+    const remoteOpacity = await this.get('bgOpacity');
+
+    if (remoteOpacity == null) {
+      // 云端没有，推送本地
+      await this.set('bgOpacity', localOpacity);
+    } else if (remoteOpacity !== localOpacity) {
+      // 使用云端值（最后修改者优先）
+      Store.set('bgOpacity', remoteOpacity);
+      if (typeof Background !== 'undefined') Background.applyOpacity(remoteOpacity);
+    }
   }
 };
 
@@ -1054,6 +1109,8 @@ const App = {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
           CloudSync.syncAvatars();
+          CloudSync.syncExerciseTime();
+          CloudSync.syncBgOpacity();
         }
       }
     });
@@ -1136,11 +1193,13 @@ const App = {
       Cloud.syncPhotos();
       Cloud.syncVoices();
       Cloud.startPolling();
-      // 同步在线时长、信件和头像
+      // 同步在线时长、信件、头像、运动时间、背景透明度
       if (typeof CloudSync !== 'undefined') {
         CloudSync.syncOnlineDuration();
         CloudSync.syncLetters();
         CloudSync.syncAvatars();
+        CloudSync.syncExerciseTime();
+        CloudSync.syncBgOpacity();
       }
       // IP地址显示已移除
       showToast('已配对成功，开始你们的日记吧 💕');
@@ -1210,6 +1269,8 @@ const App = {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
           CloudSync.syncAvatars();
+          CloudSync.syncExerciseTime();
+          CloudSync.syncBgOpacity();
         }
         // IP地址显示已移除
       });
@@ -2904,6 +2965,10 @@ const Setting = {
     const label = document.getElementById('bgOpacityLabel');
     if (label) label.textContent = val + '%';
     Background.applyOpacity(val);
+    // 同步到云端
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.set('bgOpacity', val);
+    }
   },
 
   close(ev) {
@@ -3617,6 +3682,10 @@ const ExerciseTime = {
     if (data[dateStr][key] != null) return false;
     data[dateStr][key] = minutes;
     Store.set('exercise_time', data);
+    // 同步到云端
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.syncExerciseTime();
+    }
     return true;
   },
 
