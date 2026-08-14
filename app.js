@@ -4646,7 +4646,7 @@ document.addEventListener('DOMContentLoaded', () => App.init());
 /* ============================
    新增模块（追加至 app.js 末尾）
    - FormulaCard  数理化公式
-   - PoemCard      古诗赏析
+   - PoemCard      古诗解读
    - LifeTip       生活常识
    - Joke          笑话大全
    - HotNews       热点新闻
@@ -4817,9 +4817,9 @@ const FormulaCard = {
   }
 };
 
-// ====== 古诗赏析模块 ======
+// ====== 古诗解读模块 ======
 const PoemCard = {
-  // 唐诗宋词精选（唐诗三百首 / 宋词三百首），通俗易懂的赏析
+  // 唐诗宋词精选（唐诗三百首 / 宋词三百首），通俗易懂的解读
   POEMS: [
     { title: '静夜思', author: '李白', dynasty: '唐', text: '床前明月光，疑是地上霜。\n举头望明月，低头思故乡。', analysis: '诗人由月光联想到秋霜，引发浓浓的思乡之情。语言朴实无华，却道尽了游子的心声，是思乡诗中最经典的作品。' },
     { title: '春晓', author: '孟浩然', dynasty: '唐', text: '春眠不觉晓，处处闻啼鸟。\n夜来风雨声，花落知多少。', analysis: '描写春日清晨被鸟鸣唤醒的惬意，又由昨夜风雨联想到落花，含蓄地表达了对春光易逝的淡淡惋惜。' },
@@ -5079,14 +5079,14 @@ const PoemCard = {
     showToast('为你换了一首新诗 📜');
   },
 
-  // 显示 / 隐藏赏析
+  // 显示 / 隐藏解读
   toggleAnalysis() {
     const analysis = document.getElementById('poemAnalysis');
     const btn = document.getElementById('poemAnalysisBtn');
     if (!analysis) return;
     const isHidden = analysis.style.display === 'none';
     analysis.style.display = isHidden ? '' : 'none';
-    if (btn) btn.textContent = isHidden ? '📖 收起赏析' : '📖 查看赏析';
+    if (btn) btn.textContent = isHidden ? '📖 收起解读' : '📖 查看解读';
   },
 
   _renderPoem(idx) {
@@ -5111,7 +5111,7 @@ const PoemCard = {
     const analysis = document.getElementById('poemAnalysis');
     if (analysis) analysis.style.display = 'none';
     const btn = document.getElementById('poemAnalysisBtn');
-    if (btn) btn.textContent = '📖 查看赏析';
+    if (btn) btn.textContent = '📖 查看解读';
   }
 };
 
