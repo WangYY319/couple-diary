@@ -418,6 +418,7 @@ const Cloud = {
           CloudSync.syncAvatars();
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
+          CloudSync.syncPomodoro();
         }
         // 刷新IP地址（拉取对方最新IP）
         if (typeof IPAddress !== 'undefined') {
@@ -1034,6 +1035,37 @@ const CloudSync = {
       Store.set('bgOpacity', remoteOpacity);
       if (typeof Background !== 'undefined') Background.applyOpacity(remoteOpacity);
     }
+  },
+
+  // 同步番茄统计数据：合并双方数据
+  async syncPomodoro() {
+    if (!Cloud.pairCode) return;
+    const localData = Store.get('pomodoro_count', { tao: 0, yan: 0 });
+    const remoteData = await this.get('pomodoro_count');
+
+    if (!remoteData || typeof remoteData !== 'object') {
+      // 云端没有，推送本地
+      await this.set('pomodoro_count', localData);
+      return;
+    }
+
+    let changed = false;
+    // 合并：取双方各自的最大值
+    for (const role of ['tao', 'yan']) {
+      const localVal = localData[role] || 0;
+      const remoteVal = remoteData[role] || 0;
+      if (remoteVal > localVal) {
+        localData[role] = remoteVal;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      Store.set('pomodoro_count', localData);
+      if (typeof Pomodoro !== 'undefined') Pomodoro._renderStats();
+    }
+    // 推送合并后的数据
+    await this.set('pomodoro_count', localData);
   }
 };
 
@@ -1111,6 +1143,7 @@ const App = {
           CloudSync.syncAvatars();
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
+          CloudSync.syncPomodoro();
         }
       }
     });
@@ -1137,6 +1170,7 @@ const App = {
     ExerciseTime.init();
     HistoryCard.init();
     GeoCard.init();
+    Pomodoro.init();
     DataPivot.render();
     // 首页在线时长统计
     OnlineDuration.refresh();
@@ -1200,6 +1234,7 @@ const App = {
         CloudSync.syncAvatars();
         CloudSync.syncExerciseTime();
         CloudSync.syncBgOpacity();
+        CloudSync.syncPomodoro();
       }
       // IP地址显示已移除
       showToast('已配对成功，开始你们的日记吧 💕');
@@ -1271,6 +1306,7 @@ const App = {
           CloudSync.syncAvatars();
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
+          CloudSync.syncPomodoro();
         }
         // IP地址显示已移除
       });
@@ -3066,6 +3102,7 @@ const TabNav = {
       Joke.init();
       HistoryCard.init();
       GeoCard.init();
+      Pomodoro.init();
     }
     // 切换到记录页时刷新爱心状态
     if (tabIndex === 1) { Cards.renderGreet(); Photos.render(); LetterBox.updateBadges(); }
@@ -3134,11 +3171,12 @@ const DetailMenu = {
       { icon: '📚', name: '英语刷词', selector: '.vocab-card, .card:nth-child(2)' },
       { icon: '📰', name: '热点新闻', selector: '.hotnews-card, .card:nth-child(3)' },
       { icon: '🔬', name: '数理化公式', selector: '.formula-card, .card:nth-child(4)' },
-      { icon: '📜', name: '唐宋诗词', selector: '.poem-card, .card:nth-child(5)' },
-      { icon: '🏛️', name: '历史文化', selector: '.history-card, .card:nth-child(6)' },
-      { icon: '🗺️', name: '中国地理', selector: '.geo-card, .card:nth-child(7)' },
-      { icon: '💡', name: '生活技巧', selector: '.life-tip-card, .card:nth-child(8)' },
-      { icon: '😄', name: '笑话大全', selector: '.joke-card, .card:nth-child(9)' }
+      { icon: '🍅', name: '番茄管理', selector: '.pomodoro-card, .card:nth-child(5)' },
+      { icon: '📜', name: '唐宋诗词', selector: '.poem-card, .card:nth-child(6)' },
+      { icon: '🏛️', name: '历史文化', selector: '.history-card, .card:nth-child(7)' },
+      { icon: '🗺️', name: '中国地理', selector: '.geo-card, .card:nth-child(8)' },
+      { icon: '💡', name: '生活技巧', selector: '.life-tip-card, .card:nth-child(9)' },
+      { icon: '😄', name: '笑话大全', selector: '.joke-card, .card:nth-child(10)' }
     ]
   },
 
@@ -5874,6 +5912,138 @@ const FormulaCard = {
     const detail = document.getElementById('formulaDetail');
     if (detail) detail.style.display = 'none';
     this.init();
+  }
+};
+
+// ====== 番茄管理模块 ======
+const Pomodoro = {
+  DURATION: 25 * 60, // 25分钟（秒）
+  RING_CIRCUMFERENCE: 2 * Math.PI * 54, // 圆环周长
+  _remaining: 25 * 60,
+  _running: false,
+  _timer: null,
+
+  init() {
+    this._remaining = this.DURATION;
+    this._updateDisplay();
+    this._renderStats();
+  },
+
+  toggle() {
+    if (this._running) {
+      this.pause();
+    } else {
+      this.start();
+    }
+  },
+
+  start() {
+    if (this._running) return;
+    this._running = true;
+    document.querySelector('.pomodoro-card').classList.add('running');
+    const btn = document.getElementById('pomodoroStartBtn');
+    if (btn) btn.textContent = '⏸ 暂停';
+    const hint = document.getElementById('pomodoroHint');
+    if (hint) hint.textContent = '专注中，保持下去 🍅';
+
+    this._timer = setInterval(() => {
+      this._remaining--;
+      this._updateDisplay();
+      if (this._remaining <= 0) {
+        this._complete();
+      }
+    }, 1000);
+  },
+
+  pause() {
+    this._running = false;
+    document.querySelector('.pomodoro-card').classList.remove('running');
+    const btn = document.getElementById('pomodoroStartBtn');
+    if (btn) btn.textContent = '▶ 继续';
+    const hint = document.getElementById('pomodoroHint');
+    if (hint) hint.textContent = '已暂停，点击继续 🍅';
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+  },
+
+  reset() {
+    this._running = false;
+    this._remaining = this.DURATION;
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    document.querySelector('.pomodoro-card').classList.remove('running');
+    const btn = document.getElementById('pomodoroStartBtn');
+    if (btn) btn.textContent = '▶ 开始';
+    const hint = document.getElementById('pomodoroHint');
+    if (hint) hint.textContent = '专注25分钟，完成后自动统计 🍅';
+    this._updateDisplay();
+  },
+
+  _complete() {
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    this._running = false;
+    this._remaining = this.DURATION;
+    document.querySelector('.pomodoro-card').classList.remove('running');
+    const btn = document.getElementById('pomodoroStartBtn');
+    if (btn) btn.textContent = '▶ 开始';
+    const hint = document.getElementById('pomodoroHint');
+    if (hint) hint.textContent = '完成一个番茄！休息一下吧 🎉';
+
+    // 统计：当前角色 +1
+    const role = App.currentRole;
+    if (role) {
+      const data = Store.get('pomodoro_count', { tao: 0, yan: 0 });
+      data[role.toLowerCase()] = (data[role.toLowerCase()] || 0) + 1;
+      Store.set('pomodoro_count', data);
+      this._renderStats();
+      // 云同步
+      if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+        CloudSync.syncPomodoro();
+      }
+      showToast('🍅 完成一个番茄！专注力 +1');
+    }
+
+    // 提示音
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 800;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {}
+
+    this._updateDisplay();
+  },
+
+  _updateDisplay() {
+    const m = Math.floor(this._remaining / 60);
+    const s = this._remaining % 60;
+    const display = document.getElementById('pomodoroTimeDisplay');
+    if (display) display.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+    // 更新圆环进度
+    const ringFill = document.getElementById('pomodoroRingFill');
+    if (ringFill) {
+      const progress = this._remaining / this.DURATION;
+      const offset = this.RING_CIRCUMFERENCE * (1 - progress);
+      ringFill.style.strokeDashoffset = offset;
+    }
+  },
+
+  _renderStats() {
+    const data = Store.get('pomodoro_count', { tao: 0, yan: 0 });
+    const taoEl = document.getElementById('pomodoroCountTAO');
+    const yanEl = document.getElementById('pomodoroCountYAN');
+    if (taoEl) taoEl.textContent = data.tao || 0;
+    if (yanEl) yanEl.textContent = data.yan || 0;
+  },
+
+  // 从云端同步番茄数据
+  syncFromCloud() {
+    this._renderStats();
   }
 };
 

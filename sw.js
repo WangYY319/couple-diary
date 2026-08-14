@@ -1,5 +1,5 @@
 /* TAO & YAN 相处日记 - Service Worker */
-const CACHE_NAME = 'couple-pwa-v42';
+const CACHE_NAME = 'couple-pwa-v43';
 const URLS_TO_CACHE = [
   './',
   './index.html',
