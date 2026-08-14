@@ -451,81 +451,6 @@
     <!-- ====== Tab 3: 娱乐 ====== -->
     <div class="tab-page" id="tab-3" data-tab="3">
 
-      <!-- 运动健身 -->
-      <div class="card exercise-card">
-        <div class="card-title"><span class="icon">💪</span> 运动健身</div>
-        <div class="exercise-row">
-          <div class="exercise-item tao-exercise" id="exerciseTAO" ondblclick="ExerciseTime.edit('TAO')">
-            <span class="exercise-emoji">🐱</span>
-            <span class="exercise-name">TAO</span>
-            <span class="exercise-time" id="exerciseTimeTAO">—</span>
-          </div>
-          <div class="exercise-divider">vs</div>
-          <div class="exercise-item yan-exercise" id="exerciseYAN" ondblclick="ExerciseTime.edit('YAN')">
-            <span class="exercise-emoji">🐶</span>
-            <span class="exercise-name">YAN</span>
-            <span class="exercise-time" id="exerciseTimeYAN">—</span>
-          </div>
-        </div>
-        <div class="exercise-hint">双击填写运动时间（分钟），填写后不可更改</div>
-      </div>
-
-      <!-- 英语刷词 -->
-      <div class="card vocab-card">
-        <div class="card-title"><span class="icon">📚</span> 英语刷词</div>
-        <div class="vocab-stats-row">
-          <div class="vocab-stat tao-stat">
-            <span class="vocab-stat-emoji">🐱</span>
-            <span class="vocab-stat-name">TAO</span>
-            <span class="vocab-stat-count" id="vocabCountTAO">0</span>
-          </div>
-          <div class="vocab-stat yan-stat">
-            <span class="vocab-stat-emoji">🐶</span>
-            <span class="vocab-stat-name">YAN</span>
-            <span class="vocab-stat-count" id="vocabCountYAN">0</span>
-          </div>
-        </div>
-        <div class="vocab-content" id="vocabContent">
-          <div class="vocab-word-area" id="vocabWordArea" style="display:none">
-            <div class="vocab-word-text" id="vocabWordText"></div>
-            <div class="vocab-word-meaning" id="vocabWordMeaning" style="display:none"></div>
-            <div class="vocab-word-index" id="vocabWordIndex"></div>
-          </div>
-          <div class="vocab-placeholder" id="vocabPlaceholder">点击下方按钮开始刷词 📖</div>
-        </div>
-        <div class="vocab-controls" id="vocabControls" style="display:none">
-          <button class="vocab-btn know-btn" onclick="EnglishVocab.know()">✓ 认识</button>
-          <button class="vocab-btn forget-btn" onclick="EnglishVocab.forget()">✗ 忘记</button>
-        </div>
-        <button class="vocab-start-btn" id="vocabStartBtn" onclick="EnglishVocab.start()">开始刷词</button>
-      </div>
-
-      <!-- 热点新闻 -->
-      <div class="card hotnews-card">
-        <div class="card-title"><span class="icon">📰</span> 热点新闻</div>
-        <div class="hotnews-tabs" id="hotnewsTabs">
-          <button class="hotnews-tab active" data-cat="时政" onclick="HotNews.switchCat('时政')">时政</button>
-          <button class="hotnews-tab" data-cat="科技" onclick="HotNews.switchCat('科技')">科技</button>
-          <button class="hotnews-tab" data-cat="财经" onclick="HotNews.switchCat('财经')">财经</button>
-        </div>
-        <div class="hotnews-container" id="hotnewsContainer">
-          <div class="hotnews-placeholder">加载今日热点中...</div>
-        </div>
-      </div>
-
-      <!-- 数理化公式 -->
-      <div class="card formula-card">
-        <div class="card-title"><span class="icon">🔬</span> 数理化公式</div>
-        <div class="formula-category-row" id="formulaCategoryRow"></div>
-        <div class="formula-detail" id="formulaDetail" style="display:none">
-          <div class="formula-name" id="formulaName"></div>
-          <div class="formula-expression" id="formulaExpression"></div>
-          <div class="formula-usage" id="formulaUsage"></div>
-          <div class="formula-principle" id="formulaPrinciple"></div>
-          <button class="formula-back-btn" onclick="FormulaCard.backToList()">← 返回列表</button>
-        </div>
-      </div>
-
       <!-- 番茄管理 -->
       <div class="card pomodoro-card">
         <div class="card-title"><span class="icon">🍅</span> 番茄管理</div>
@@ -559,8 +484,83 @@
         <div class="pomodoro-hint" id="pomodoroHint">专注25分钟，完成后自动统计 🍅</div>
       </div>
 
+      <!-- 英语刷词 -->
+      <div class="card vocab-card">
+        <div class="card-title"><span class="icon">📚</span> 英语刷词</div>
+        <div class="vocab-stats-row">
+          <div class="vocab-stat tao-stat">
+            <span class="vocab-stat-emoji">🐱</span>
+            <span class="vocab-stat-name">TAO</span>
+            <span class="vocab-stat-count" id="vocabCountTAO">0</span>
+          </div>
+          <div class="vocab-stat yan-stat">
+            <span class="vocab-stat-emoji">🐶</span>
+            <span class="vocab-stat-name">YAN</span>
+            <span class="vocab-stat-count" id="vocabCountYAN">0</span>
+          </div>
+        </div>
+        <div class="vocab-content" id="vocabContent">
+          <div class="vocab-word-area" id="vocabWordArea" style="display:none">
+            <div class="vocab-word-text" id="vocabWordText"></div>
+            <div class="vocab-word-meaning" id="vocabWordMeaning" style="display:none"></div>
+            <div class="vocab-word-index" id="vocabWordIndex"></div>
+          </div>
+          <div class="vocab-placeholder" id="vocabPlaceholder">点击下方按钮开始刷词 📖</div>
+        </div>
+        <div class="vocab-controls" id="vocabControls" style="display:none">
+          <button class="vocab-btn know-btn" onclick="EnglishVocab.know()">✓ 认识</button>
+          <button class="vocab-btn forget-btn" onclick="EnglishVocab.forget()">✗ 忘记</button>
+        </div>
+        <button class="vocab-start-btn" id="vocabStartBtn" onclick="EnglishVocab.start()">开始刷词</button>
+      </div>
+
+      <!-- 运动健身 -->
+      <div class="card exercise-card">
+        <div class="card-title"><span class="icon">💪</span> 运动健身</div>
+        <div class="exercise-row">
+          <div class="exercise-item tao-exercise" id="exerciseTAO" ondblclick="ExerciseTime.edit('TAO')">
+            <span class="exercise-emoji">🐱</span>
+            <span class="exercise-name">TAO</span>
+            <span class="exercise-time" id="exerciseTimeTAO">—</span>
+          </div>
+          <div class="exercise-divider">vs</div>
+          <div class="exercise-item yan-exercise" id="exerciseYAN" ondblclick="ExerciseTime.edit('YAN')">
+            <span class="exercise-emoji">🐶</span>
+            <span class="exercise-name">YAN</span>
+            <span class="exercise-time" id="exerciseTimeYAN">—</span>
+          </div>
+        </div>
+        <div class="exercise-hint">双击填写运动时间（分钟），填写后不可更改</div>
+      </div>
+
+      <!-- 热点新闻 -->
+      <div class="card hotnews-card">
+        <div class="card-title"><span class="icon">📰</span> 热点新闻</div>
+        <div class="hotnews-tabs" id="hotnewsTabs">
+          <button class="hotnews-tab active" data-cat="时政" onclick="HotNews.switchCat('时政')">时政</button>
+          <button class="hotnews-tab" data-cat="科技" onclick="HotNews.switchCat('科技')">科技</button>
+          <button class="hotnews-tab" data-cat="财经" onclick="HotNews.switchCat('财经')">财经</button>
+        </div>
+        <div class="hotnews-container" id="hotnewsContainer">
+          <div class="hotnews-placeholder">加载今日热点中...</div>
+        </div>
+      </div>
+
+      <!-- 数理化公式 -->
+      <div class="card formula-card">
+        <div class="card-title"><span class="icon">🔬</span> 数理化公式</div>
+        <div class="formula-category-row" id="formulaCategoryRow"></div>
+        <div class="formula-detail" id="formulaDetail" style="display:none">
+          <div class="formula-name" id="formulaName"></div>
+          <div class="formula-expression" id="formulaExpression"></div>
+          <div class="formula-usage" id="formulaUsage"></div>
+          <div class="formula-principle" id="formulaPrinciple"></div>
+          <button class="formula-back-btn" onclick="FormulaCard.backToList()">← 返回列表</button>
+        </div>
+      </div>
+
       <!-- 唐宋诗词 -->
-      <div class="card poem-card" id="poemCard" ondblclick="PoemCard.markRead()">
+      <div class="card poem-card" id="poemCard" ondblclick="ReadMark.toggle('poem')">
         <div class="card-title"><span class="icon">📜</span> <span id="poemCardTitle">唐宋诗词</span></div>
         <div class="poem-content" id="poemContent">
           <div class="poem-title" id="poemTitle"></div>
@@ -572,30 +572,34 @@
       </div>
 
       <!-- 历史文化 -->
-      <div class="card history-card">
+      <div class="card history-card" ondblclick="ReadMark.toggle('history')">
         <div class="card-title"><span class="icon">🏛️</span> 历史文化</div>
         <div class="history-content" id="historyContent">加载中...</div>
+        <div class="read-badge" id="historyReadBadge"></div>
         <button class="history-refresh-btn" onclick="HistoryCard.refresh()" title="换一条">🔄</button>
       </div>
 
       <!-- 中国地理 -->
-      <div class="card geo-card">
+      <div class="card geo-card" ondblclick="ReadMark.toggle('geo')">
         <div class="card-title"><span class="icon">🗺️</span> 中国地理</div>
         <div class="geo-content" id="geoContent">加载中...</div>
+        <div class="read-badge" id="geoReadBadge"></div>
         <button class="geo-refresh-btn" onclick="GeoCard.refresh()" title="换一条">🔄</button>
       </div>
 
       <!-- 生活技巧 -->
-      <div class="card life-tip-card">
+      <div class="card life-tip-card" ondblclick="ReadMark.toggle('lifetip')">
         <div class="card-title"><span class="icon">💡</span> 生活技巧</div>
         <div class="life-tip-content" id="lifeTipContent">加载中...</div>
+        <div class="read-badge" id="lifetipReadBadge"></div>
         <button class="life-tip-refresh-btn" onclick="LifeTip.refresh()" title="换一条">🔄</button>
       </div>
 
       <!-- 笑话大全 -->
-      <div class="card joke-card">
+      <div class="card joke-card" ondblclick="ReadMark.toggle('joke')">
         <div class="card-title"><span class="icon">😄</span> 笑话大全</div>
         <div class="joke-content" id="jokeContent">加载中...</div>
+        <div class="read-badge" id="jokeReadBadge"></div>
         <button class="joke-refresh-btn" onclick="Joke.refresh()" title="换一个">🔄</button>
       </div>
 

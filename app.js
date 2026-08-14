@@ -419,6 +419,7 @@ const Cloud = {
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
+          ReadMark.syncAll();
         }
         // 刷新IP地址（拉取对方最新IP）
         if (typeof IPAddress !== 'undefined') {
@@ -1144,6 +1145,7 @@ const App = {
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
+          ReadMark.syncAll();
         }
       }
     });
@@ -1171,6 +1173,7 @@ const App = {
     HistoryCard.init();
     GeoCard.init();
     Pomodoro.init();
+    ReadMark.renderAll();
     DataPivot.render();
     // 首页在线时长统计
     OnlineDuration.refresh();
@@ -1235,6 +1238,7 @@ const App = {
         CloudSync.syncExerciseTime();
         CloudSync.syncBgOpacity();
         CloudSync.syncPomodoro();
+        ReadMark.syncAll();
       }
       // IP地址显示已移除
       showToast('已配对成功，开始你们的日记吧 💕');
@@ -1307,6 +1311,7 @@ const App = {
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
+          ReadMark.syncAll();
         }
         // IP地址显示已移除
       });
@@ -3103,6 +3108,7 @@ const TabNav = {
       HistoryCard.init();
       GeoCard.init();
       Pomodoro.init();
+      ReadMark.renderAll();
     }
     // 切换到记录页时刷新爱心状态
     if (tabIndex === 1) { Cards.renderGreet(); Photos.render(); LetterBox.updateBadges(); }
@@ -3167,11 +3173,11 @@ const DetailMenu = {
       { icon: '✨', name: '打卡晚安', selector: '#card-night, .card:nth-child(6)' }
     ],
     3: [
-      { icon: '💪', name: '运动健身', selector: '.exercise-card, .card:nth-child(1)' },
+      { icon: '🍅', name: '番茄管理', selector: '.pomodoro-card, .card:nth-child(1)' },
       { icon: '📚', name: '英语刷词', selector: '.vocab-card, .card:nth-child(2)' },
-      { icon: '📰', name: '热点新闻', selector: '.hotnews-card, .card:nth-child(3)' },
-      { icon: '🔬', name: '数理化公式', selector: '.formula-card, .card:nth-child(4)' },
-      { icon: '🍅', name: '番茄管理', selector: '.pomodoro-card, .card:nth-child(5)' },
+      { icon: '💪', name: '运动健身', selector: '.exercise-card, .card:nth-child(3)' },
+      { icon: '📰', name: '热点新闻', selector: '.hotnews-card, .card:nth-child(4)' },
+      { icon: '🔬', name: '数理化公式', selector: '.formula-card, .card:nth-child(5)' },
       { icon: '📜', name: '唐宋诗词', selector: '.poem-card, .card:nth-child(6)' },
       { icon: '🏛️', name: '历史文化', selector: '.history-card, .card:nth-child(7)' },
       { icon: '🗺️', name: '中国地理', selector: '.geo-card, .card:nth-child(8)' },
@@ -5915,6 +5921,101 @@ const FormulaCard = {
   }
 };
 
+// ====== 通用已阅标记模块 ======
+const ReadMark = {
+  // 卡片ID映射：cardKey → badge元素ID
+  BADGE_IDS: {
+    poem: 'poemReadBadge',
+    history: 'historyReadBadge',
+    geo: 'geoReadBadge',
+    lifetip: 'lifetipReadBadge',
+    joke: 'jokeReadBadge'
+  },
+
+  // 双击切换已阅状态
+  toggle(cardKey) {
+    const role = Store.get('role', null);
+    if (!role) return;
+    const dateStr = todayStr();
+    const key = `${cardKey}_read_${dateStr}`;
+    let readBy = Store.get(key, {});
+    if (!readBy || typeof readBy !== 'object') readBy = {};
+    if (readBy[role]) {
+      // 已标记则取消
+      delete readBy[role];
+      Store.set(key, readBy);
+      this.render(cardKey);
+      showToast(`${role} 取消已阅`);
+    } else {
+      readBy[role] = true;
+      Store.set(key, readBy);
+      this.render(cardKey);
+      showToast(`${role} 已阅 ✅`);
+    }
+    // 云同步
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      this.sync(cardKey);
+    }
+  },
+
+  // 渲染已阅标记
+  render(cardKey) {
+    const badgeId = this.BADGE_IDS[cardKey];
+    if (!badgeId) return;
+    const badgeEl = document.getElementById(badgeId);
+    if (!badgeEl) return;
+    const dateStr = todayStr();
+    const readBy = Store.get(`${cardKey}_read_${dateStr}`, {});
+    let html = '';
+    if (readBy && readBy.TAO) {
+      html += '<span class="read-tag tao">TAO已阅</span>';
+    }
+    if (readBy && readBy.YAN) {
+      html += '<span class="read-tag yan">YAN已阅</span>';
+    }
+    badgeEl.innerHTML = html;
+  },
+
+  // 渲染所有卡片已阅标记
+  renderAll() {
+    Object.keys(this.BADGE_IDS).forEach(key => this.render(key));
+  },
+
+  // 云同步已阅状态
+  async sync(cardKey) {
+    if (!Cloud.pairCode) return;
+    const dateStr = todayStr();
+    const storeKey = `${cardKey}_read_${dateStr}`;
+    const localData = Store.get(storeKey, {});
+    const remoteData = await CloudSync.get(storeKey);
+
+    if (!remoteData || typeof remoteData !== 'object') {
+      if (localData && Object.keys(localData).length > 0) {
+        await CloudSync.set(storeKey, localData);
+      }
+      return;
+    }
+
+    let changed = false;
+    for (const role of ['TAO', 'YAN']) {
+      if (remoteData[role] && !localData[role]) {
+        localData[role] = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      Store.set(storeKey, localData);
+      this.render(cardKey);
+    }
+    await CloudSync.set(storeKey, localData);
+  },
+
+  // 同步所有卡片已阅状态
+  syncAll() {
+    Object.keys(this.BADGE_IDS).forEach(key => this.sync(key));
+  }
+};
+
 // ====== 番茄管理模块 ======
 const Pomodoro = {
   DURATION: 25 * 60, // 25分钟（秒）
@@ -6321,41 +6422,7 @@ const PoemCard = {
     if (titleEl) titleEl.textContent = poem.title || '';
     if (authorEl) authorEl.textContent = `${poem.dynasty ? poem.dynasty + ' · ' : ''}${poem.author}`;
     if (textEl) textEl.innerHTML = poem.text.replace(/\n/g, '<br>');
-    this._renderReadBadge();
-  },
-
-  // 双击标记已阅
-  markRead() {
-    const role = Store.get('role', null);
-    if (!role) return;
-    const dateStr = todayStr();
-    const key = `poem_read_${dateStr}`;
-    let readBy = Store.get(key, {});
-    if (!readBy || typeof readBy !== 'object') readBy = {};
-    if (readBy[role]) {
-      // 已标记过，不重复
-      return;
-    }
-    readBy[role] = true;
-    Store.set(key, readBy);
-    this._renderReadBadge();
-    showToast(`${role} 已阅 📜`);
-  },
-
-  // 渲染已阅标记
-  _renderReadBadge() {
-    const badgeEl = document.getElementById('poemReadBadge');
-    if (!badgeEl) return;
-    const dateStr = todayStr();
-    const readBy = Store.get(`poem_read_${dateStr}`, {});
-    let html = '';
-    if (readBy && readBy.TAO) {
-      html += '<span class="read-tag tao">TAO已阅</span>';
-    }
-    if (readBy && readBy.YAN) {
-      html += '<span class="read-tag yan">YAN已阅</span>';
-    }
-    badgeEl.innerHTML = html;
+    ReadMark.render('poem');
   }
 };
 

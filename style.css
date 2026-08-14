@@ -4893,7 +4893,8 @@ html, body {
 
 .poem-card { position: relative; padding-bottom: 40px; min-height: auto; }
 
-/* 已阅标记 */
+/* 已阅标记（通用） */
+.read-badge,
 .poem-read-badge {
   position: absolute;
   top: 10px;
@@ -4909,12 +4910,16 @@ html, body {
   z-index: 1;
 }
 
+.read-badge .read-tag,
 .poem-read-badge .read-tag {
   font-weight: 400;
   letter-spacing: 0.5px;
 }
 
+.read-badge .read-tag.tao,
 .poem-read-badge .read-tag.tao { color: #1b7fe3; }
+
+.read-badge .read-tag.yan,
 .poem-read-badge .read-tag.yan { color: #e8296a; }
 
 .poem-refresh-btn {
