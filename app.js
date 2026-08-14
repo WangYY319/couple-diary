@@ -538,7 +538,29 @@ const Cloud = {
   },
 
   // ====== 文件分块同步（图片、音乐等二进制文件） ======
-  CHUNK_SIZE: 30000, // 每块 30KB（base64后约40KB，在 mantledb 限制内）
+  CHUNK_SIZE: 60000, // 每块 60KB（MantleDB 限制约 65KB，留余量）
+  MAX_RETRIES: 2, // 每块失败重试次数
+
+  // 带重试的 POST 请求
+  async _retryPOST(url, body, retries) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body
+        });
+        if (r.ok) return true; // 成功
+        // 413 = payload 太大，不重试直接失败
+        if (r.status === 413) return false;
+        // 其他错误（500 等）重试
+      } catch (e) { /* 网络错误，重试 */ }
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 500 * (attempt + 1))); // 递增延迟
+      }
+    }
+    return false;
+  },
 
   // Blob → base64 字符串
   _blobToBase64(blob) {
@@ -575,36 +597,27 @@ const Cloud = {
     }
 
     // 存储元数据
-    const meta = {
+    const meta = JSON.stringify({
       totalChunks: chunks.length,
       mime: blob.type || 'application/octet-stream',
       size: blob.size,
       uploadedAt: Date.now()
-    };
-    try {
-      await fetch(this._url(`${path}/meta`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(meta)
-      });
-    } catch (e) { return null; }
+    });
+    const metaOk = await this._retryPOST(this._url(`${path}/meta`), meta, this.MAX_RETRIES);
+    if (!metaOk) return null;
 
-    // 分块上传
+    // 分块上传（带重试）
     for (let i = 0; i < chunks.length; i++) {
-      try {
-        await fetch(this._url(`${path}/chunk_${i}`), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: chunks[i] })
-        });
-        if (onProgress) onProgress(Math.round((i + 1) / chunks.length * 100));
-      } catch (e) { return null; }
+      const chunkBody = JSON.stringify({ data: chunks[i] });
+      const ok = await this._retryPOST(this._url(`${path}/chunk_${i}`), chunkBody, this.MAX_RETRIES);
+      if (!ok) return null; // 某块失败则整体失败
+      if (onProgress) onProgress(Math.round((i + 1) / chunks.length * 100));
     }
 
     return path;
   },
 
-  // 下载文件（分块）从云端
+  // 下载文件（分块）从云端（带重试）
   async downloadFile(path) {
     if (!this.pairCode) return null;
 
@@ -618,16 +631,27 @@ const Cloud = {
 
     if (!meta || !meta.totalChunks) return null;
 
-    // 分块下载并拼接
+    // 分块下载并拼接（带重试）
     let b64 = '';
     for (let i = 0; i < meta.totalChunks; i++) {
-      try {
-        const r = await fetch(this._url(`${path}/chunk_${i}`));
-        if (!r.ok) return null;
-        const chunk = await r.json();
-        if (chunk && chunk.data) b64 += chunk.data;
-        else return null;
-      } catch (e) { return null; }
+      let chunkData = null;
+      for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+        try {
+          const r = await fetch(this._url(`${path}/chunk_${i}`));
+          if (r.ok) {
+            const chunk = await r.json();
+            if (chunk && chunk.data) {
+              chunkData = chunk.data;
+              break;
+            }
+          }
+        } catch (e) { /* 重试 */ }
+        if (attempt < this.MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+        }
+      }
+      if (chunkData === null) return null; // 某块下载失败
+      b64 += chunkData;
     }
 
     return this._base64ToBlob(b64, meta.mime);
@@ -718,20 +742,32 @@ const Cloud = {
   // ====== 音乐云同步 ======
 
   async pushMusic(blob, name) {
-    if (!this.pairCode) return;
+    if (!this.pairCode) return false;
     try {
-      // 先上传文件
-      await this.uploadFile(blob, 'music/file');
-      const uploadedAt = Date.now();
-      // 再存储音乐信息
-      await fetch(this._url('music_info'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, size: blob.size, type: blob.type, uploadedAt })
+      // 先上传文件（分块）
+      const uploadResult = await this.uploadFile(blob, 'music/file', (pct) => {
+        if (pct % 25 === 0) showToast(`音乐同步中... ${pct}%`);
       });
+      if (!uploadResult) {
+        showToast('音乐文件过大或网络不佳，同步失败 ❌');
+        return false;
+      }
+      const uploadedAt = Date.now();
+      // 上传成功后才存储音乐信息
+      const infoOk = await this._retryPOST(
+        this._url('music_info'),
+        JSON.stringify({ name, size: blob.size, type: blob.type, uploadedAt }),
+        this.MAX_RETRIES
+      );
+      if (!infoOk) return false;
       // 标记本地已拥有此音乐，避免重复下载
       Store.set('cloudMusicAt', uploadedAt);
-    } catch (e) { /* ignore */ }
+      showToast('音乐已同步给对方 ✅');
+      return true;
+    } catch (e) {
+      showToast('音乐同步失败 ❌');
+      return false;
+    }
   },
 
   async pullMusic() {
@@ -3016,10 +3052,10 @@ const MusicPlayer = {
     try {
       await this._saveMusic(file, fileName);
       Store.set('musicUrl', ''); // 清除 URL 模式
-      // 云同步音乐给对方
+      // 云同步音乐给对方（异步，不阻塞 UI）
       if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
         showToast(`已导入：${fileName} 🎵 正在同步给对方...`);
-        Cloud.pushMusic(file, fileName);
+        Cloud.pushMusic(file, fileName).catch(() => {});
       }
     } catch (e) {
       // 保存失败不影响当前播放
