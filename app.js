@@ -1562,12 +1562,43 @@ const Calendar = {
     // 计算今天是该月第几天
     const todayDate = (today.getFullYear() === year && today.getMonth() === month) ? today.getDate() : null;
 
+    const TOTAL_CELLS = 35; // 固定5行
+    const totalNeeded = firstDay + daysInMonth;
+    const hasOverflow = totalNeeded > TOTAL_CELLS;
+    const overflowCount = hasOverflow ? totalNeeded - TOTAL_CELLS : 0;
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    const leadingCount = firstDay - overflowCount;
+
     let html = '';
     ['日', '一', '二', '三', '四', '五', '六'].forEach(d => {
       html += `<div class="cal-dow">${d}</div>`;
     });
-    for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
-    for (let d = 1; d <= daysInMonth; d++) {
+
+    // 溢出日：月末几天前置到首行（当月需要6行时，将超出部分移到开头）
+    if (hasOverflow) {
+      for (let i = 0; i < overflowCount; i++) {
+        const d = daysInMonth - overflowCount + 1 + i;
+        const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayDate = new Date(year, month, d);
+        dayDate.setHours(0, 0, 0, 0);
+        const isPast = dayDate < today;
+        const dayData = allDays[ds];
+        const bothChecked = dayData && dayData.greet && dayData.greet.tao && dayData.greet.yan ? 'both-checked' : '';
+        const hasData = dayData ? 'has-data' : '';
+        const pastClass = isPast ? 'past' : '';
+        html += `<div class="cal-day overflow ${pastClass} ${bothChecked} ${hasData}" data-date="${ds}">${d}</div>`;
+      }
+    }
+
+    // 前置空白：上月末尾日期
+    for (let i = 0; i < leadingCount; i++) {
+      const d = prevMonthDays - leadingCount + 1 + i;
+      html += `<div class="cal-day other-month">${d}</div>`;
+    }
+
+    // 当月日期（如有溢出则不显示末尾几天，已前置）
+    const displayDays = hasOverflow ? daysInMonth - overflowCount : daysInMonth;
+    for (let d = 1; d <= displayDays; d++) {
       const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const isToday = d === todayDate;
       const dayDate = new Date(year, month, d);
@@ -1580,6 +1611,14 @@ const Calendar = {
       const pastClass = isPast ? 'past' : '';
       html += `<div class="cal-day ${isToday ? 'today' : ''} ${pastClass} ${bothChecked} ${hasData}" data-date="${ds}">${d}</div>`;
     }
+
+    // 后置空白：下月开头日期
+    const usedCells = overflowCount + leadingCount + displayDays;
+    const trailingCount = TOTAL_CELLS - usedCells;
+    for (let i = 0; i < trailingCount; i++) {
+      html += `<div class="cal-day other-month">${i + 1}</div>`;
+    }
+
     container.innerHTML = html;
 
     // 为有数据的历史日期绑定双击事件（叠加卡片查看）
@@ -3382,11 +3421,11 @@ const DetailMenu = {
       { icon: '🎭', name: '角色选择', selector: '.role-card' },
       { icon: '💌', name: '甜蜜语录', selector: '.sweet-text-card, .card:nth-child(2)' },
       { icon: '🎵', name: '音乐播放', selector: '.music-card, .card:nth-child(3)' },
-      { icon: '📊', name: '本周数据透视', selector: '.data-pivot-card, .card:nth-child(4)' }
+      { icon: '📊', name: '本周数透', selector: '.data-pivot-card, .card:nth-child(4)' }
     ],
     1: [
       { icon: '❤️', name: '爱心打卡', selector: '#card-greet, .card:nth-child(1)' },
-      { icon: '📷', name: '我们的照片', selector: '.photo-card, .card:nth-child(2)' },
+      { icon: '📷', name: '相处照片', selector: '.photo-card, .card:nth-child(2)' },
       { icon: '✉️', name: '投递信件', selector: '#card-letter, .card:nth-child(3)' }
     ],
     2: [
