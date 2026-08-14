@@ -1,12 +1,12 @@
 /* TAO & YAN 相处日记 - Service Worker */
-const CACHE_NAME = 'couple-pwa-v5';
+const CACHE_NAME = 'couple-pwa-v6';
 const URLS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/manifest.json',
-  '/img/bg-base.jpg'
+  './',
+  './index.html',
+  './style.css',
+  './app.js',
+  './manifest.json',
+  './img/favicon.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -30,7 +30,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
       return cached || fetch(event.request).then((response) => {
-        // cache new resources
         if (!response || response.status !== 200 || response.type !== 'basic') return response;
         const cloned = response.clone();
         caches.open(CACHE_NAME).then((cache) => {

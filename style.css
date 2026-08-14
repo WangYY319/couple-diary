@@ -71,7 +71,6 @@ html, body {
   align-items: center; justify-content: center;
   background:
     linear-gradient(rgba(240, 244, 248, 0.55), rgba(253, 240, 243, 0.55)),
-    url('img/bg-base.jpg') center/cover no-repeat,
     linear-gradient(135deg, var(--theme-light), var(--theme-bg));
   background-size: cover;
   background-position: center;
@@ -134,7 +133,6 @@ html, body {
   position: relative;
   background:
     linear-gradient(rgba(248, 250, 253, 0.45), rgba(252, 245, 248, 0.45)),
-    url('img/bg-base.jpg') center/cover no-repeat,
     var(--theme-bg);
   background-size: cover;
   background-position: center;
