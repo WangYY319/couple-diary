@@ -471,6 +471,11 @@
       <!-- 热点新闻 -->
       <div class="card hotnews-card">
         <div class="card-title"><span class="icon">📰</span> 热点新闻</div>
+        <div class="hotnews-tabs" id="hotnewsTabs">
+          <button class="hotnews-tab active" data-cat="时政" onclick="HotNews.switchCat('时政')">时政</button>
+          <button class="hotnews-tab" data-cat="科技" onclick="HotNews.switchCat('科技')">科技</button>
+          <button class="hotnews-tab" data-cat="财经" onclick="HotNews.switchCat('财经')">财经</button>
+        </div>
         <div class="hotnews-container" id="hotnewsContainer">
           <div class="hotnews-placeholder">加载今日热点中...</div>
         </div>

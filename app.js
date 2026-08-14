@@ -6172,14 +6172,22 @@ const GeoCard = {
 
 // ====== 热点新闻模块 ======
 const HotNews = {
-  _items: [],
+  _items: [],        // 全部新闻（带分类）
+  _catItems: [],     // 当前分类筛选后的新闻
+  _currentCat: '时政',
   _offset: 0,
   _isPaused: false,
   _scrollTimer: null,
   _loading: false,
   _currentScrollY: 0,
 
-  // 尝试获取热点新闻：60s API → tenapi → vvhan → 兜底提示
+  // 分类关键词
+  CAT_KEYWORDS: {
+    '时政': ['政治', '时政', '外交', '会议', '政策', '法律', '主席', '总理', '政府', '人大', '政协', '改革', '国务院', '总统', '选举', '议会', '联合国', '北约', '欧盟', '东盟', '中美', '中俄', '台海', '香港', '澳门', '官员', '部委', '人大', '两会', '中央', '党史', '纪检', '反腐', '巡视', '党政', '治国', '立法', '宪法', '国务院', '白宫', '克里姆林宫', '联合国', '外交部', '国防部', '中纪委', '巡察', '公报', '决议', '条例', '法规', '执法', '司法', '检察', '法院', '公安', '国安'],
+    '科技': ['科技', 'AI', '人工智能', '芯片', '半导体', '手机', '互联网', '算法', '数据', '量子', '航天', '卫星', '5G', '6G', '生物', '基因', '火箭', '探测器', '北斗', '华为', '苹果', '谷歌', '微软', '腾讯', '阿里', '百度', '字节', '大模型', 'GPT', '机器人', '自动驾驶', '新能源', '光伏', '电池', '核聚变', '克隆', '疫苗', '航天员', '空间站', '嫦娥', '火星', '月球', '深空', '天文', '望远镜', '超算', '量子计算', '光刻机', '纳米', '材料', '开源', '编程', '操作系统', '芯片'],
+    '财经': ['股市', '基金', '经济', '金融', '投资', '银行', '利率', '汇率', '财报', '上市', 'A股', '港股', '美股', '创业板', '科创板', '北交所', '涨停', '跌停', '牛市', '熊市', '债券', '期货', '原油', '黄金', '白银', '比特币', '数字货币', '通胀', 'CPI', 'PPI', 'GDP', 'PMI', '社融', 'M2', '降准', '降息', '加息', '央行', '证监会', '银保监', '财政', '税收', '关税', '贸易', '出口', '进口', '顺差', '逆差', '外资', '并购', '重组', '分红', '回购', '市值', '营收', '净利', '定增', '募资', 'IPO', '退市', 'ST']
+  },
+
   async init() {
     this._stopScroll();
     if (this._loading) return;
@@ -6196,20 +6204,63 @@ const HotNews = {
         this._showFallback();
         return;
       }
-      // 若有分类信息，优先展示政治时事与科技类，其余补齐
-      items = this._prioritize(items);
-      this._items = items.slice(0, 10).map((it, i) => ({
-        rank: i + 1,
+      // 为每条新闻分配分类
+      items = items.map(it => ({
         title: it.title || '未知',
-        hot: it.hot || ''
+        hot: it.hot || '',
+        category: this._categorize(it)
       }));
-      this._offset = 0;
-      this._isPaused = false;
+      this._items = items;
+      this._filterByCat(this._currentCat);
       this._render();
       this._startScroll();
     } finally {
       this._loading = false;
     }
+  },
+
+  // 根据关键词匹配分类
+  _categorize(item) {
+    const text = (item.title || '') + (item.category || '') + (item.hot || '');
+    for (const [cat, keywords] of Object.entries(this.CAT_KEYWORDS)) {
+      if (keywords.some(k => text.includes(k))) {
+        return cat;
+      }
+    }
+    // 默认归入时政
+    return '时政';
+  },
+
+  // 切换分类
+  switchCat(cat) {
+    if (this._currentCat === cat) return;
+    this._currentCat = cat;
+    // 更新tab样式
+    document.querySelectorAll('.hotnews-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.cat === cat);
+    });
+    this._stopScroll();
+    this._currentScrollY = 0;
+    this._filterByCat(cat);
+    this._render();
+    this._startScroll();
+  },
+
+  // 筛选当前分类的新闻，不足则用其他分类补齐
+  _filterByCat(cat) {
+    const matched = this._items.filter(it => it.category === cat);
+    if (matched.length >= 5) {
+      this._catItems = matched.slice(0, 10);
+    } else {
+      // 不足5条，用其他分类补齐至10条
+      const others = this._items.filter(it => it.category !== cat);
+      this._catItems = [...matched, ...others].slice(0, 10);
+    }
+    // 编号
+    this._catItems = this._catItems.map((it, i) => ({
+      ...it,
+      rank: i + 1
+    }));
   },
 
   // 带超时的 JSON 请求
@@ -6227,12 +6278,11 @@ const HotNews = {
     }
   },
 
-  // 第一数据源：60s.viki.moe 每天60秒读懂世界
   async _try60s() {
     try {
       const data = await this._fetchJson('https://60s.viki.moe/v2/60s', 8000);
       if (!data || !data.data || !Array.isArray(data.data.news)) return [];
-      return data.data.news.map((title, i) => ({
+      return data.data.news.map((title) => ({
         title: title,
         hot: '',
         category: ''
@@ -6242,7 +6292,6 @@ const HotNews = {
     }
   },
 
-  // 第二数据源：tenapi.cn 头条热榜
   async _tryTenapi() {
     try {
       const data = await this._fetchJson('https://tenapi.cn/v2/toutiaohot');
@@ -6259,7 +6308,6 @@ const HotNews = {
     }
   },
 
-  // 第二数据源：vvhan 微博热搜
   async _tryVvhan() {
     try {
       const data = await this._fetchJson('https://api.vvhan.com/api/hotlist/wbHot');
@@ -6276,57 +6324,48 @@ const HotNews = {
     }
   },
 
-  // 优先排列政治时事与科技类（若存在分类字段）
-  _prioritize(items) {
-    const hasCat = items.some(it => it.category);
-    if (!hasCat) return items;
-    const keywords = ['政治', '时事', '时政', '科技'];
-    const priority = items.filter(it => {
-      const cat = it.category || '';
-      return keywords.some(k => cat.includes(k));
-    });
-    const rest = items.filter(it => !priority.includes(it));
-    return [...priority, ...rest];
-  },
-
-  // 渲染所有新闻条目到滚动容器
   _render() {
     const container = document.getElementById('hotnewsContainer');
-    if (!container || this._items.length === 0) return;
-    // 创建滚动包裹层，渲染全部条目（首尾各加一份用于无缝循环）
-    const all = [...this._items, ...this._items.slice(0, 5)];
+    if (!container || this._catItems.length === 0) {
+      if (container) container.innerHTML = '<div class="hotnews-placeholder">暂无' + this._currentCat + '类热点</div>';
+      return;
+    }
+    // 首尾各加一份用于无缝循环
+    const all = [...this._catItems, ...this._catItems.slice(0, Math.min(3, this._catItems.length))];
     let html = '<div class="hotnews-scroll-wrap" id="hotnewsScrollWrap">';
     all.forEach(item => {
       html += `<div class="hotnews-item">
         <span class="hotnews-rank">${item.rank}</span>
         <span class="hotnews-title">${item.title}</span>
-        ${item.hot ? `<span class="hotnews-hot">🔥 ${item.hot}</span>` : ''}
+        <span class="hotnews-cat-tag">${item.category}</span>
       </div>`;
     });
     html += '</div>';
     container.innerHTML = html;
   },
 
-  // 丝滑滚动：每3秒平滑上移一条
   _startScroll() {
     this._stopScroll();
-    if (this._isPaused || this._items.length === 0) return;
+    if (this._isPaused || this._catItems.length === 0) return;
     this._scrollTimer = setInterval(() => {
       this._smoothScrollOne();
-    }, 3000);
+    }, 3500);
   },
 
   _smoothScrollOne() {
     const wrap = document.getElementById('hotnewsScrollWrap');
-    if (!wrap) return;
-    const itemHeight = 56; // 每条新闻高度
+    if (!wrap || !wrap.firstElementChild) return;
+    // 动态获取第一条高度
+    const firstItem = wrap.firstElementChild;
+    const itemHeight = firstItem.offsetHeight + 1; // +1 for border
     const currentY = this._currentScrollY || 0;
     const newY = currentY - itemHeight;
     wrap.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)';
     wrap.style.transform = `translateY(${newY}px)`;
     this._currentScrollY = newY;
-    // 当滚动超过一组数据后，无缝重置
-    const totalHeight = this._items.length * itemHeight;
+    // 计算一组数据的总高度
+    const totalHeight = Array.from(wrap.children).slice(0, this._catItems.length)
+      .reduce((sum, el) => sum + el.offsetHeight + 1, 0);
     if (Math.abs(newY) >= totalHeight) {
       setTimeout(() => {
         wrap.style.transition = 'none';
