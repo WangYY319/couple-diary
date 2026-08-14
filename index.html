@@ -155,32 +155,33 @@
 
     <!-- ====== Tab 0: 首页（角色+音乐+文案） ====== -->
     <div class="tab-page active" id="tab-0" data-tab="0">
-      <!-- 角色选择 -->
+      <!-- 角色选择 + 在线状态合并 -->
       <div class="card role-card">
         <div class="card-title"><span class="icon">🎭</span> 角色选择</div>
-        <div class="role-display" id="roleDisplay">
-          <div class="role-current" id="roleCurrent">
-            <span class="role-emoji" id="roleCurrentEmoji">🐱</span>
-            <span class="role-name" id="roleCurrentName">TAO</span>
-          </div>
-          <div class="role-switch-btns">
-            <button class="role-pill tao" id="pillTAO" onclick="Setting.switchRoleTo('TAO')">🐱 TAO</button>
-            <button class="role-pill yan" id="pillYAN" onclick="Setting.switchRoleTo('YAN')">🐶 YAN</button>
-          </div>
+        <div class="role-pair-row">
+          <button class="role-pair-item tao" id="pillTAO" onclick="Setting.switchRoleTo('TAO')">
+            <span class="role-pair-emoji">🐱</span>
+            <span class="role-pair-name">TAO</span>
+            <span class="role-pair-dot off" id="homeDotTAO"></span>
+          </button>
+          <span class="role-pair-connector">❤</span>
+          <button class="role-pair-item yan" id="pillYAN" onclick="Setting.switchRoleTo('YAN')">
+            <span class="role-pair-emoji">🐶</span>
+            <span class="role-pair-name">YAN</span>
+            <span class="role-pair-dot off" id="homeDotYAN"></span>
+          </button>
         </div>
-        <!-- 在线状态 -->
-        <div class="home-status-row">
-          <div class="home-status-item" data-role="TAO">
-            <span class="home-status-emoji">🐱</span>
-            <span class="home-status-name">TAO</span>
-            <span class="home-status-dot off" id="homeDotTAO"></span>
-            <span class="home-status-text" id="homeTextTAO">离线</span>
+        <!-- 在线时长统计（无边框） -->
+        <div class="online-duration-row">
+          <div class="online-duration-item">
+            <span class="od-label">🐱</span>
+            <div class="od-bar-track"><div class="od-bar-fill tao" id="odBarTAO"></div></div>
+            <span class="od-time" id="odTimeTAO">0m</span>
           </div>
-          <div class="home-status-item" data-role="YAN">
-            <span class="home-status-emoji">🐶</span>
-            <span class="home-status-name">YAN</span>
-            <span class="home-status-dot off" id="homeDotYAN"></span>
-            <span class="home-status-text" id="homeTextYAN">离线</span>
+          <div class="online-duration-item">
+            <span class="od-label">🐶</span>
+            <div class="od-bar-track"><div class="od-bar-fill yan" id="odBarYAN"></div></div>
+            <span class="od-time" id="odTimeYAN">0m</span>
           </div>
         </div>
       </div>
@@ -254,6 +255,36 @@
         </div>
         <div class="photo-grid" id="photoGrid"></div>
       </div>
+
+      <!-- 投递信件板块 -->
+      <div class="card" id="card-letter">
+        <div class="card-title"><span class="icon">✉️</span> 投递信件</div>
+        <div class="letter-section">
+          <div class="letter-pair">
+            <!-- TAO 信件 + 邮筒 -->
+            <div class="letter-side tao" onclick="LetterBox.openWriter('TAO')">
+              <div class="letter-icon">✉️</div>
+              <div class="letter-label">TAO</div>
+            </div>
+            <!-- YAN 信件 + 邮筒 -->
+            <div class="letter-side yan" onclick="LetterBox.openWriter('YAN')">
+              <div class="letter-icon">✉️</div>
+              <div class="letter-label">YAN</div>
+            </div>
+          </div>
+          <div class="letter-pair">
+            <div class="letter-mailbox tao" onclick="LetterBox.openMailbox('TAO')" style="position:relative">
+              📮
+              <span class="letter-mailbox-badge" id="mailboxBadgeTAO" style="display:none"></span>
+            </div>
+            <div class="letter-mailbox yan" onclick="LetterBox.openMailbox('YAN')" style="position:relative">
+              📮
+              <span class="letter-mailbox-badge" id="mailboxBadgeYAN" style="display:none"></span>
+            </div>
+          </div>
+          <button class="letter-export-btn" onclick="LetterBox.exportAll()" title="导出分享">📤</button>
+        </div>
+      </div>
     </div>
 
     <!-- ====== Tab 2: 总览（原有所有界面） ====== -->
@@ -320,6 +351,12 @@
         </div>
       </div>
 
+      <!-- 历史统计缩略提示（无边框单行） -->
+      <div class="history-hint-bar" id="historyHintBar">
+        <span id="historyHintText">统计加载中...</span>
+        <button class="history-hint-export" onclick="HistoryView.sharePDF()">📤</button>
+      </div>
+
       <!-- 随机问答 -->
       <div class="card quiz-card">
         <div class="card-title"><span class="icon">🎲</span> 随机问答</div>
@@ -349,12 +386,6 @@
         </div>
         <button class="quiz-start-btn" id="quizStartBtn" onclick="RandomQA.start()">开始问答</button>
         <button class="quiz-view-btn" id="quizViewBtn" style="display:none" onclick="RandomQA.viewPartner()">查看对方选择</button>
-      </div>
-
-      <!-- 历史统计缩略提示（无边框单行） -->
-      <div class="history-hint-bar" id="historyHintBar">
-        <span id="historyHintText">统计加载中...</span>
-        <button class="history-hint-export" onclick="HistoryView.sharePDF()">📤</button>
       </div>
 
       <!-- 语音留言（从首页移入） -->
@@ -452,21 +483,21 @@
           <button class="poem-analysis-btn" id="poemAnalysisBtn" onclick="PoemCard.toggleAnalysis()">📖 查看赏析</button>
           <div class="poem-analysis" id="poemAnalysis" style="display:none"></div>
         </div>
-        <button class="poem-refresh-btn" onclick="PoemCard.refresh()">🔄 换一首</button>
+        <button class="poem-refresh-btn" onclick="PoemCard.refresh()" title="换一首">🔄</button>
       </div>
 
-      <!-- 生活常识 -->
+      <!-- 生活技巧 -->
       <div class="card life-tip-card">
-        <div class="card-title"><span class="icon">💡</span> 生活常识</div>
+        <div class="card-title"><span class="icon">💡</span> 生活技巧</div>
         <div class="life-tip-content" id="lifeTipContent">加载中...</div>
-        <button class="life-tip-refresh-btn" onclick="LifeTip.refresh()">🔄 换一条</button>
+        <button class="life-tip-refresh-btn" onclick="LifeTip.refresh()" title="换一条">🔄</button>
       </div>
 
       <!-- 笑话大全 -->
       <div class="card joke-card">
         <div class="card-title"><span class="icon">😄</span> 笑话大全</div>
         <div class="joke-content" id="jokeContent">加载中...</div>
-        <button class="joke-refresh-btn" onclick="Joke.refresh()">🔄 换一个</button>
+        <button class="joke-refresh-btn" onclick="Joke.refresh()" title="换一个">🔄</button>
       </div>
 
     </div>

@@ -941,6 +941,9 @@ const App = {
     LifeTip.init();
     Joke.init();
     HotNews.init();
+    LetterBox.init();
+    // 首页在线时长统计
+    OnlineDuration.refresh();
     // 首页在线状态刷新
     if (Cloud.isPaired()) {
       Setting.refreshStatus();
@@ -2421,14 +2424,11 @@ const Setting = {
         text.className = 'status-text ' + (online ? 'online' : 'offline');
       }
     });
-    // 首页角色卡
-    const homeDot = document.getElementById('homeDot' + role);
-    const homeText = document.getElementById('homeText' + role);
-    if (homeDot) homeDot.className = 'home-status-dot ' + (online ? 'on' : 'off');
-    if (homeText) {
-      homeText.textContent = online ? '在线' : '离线';
-      homeText.className = 'home-status-text ' + (online ? 'online' : 'offline');
-    }
+    // 首页角色卡（合并后的角色对按钮）
+    const pairDot = document.getElementById('homeDot' + role);
+    if (pairDot) pairDot.className = 'role-pair-dot ' + (online ? 'on' : 'off');
+    // 在线时长统计：更新对方是否在线
+    OnlineDuration.refresh();
   },
 
   // 状态轮询定时器
@@ -2595,12 +2595,13 @@ const TabNav = {
       Joke.init();
     }
     // 切换到记录页时刷新爱心状态
-    if (tabIndex === 1) { Cards.renderGreet(); Photos.render(); }
+    if (tabIndex === 1) { Cards.renderGreet(); Photos.render(); LetterBox.updateBadges(); }
     // 切换到打卡页时刷新日历、问答、语音、历史提示
     if (tabIndex === 2) { Calendar.render(); RandomQA.render(); VoiceRecord.render(); HistoryHint.render(); Cards.renderNight(); }
     // 切换到首页时更新角色显示和在线状态
     if (tabIndex === 0) {
       this.updateRoleDisplay();
+      OnlineDuration.refresh();
       Setting.refreshStatus();
       Setting.startStatusPolling();
     } else {
@@ -2609,22 +2610,78 @@ const TabNav = {
   },
 
   updateRoleDisplay() {
-    const emojiEl = document.getElementById('roleCurrentEmoji');
-    const nameEl = document.getElementById('roleCurrentName');
     const pillTAO = document.getElementById('pillTAO');
     const pillYAN = document.getElementById('pillYAN');
-    if (!emojiEl || !nameEl) return;
     if (App.currentRole === 'TAO') {
-      emojiEl.textContent = '🐱';
-      nameEl.textContent = 'TAO';
       if (pillTAO) pillTAO.classList.add('active');
       if (pillYAN) pillYAN.classList.remove('active');
     } else if (App.currentRole === 'YAN') {
-      emojiEl.textContent = '🐶';
-      nameEl.textContent = 'YAN';
       if (pillTAO) pillTAO.classList.remove('active');
       if (pillYAN) pillYAN.classList.add('active');
     }
+    OnlineDuration.start();
+  }
+};
+
+// ====== 在线时长统计模块 ======
+const OnlineDuration = {
+  _timer: null,
+  _started: false,
+
+  start() {
+    if (this._started) return;
+    this._started = true;
+    // 立即刷新一次
+    this.refresh();
+    // 每60秒更新一次
+    this._timer = setInterval(() => this.tick(), 60000);
+  },
+
+  stop() {
+    if (this._timer) {
+      clearInterval(this._timer);
+      this._timer = null;
+    }
+    this._started = false;
+  },
+
+  tick() {
+    if (!App.currentRole) return;
+    const today = this._todayStr();
+    const data = Store.get('online_duration', {});
+    if (!data[today]) data[today] = { tao: 0, yan: 0 };
+    const key = App.currentRole.toLowerCase();
+    data[today][key] = (data[today][key] || 0) + 60;
+    Store.set('online_duration', data);
+    this.refresh();
+    // 同步到云端
+    CloudSync.set('online_duration', data);
+  },
+
+  refresh() {
+    const today = this._todayStr();
+    const data = Store.get('online_duration', {});
+    const dayData = data[today] || { tao: 0, yan: 0 };
+    ['TAO', 'YAN'].forEach(role => {
+      const key = role.toLowerCase();
+      const seconds = dayData[key] || 0;
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const displayTime = hours > 0 ? `${hours}h${minutes % 60}m` : `${minutes}m`;
+      const bar = document.getElementById('odBar' + role);
+      const time = document.getElementById('odTime' + role);
+      if (bar) {
+        // 满值为2小时(120分钟)
+        const percent = Math.min(100, (minutes / 120) * 100);
+        bar.style.width = percent + '%';
+      }
+      if (time) time.textContent = displayTime;
+    });
+  },
+
+  _todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 };
 
@@ -4695,8 +4752,9 @@ const FormulaCard = {
 ],
 
   _currentCat: null,
+  _daySeed: null,
 
-  // 渲染分类按钮（数学 / 物理 / 化学）
+  // 每日自动显示一条：数学/物理/化学各一条
   init() {
     const detail = document.getElementById('formulaDetail');
     if (detail) detail.style.display = 'none';
@@ -4704,33 +4762,35 @@ const FormulaCard = {
     if (!row) return;
     row.style.display = '';
     const cats = ['数学', '物理', '化学'];
+    // 按日期种子选取每天不同的公式
+    const seed = this._getDaySeed();
     let html = '';
     cats.forEach(cat => {
-      html += `<button class="formula-cat-btn" onclick="FormulaCard.showCategory('${cat}')">${cat}</button>`;
-    });
-    row.innerHTML = html;
-  },
-
-  // 显示某分类下的公式列表
-  showCategory(cat) {
-    this._currentCat = cat;
-    const detail = document.getElementById('formulaDetail');
-    if (detail) detail.style.display = 'none';
-    const row = document.getElementById('formulaCategoryRow');
-    if (!row) return;
-    row.style.display = '';
-    const list = this.DATA.filter(f => f.category === cat);
-    let html = `<button class="formula-cat-btn formula-back-cat-btn" onclick="FormulaCard.init()">← 返回分类</button>`;
-    list.forEach(f => {
-      html += `<div class="formula-item" onclick="FormulaCard.showDetail('${f.id}')">
-        <span class="formula-item-name">${f.name}</span>
-        <span class="formula-item-expr">${f.expression}</span>
+      const list = this.DATA.filter(f => f.category === cat);
+      const idx = seed % list.length;
+      const f = list[idx];
+      html += `<div class="formula-item" onclick="FormulaCard.showDetail('${f.id}')" style="cursor:pointer;padding:10px 12px;margin-bottom:8px;border-radius:8px;background:var(--theme-light);transition:all 0.2s;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="formula-item-name" style="font-weight:600;font-size:14px;color:var(--theme-primary);">${cat} · ${f.name}</span>
+          <span style="font-size:11px;color:var(--text-muted);">点击查看解析 →</span>
+        </div>
+        <div class="formula-item-expr" style="margin-top:4px;font-size:13px;color:var(--text-main);font-family:Georgia,serif;">${f.expression}</div>
       </div>`;
     });
     row.innerHTML = html;
   },
 
-  // 显示某条公式的详情
+  _getDaySeed() {
+    const d = new Date();
+    return d.getFullYear() * 1000 + (d.getMonth() + 1) * 40 + d.getDate();
+  },
+
+  // 兼容旧方法
+  showCategory(cat) {
+    this.init();
+  },
+
+  // 显示某条公式的详情（解析）
   showDetail(id) {
     const f = this.DATA.find(x => x.id === id);
     if (!f) return;
@@ -4753,9 +4813,7 @@ const FormulaCard = {
   backToList() {
     const detail = document.getElementById('formulaDetail');
     if (detail) detail.style.display = 'none';
-    const row = document.getElementById('formulaCategoryRow');
-    if (row) row.style.display = '';
-    if (!this._currentCat) this.init();
+    this.init();
   }
 };
 
@@ -5057,10 +5115,53 @@ const PoemCard = {
   }
 };
 
-// ====== 生活常识模块 ======
+// ====== 生活技巧模块 ======
 const LifeTip = {
-  // 50+ 条简短生活小常识（每条不超过 30 字）
+  // 实用生活技巧（每条不超过 30 字，实用性高）
   TIPS: [
+    '钥匙断锁里用502胶粘细针拔出',
+    '拉链卡住用铅笔芯涂抹就顺滑了',
+    '手机进水先关机放米里吸湿一晚',
+    '充电线头易断用弹簧缠绕保护',
+    '眼镜螺丝松了涂透明指甲油固定',
+    '撕贴纸留胶用风油精一擦就掉',
+    '衣服起球用剃须刀轻轻刮平',
+    '白鞋发黄用牙膏刷完包纸巾晒',
+    '快递单用水抹个人信息就消失',
+    '插头难拔套橡皮筋增加摩擦',
+    '拧不开瓶盖套橡皮筋增摩擦力',
+    '首饰氧化用锡纸盐小苏打泡',
+    '手机划痕用牙膏轻擦减轻',
+    '路由器信号弱换频道或升高位置',
+    '充电慢换粗线或清理充电口',
+    '手机内存满清理微信缓存最有效',
+    '电脑卡顿关掉开机自启软件',
+    '路由器重启能解决大部分网络问题',
+    '手机发烫取下壳放阴凉处散热',
+    '延长手机续航关掉后台刷新',
+    'U盘中毒用电脑杀毒别双击打开',
+    '充电宝鼓包立即停用防危险',
+    '键盘进灰用便利贴粘性面清理',
+    '耳机有杂音用棉签清理出声孔',
+    '下水道堵用小苏打加白醋冲',
+    '马桶黄垢用可乐泡一夜再刷',
+    '木质划痕用核桃仁摩擦可遮盖',
+    '墙上铅笔印用橡皮擦就干净',
+    '口香糖粘衣服用冰块冻硬再剥',
+    '衣服滴油用洗洁精干搓再洗',
+    '血渍用冷水洗千万别用热水',
+    '衣服静电用金属衣架刮一下消除',
+    '毛衣缩水用护发素泡半小时恢复',
+    '保温杯装水摇晃可除茶垢',
+    '微波炉放碗水加热一分钟去油',
+    '番茄去皮划十字开水烫十秒',
+    '大蒜放微波炉十秒轻松剥皮',
+    '生姜埋盐里保鲜一个月不坏',
+    '生菜垫厨房纸放保鲜盒更脆',
+    '切洋葱冷冻十分钟就不流泪了',
+    '炒菜太咸加糖或醋中和咸味',
+    '煮粥加几滴油不溢锅',
+    '蒸蛋用温水蛋更嫩滑无孔',
     '切洋葱时嚼口香糖可有效防止流泪',
     '用盐水浸泡草莓可延长保鲜时间',
     '生姜擦拭刀具可去除鱼腥味',
@@ -5523,6 +5624,7 @@ const HotNews = {
   _isPaused: false,
   _scrollTimer: null,
   _loading: false,
+  _currentScrollY: 0,
 
   // 尝试获取热点新闻：60s API → tenapi → vvhan → 兜底提示
   async init() {
@@ -5637,32 +5739,51 @@ const HotNews = {
     return [...priority, ...rest];
   },
 
-  // 渲染当前窗口的 5 条
+  // 渲染所有新闻条目到滚动容器
   _render() {
     const container = document.getElementById('hotnewsContainer');
     if (!container || this._items.length === 0) return;
-    const n = this._items.length;
-    const visible = Math.min(5, n);
-    let html = '';
-    for (let i = 0; i < visible; i++) {
-      const item = this._items[(this._offset + i) % n];
+    // 创建滚动包裹层，渲染全部条目（首尾各加一份用于无缝循环）
+    const all = [...this._items, ...this._items.slice(0, 5)];
+    let html = '<div class="hotnews-scroll-wrap" id="hotnewsScrollWrap">';
+    all.forEach(item => {
       html += `<div class="hotnews-item">
         <span class="hotnews-rank">${item.rank}</span>
         <span class="hotnews-title">${item.title}</span>
         ${item.hot ? `<span class="hotnews-hot">🔥 ${item.hot}</span>` : ''}
       </div>`;
-    }
+    });
+    html += '</div>';
     container.innerHTML = html;
   },
 
-  // 每 3 秒滚动一次，循环展示全部条目
+  // 丝滑滚动：每3秒平滑上移一条
   _startScroll() {
     this._stopScroll();
     if (this._isPaused || this._items.length === 0) return;
     this._scrollTimer = setInterval(() => {
-      this._offset = (this._offset + 1) % this._items.length;
-      this._render();
+      this._smoothScrollOne();
     }, 3000);
+  },
+
+  _smoothScrollOne() {
+    const wrap = document.getElementById('hotnewsScrollWrap');
+    if (!wrap) return;
+    const itemHeight = 56; // 每条新闻高度
+    const currentY = this._currentScrollY || 0;
+    const newY = currentY - itemHeight;
+    wrap.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)';
+    wrap.style.transform = `translateY(${newY}px)`;
+    this._currentScrollY = newY;
+    // 当滚动超过一组数据后，无缝重置
+    const totalHeight = this._items.length * itemHeight;
+    if (Math.abs(newY) >= totalHeight) {
+      setTimeout(() => {
+        wrap.style.transition = 'none';
+        wrap.style.transform = 'translateY(0)';
+        this._currentScrollY = 0;
+      }, 620);
+    }
   },
 
   _stopScroll() {
@@ -5670,6 +5791,7 @@ const HotNews = {
       clearInterval(this._scrollTimer);
       this._scrollTimer = null;
     }
+    this._currentScrollY = 0;
   },
 
   // 暂停 / 继续自动滚动
@@ -5696,5 +5818,338 @@ const HotNews = {
     }
     const btn = document.getElementById('hotnewsPauseBtn');
     if (btn) btn.style.display = 'none';
+  }
+};
+
+// ====== 投递信件模块 ======
+const LetterBox = {
+  letters: [],
+  DB_NAME: 'couple_letter_db',
+  DB_STORE: 'letters',
+  _db: null,
+
+  async init() {
+    try {
+      await this.loadAll();
+    } catch (e) {
+      console.warn('LetterBox: loadAll failed', e);
+      this.letters = [];
+    }
+    this.updateBadges();
+    // 尝试云端同步
+    setTimeout(() => this.syncFromCloud(), 2000);
+  },
+
+  _openDB() {
+    return new Promise((resolve, reject) => {
+      if (this._db) { resolve(this._db); return; }
+      if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB not available')); return; }
+      const req = indexedDB.open(this.DB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(this.DB_STORE)) {
+          db.createObjectStore(this.DB_STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = (e) => { this._db = e.target.result; resolve(this._db); };
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async saveAll() {
+    try {
+      const db = await this._openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(this.DB_STORE, 'readwrite');
+        const store = tx.objectStore(this.DB_STORE);
+        store.clear();
+        this.letters.forEach(l => store.put(l));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      });
+    } catch (e) { console.warn('saveAll error', e); }
+  },
+
+  async loadAll() {
+    const db = await this._openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.DB_STORE, 'readonly');
+      const store = tx.objectStore(this.DB_STORE);
+      const req = store.getAll();
+      req.onsuccess = () => { this.letters = req.result || []; resolve(this.letters); };
+      req.onerror = () => reject(req.error);
+    });
+  },
+
+  _genId() {
+    return 'letter_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+  },
+
+  // 打开写信界面（role指定收件人）
+  openWriter(role) {
+    // 如果传了role，说明是TAO或YAN的信件入口
+    // 粉色主题下(当前角色YAN)→Dear TAO，蓝色主题下(当前角色TAO)→Dear YAN
+    const currentRole = (typeof App !== 'undefined' && App.currentRole) ? App.currentRole : 'TAO';
+    const fromRole = role || currentRole;
+    const toRole = fromRole === 'TAO' ? 'YAN' : 'TAO';
+    const themeClass = fromRole === 'TAO' ? 'tao-theme' : 'yan-theme';
+    const today = this._todayStr();
+
+    // 移除已有弹层
+    const existing = document.querySelector('.letter-writer-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'letter-writer-overlay';
+
+    const paper = document.createElement('div');
+    paper.className = 'letter-paper ' + themeClass;
+
+    paper.innerHTML = `
+      <div class="letter-header">
+        <button class="letter-close" onclick="LetterBox.closeWriter()">&times;</button>
+        <button class="letter-send" id="letterSendBtn" onclick="LetterBox._doSend('${fromRole}', '${toRole}')">✓ 确认投递</button>
+      </div>
+      <div class="letter-greeting">Dear ${toRole}：</div>
+      <textarea class="letter-content" id="letterContentInput" maxlength="50" placeholder="写下想对对方说的话..." rows="5"></textarea>
+      <div class="letter-counter" id="letterCounter">0 / 50</div>
+      <div class="letter-date">${today}</div>
+    `;
+
+    overlay.appendChild(paper);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this.closeWriter();
+    });
+    document.body.appendChild(overlay);
+
+    // 字符计数
+    const textarea = paper.querySelector('#letterContentInput');
+    const counter = paper.querySelector('#letterCounter');
+    textarea.addEventListener('input', () => {
+      counter.textContent = textarea.value.length + ' / 50';
+    });
+
+    setTimeout(() => textarea.focus(), 100);
+  },
+
+  closeWriter() {
+    const overlay = document.querySelector('.letter-writer-overlay');
+    if (overlay) overlay.remove();
+  },
+
+  async _doSend(fromRole, toRole) {
+    const textarea = document.getElementById('letterContentInput');
+    if (!textarea) return;
+    const content = textarea.value.trim();
+    if (!content) {
+      showToast('请写点什么再投递吧');
+      textarea.focus();
+      return;
+    }
+
+    const sendBtn = document.getElementById('letterSendBtn');
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '投递中...'; }
+
+    const letter = {
+      id: this._genId(),
+      from: fromRole,
+      to: toRole,
+      content: content,
+      date: this._todayStr(),
+      timestamp: Date.now(),
+      read: false
+    };
+
+    this.letters.push(letter);
+    await this.saveAll();
+    this.updateBadges();
+
+    // 同步到云端
+    try {
+      if (typeof CloudSync !== 'undefined' && CloudSync.set) {
+        CloudSync.set('letters', this.letters.map(l => ({
+          id: l.id, from: l.from, to: l.to, content: l.content,
+          date: l.date, timestamp: l.timestamp, read: l.read
+        })));
+      }
+    } catch (e) { console.warn('cloud sync failed', e); }
+
+    // 关闭写信，打开邮筒
+    this.closeWriter();
+    showToast('信件已投递 ✉️');
+    // 延迟打开邮筒，体验信件飞入效果
+    setTimeout(() => this.openMailbox(fromRole), 400);
+  },
+
+  // 打开邮筒查看信件
+  openMailbox(role) {
+    const existing = document.querySelector('.letter-viewer-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'letter-viewer-overlay';
+
+    // 关闭按钮
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'letter-viewer-close';
+    closeBtn.textContent = '×';
+    closeBtn.onclick = () => this.closeMailbox();
+    overlay.appendChild(closeBtn);
+
+    // 信件容器
+    const container = document.createElement('div');
+    container.className = 'letter-fall-container';
+
+    overlay.appendChild(container);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this.closeMailbox();
+    });
+    document.body.appendChild(overlay);
+
+    // 按日期倒序排列
+    const sorted = [...this.letters].sort((a, b) => b.timestamp - a.timestamp);
+
+    if (sorted.length === 0) {
+      container.innerHTML = '<div style="text-align:center;color:#aaa;padding:60px 0;font-size:14px;">信箱空空如也...<br>写一封信投入吧 ✉️</div>';
+      return;
+    }
+
+    // 依次飘落信件
+    sorted.forEach((letter, index) => {
+      setTimeout(() => {
+        if (!document.body.contains(overlay)) return;
+        const themeClass = letter.from === 'TAO' ? 'tao-theme' : 'yan-theme';
+        const item = document.createElement('div');
+        item.className = 'letter-fall-item ' + themeClass;
+        item.style.animationDelay = '0s';
+        item.innerHTML = `
+          <div class="letter-fall-from">来自 ${letter.from}</div>
+          <div class="letter-fall-text">${letter.content.length > 40 ? letter.content.substring(0, 40) + '...' : letter.content}</div>
+          <div class="letter-fall-date">${letter.date}</div>
+        `;
+        item.onclick = () => this.viewLetter(letter.id);
+        container.appendChild(item);
+      }, index * 300);
+    });
+
+    // 标记对方角色已查看
+    const viewerRole = (typeof App !== 'undefined' && App.currentRole) ? App.currentRole : 'TAO';
+    sorted.forEach(letter => {
+      if (letter.to === viewerRole && !letter.read) {
+        letter.read = true;
+      }
+    });
+    this.saveAll();
+    this.updateBadges();
+  },
+
+  closeMailbox() {
+    const overlay = document.querySelector('.letter-viewer-overlay');
+    if (overlay) overlay.remove();
+  },
+
+  // 查看单封信件详情
+  viewLetter(id) {
+    const letter = this.letters.find(l => l.id === id);
+    if (!letter) return;
+
+    const existing = document.querySelector('.letter-detail-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'letter-detail-overlay';
+
+    const themeClass = letter.from === 'TAO' ? 'tao-theme' : 'yan-theme';
+    const paper = document.createElement('div');
+    paper.className = 'letter-detail-paper ' + themeClass;
+
+    paper.innerHTML = `
+      <button class="letter-detail-close" onclick="this.closest('.letter-detail-overlay').remove()">&times;</button>
+      <div class="letter-detail-greeting">Dear ${letter.to}：</div>
+      <div class="letter-detail-text">${letter.content}</div>
+      <div class="letter-detail-date">— ${letter.from} · ${letter.date}</div>
+    `;
+
+    overlay.appendChild(paper);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.body.appendChild(overlay);
+  },
+
+  // 更新邮筒徽章（未读数量）
+  updateBadges() {
+    ['TAO', 'YAN'].forEach(role => {
+      const badge = document.getElementById('mailboxBadge' + role);
+      if (!badge) return;
+      // 显示发送给该角色的未读信件数
+      const unread = this.letters.filter(l => l.to === role && !l.read).length;
+      if (unread > 0) {
+        badge.style.display = 'flex';
+        badge.textContent = unread > 9 ? '9+' : String(unread);
+      } else {
+        badge.style.display = 'none';
+      }
+    });
+  },
+
+  // 导出所有信件
+  exportAll() {
+    if (this.letters.length === 0) {
+      showToast('还没有信件可以导出');
+      return;
+    }
+    const sorted = [...this.letters].sort((a, b) => b.timestamp - a.timestamp);
+    let text = 'TAO & YAN 信件合集\n';
+    text += '导出日期: ' + this._todayStr() + '\n';
+    text += '信件总数: ' + sorted.length + '\n';
+    text += '='.repeat(30) + '\n\n';
+    sorted.forEach((l, i) => {
+      text += `【第${i+1}封】\n`;
+      text += `来自: ${l.from}\n`;
+      text += `致: ${l.to}\n`;
+      text += `日期: ${l.date}\n`;
+      text += `内容: ${l.content}\n`;
+      text += '-'.repeat(20) + '\n\n';
+    });
+
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'TAO_YAN_信件合集_' + this._todayStr() + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('信件已导出');
+  },
+
+  // 云端同步
+  async syncFromCloud() {
+    try {
+      if (typeof CloudSync === 'undefined' || !CloudSync.get) return;
+      const cloudLetters = await CloudSync.get('letters');
+      if (!cloudLetters || !Array.isArray(cloudLetters)) return;
+      const localIds = new Set(this.letters.map(l => l.id));
+      let newCount = 0;
+      cloudLetters.forEach(cl => {
+        if (!localIds.has(cl.id)) {
+          this.letters.push(cl);
+          newCount++;
+        }
+      });
+      if (newCount > 0) {
+        await this.saveAll();
+        this.updateBadges();
+        showToast('收到 ' + newCount + ' 封新信件 ✉️');
+      }
+    } catch (e) {
+      console.warn('LetterBox sync failed', e);
+    }
+  },
+
+  _todayStr() {
+    if (typeof todayStr === 'function') return todayStr();
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 };
