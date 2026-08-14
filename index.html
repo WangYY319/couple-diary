@@ -13,6 +13,7 @@
   <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
   <title>TAO&YAN 相处日记</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -477,9 +478,8 @@
 
       <!-- 古诗 -->
       <div class="card poem-card">
-        <div class="card-title"><span class="icon">📜</span> 古诗</div>
+        <div class="card-title"><span class="icon">📜</span> <span id="poemCardTitle">古诗</span></div>
         <div class="poem-content" id="poemContent">
-          <div class="poem-title" id="poemTitle"></div>
           <div class="poem-author" id="poemAuthor"></div>
           <div class="poem-text" id="poemText"></div>
         </div>

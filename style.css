@@ -3916,6 +3916,7 @@ html, body {
   font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 12px;
+  margin-top: 2px;
 }
 
 .poem-text {
