@@ -752,6 +752,12 @@ const App = {
   init() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
+      // 监听 Service Worker 强制刷新消息
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'FORCE_RELOAD') {
+          window.location.reload();
+        }
+      });
     }
 
     // 初始化云同步
