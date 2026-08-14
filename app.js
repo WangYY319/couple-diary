@@ -4580,37 +4580,99 @@ document.addEventListener('DOMContentLoaded', () => App.init());
 const FormulaCard = {
   // 公式数据：按 数学 / 物理 / 化学 分类，高中及以下常用公式
   DATA: [
-    // ---------- 数学 ----------
-    { id: 'math_gougu', category: '数学', name: '勾股定理', expression: 'a² + b² = c²', usage: '已知直角三角形任意两边，求第三边长度。', principle: '直角三角形中，两直角边的平方和等于斜边的平方，是几何学最基础的定理。' },
-    { id: 'math_root', category: '数学', name: '二次方程求根公式', expression: 'x = (-b ± √(b²-4ac)) / 2a', usage: '求解一元二次方程 ax² + bx + c = 0（a≠0）的根。', principle: '由配方法推导而来；判别式 Δ=b²-4ac 决定根的个数：Δ>0 两实根，Δ=0 一实根，Δ<0 无实根。' },
-    { id: 'math_circle_area', category: '数学', name: '圆的面积', expression: 'S = πr²', usage: '已知半径 r 求圆的面积。', principle: '将圆等分为无数小扇形拼成近似长方形推导而得，π 为圆周率（约 3.14159）。' },
-    { id: 'math_circle_peri', category: '数学', name: '圆的周长', expression: 'C = 2πr', usage: '已知半径 r 求圆的周长。', principle: '圆周率 π 是周长与直径的比值，是一个无理数。' },
-    { id: 'math_tri_area', category: '数学', name: '三角形面积', expression: 'S = ½ × a × h', usage: '已知底边 a 和对应高 h 求三角形面积。', principle: '三角形面积等于与它等底等高的平行四边形面积的一半。' },
-    { id: 'math_sine', category: '数学', name: '正弦定理', expression: 'a/sinA = b/sinB = c/sinC = 2R', usage: '在任意三角形中，已知边角关系求未知边或角。', principle: '三角形任意一边与其对角正弦之比相等，且等于外接圆直径 2R。' },
-    { id: 'math_cosine', category: '数学', name: '余弦定理', expression: 'c² = a² + b² - 2ab·cosC', usage: '已知两边及夹角求第三边，或已知三边求角。', principle: '勾股定理的推广；当 C=90° 时 cosC=0，退化为勾股定理。' },
-    { id: 'math_arith_sum', category: '数学', name: '等差数列求和', expression: 'Sn = n(a₁ + aₙ) / 2', usage: '求等差数列前 n 项的和。', principle: '将数列首尾配对，每对之和相等，共有 n/2 对。' },
-    { id: 'math_geom_sum', category: '数学', name: '等比数列求和', expression: 'Sn = a₁(1 - qⁿ) / (1 - q)', usage: '求公比 q≠1 的等比数列前 n 项的和。', principle: '利用错位相减法推导；q 为公比，a₁ 为首项。' },
-    { id: 'math_linear', category: '数学', name: '一元一次方程', expression: 'ax + b = 0 → x = -b/a', usage: '求解最简单的一元一次方程（a≠0）。', principle: '通过移项并把未知数系数化为 1，即可求得未知数的值。' },
+  // ========== 数学（原有 10 + 新增 20 = 30 条）==========
 
-    // ---------- 物理 ----------
-    { id: 'phy_newton2', category: '物理', name: '牛顿第二定律', expression: 'F = ma', usage: '已知质量和加速度求合外力，或已知力求加速度。', principle: '物体加速度与所受合外力成正比，与质量成反比，方向与合力方向相同。' },
-    { id: 'phy_ohm', category: '物理', name: '欧姆定律', expression: 'I = U / R', usage: '已知电压和电阻求电流。', principle: '导体中的电流与两端电压成正比，与电阻成反比。' },
-    { id: 'phy_kinetic', category: '物理', name: '动能', expression: 'Ek = ½mv²', usage: '计算物体由于运动而具有的动能。', principle: '动能与质量成正比，与速度的平方成正比。' },
-    { id: 'phy_potential', category: '物理', name: '重力势能', expression: 'Ep = mgh', usage: '计算物体相对某参考面的重力势能。', principle: '物体由于被举高而具有的能量；h 为相对参考面的高度，g 为重力加速度。' },
-    { id: 'phy_work', category: '物理', name: '功', expression: 'W = Fs cosθ', usage: '计算恒力对物体所做的功。', principle: '功等于力、位移及两者夹角余弦的乘积；θ 为力与位移方向的夹角。' },
-    { id: 'phy_power', category: '物理', name: '功率', expression: 'P = W / t = Fv', usage: '计算做功的快慢。', principle: '功率等于单位时间内所做的功；匀速运动时也等于力与速度的乘积。' },
-    { id: 'phy_hooke', category: '物理', name: '胡克定律', expression: 'F = kx', usage: '计算弹簧弹力或形变量。', principle: '在弹性限度内，弹力与形变量成正比；k 为弹簧的劲度系数。' },
-    { id: 'phy_gravity', category: '物理', name: '万有引力定律', expression: 'F = G·m₁m₂ / r²', usage: '计算两个质点间的万有引力。', principle: '任意两个有质量的物体间存在引力，与质量乘积成正比，与距离平方成反比。' },
-    { id: 'phy_joule', category: '物理', name: '焦耳定律', expression: 'Q = I²Rt', usage: '计算电流通过导体产生的热量。', principle: '电流通过导体产生的热量与电流平方、电阻和通电时间成正比。' },
-    { id: 'phy_buoyancy', category: '物理', name: '浮力', expression: 'F浮 = ρ液·g·V排', usage: '计算浸在液体中的物体所受浮力。', principle: '浮力等于物体排开液体所受的重力；ρ液 为液体密度，V排 为排开液体的体积。' },
+  // ---------- 数学·原有 ----------
+  { id: 'math_gougu', category: '数学', name: '勾股定理', expression: 'a² + b² = c²', usage: '已知直角三角形任意两边，求第三边长度。', principle: '直角三角形中，两直角边的平方和等于斜边的平方，是几何学最基础的定理。' },
+  { id: 'math_root', category: '数学', name: '二次方程求根公式', expression: 'x = (-b ± √(b²-4ac)) / 2a', usage: '求解一元二次方程 ax² + bx + c = 0（a≠0）的根。', principle: '由配方法推导而来；判别式 Δ=b²-4ac 决定根的个数：Δ>0 两实根，Δ=0 一实根，Δ<0 无实根。' },
+  { id: 'math_circle_area', category: '数学', name: '圆的面积', expression: 'S = πr²', usage: '已知半径 r 求圆的面积。', principle: '将圆等分为无数小扇形拼成近似长方形推导而得，π 为圆周率（约 3.14159）。' },
+  { id: 'math_circle_peri', category: '数学', name: '圆的周长', expression: 'C = 2πr', usage: '已知半径 r 求圆的周长。', principle: '圆周率 π 是周长与直径的比值，是一个无理数。' },
+  { id: 'math_tri_area', category: '数学', name: '三角形面积', expression: 'S = ½ × a × h', usage: '已知底边 a 和对应高 h 求三角形面积。', principle: '三角形面积等于与它等底等高的平行四边形面积的一半。' },
+  { id: 'math_sine', category: '数学', name: '正弦定理', expression: 'a/sinA = b/sinB = c/sinC = 2R', usage: '在任意三角形中，已知边角关系求未知边或角。', principle: '三角形任意一边与其对角正弦之比相等，且等于外接圆直径 2R。' },
+  { id: 'math_cosine', category: '数学', name: '余弦定理', expression: 'c² = a² + b² - 2ab·cosC', usage: '已知两边及夹角求第三边，或已知三边求角。', principle: '勾股定理的推广；当 C=90° 时 cosC=0，退化为勾股定理。' },
+  { id: 'math_arith_sum', category: '数学', name: '等差数列求和', expression: 'Sn = n(a₁ + aₙ) / 2', usage: '求等差数列前 n 项的和。', principle: '将数列首尾配对，每对之和相等，共有 n/2 对。' },
+  { id: 'math_geom_sum', category: '数学', name: '等比数列求和', expression: 'Sn = a₁(1 - qⁿ) / (1 - q)', usage: '求公比 q≠1 的等比数列前 n 项的和。', principle: '利用错位相减法推导；q 为公比，a₁ 为首项。' },
+  { id: 'math_linear', category: '数学', name: '一元一次方程', expression: 'ax + b = 0 → x = -b/a', usage: '求解最简单的一元一次方程（a≠0）。', principle: '通过移项并把未知数系数化为 1，即可求得未知数的值。' },
 
-    // ---------- 化学 ----------
-    { id: 'chem_balance', category: '化学', name: '化学方程式配平', expression: 'aA + bB → cC + dD', usage: '书写并配平化学反应方程式。', principle: '遵循质量守恒定律，反应前后各元素的原子种类和数目不变。' },
-    { id: 'chem_mole', category: '化学', name: '摩尔质量公式', expression: 'n = m / M', usage: '在物质的量、质量和摩尔质量之间换算。', principle: '物质的量等于质量除以摩尔质量；n 单位为 mol，M 单位为 g/mol。' },
-    { id: 'chem_gas', category: '化学', name: '理想气体状态方程', expression: 'PV = nRT', usage: '计算理想气体的压强、体积、温度等关系。', principle: '理想气体的压强与体积乘积等于物质的量、气体常数 R 与热力学温度 T 的乘积。' },
-    { id: 'chem_ph', category: '化学', name: 'pH 计算', expression: 'pH = -lg[H⁺]', usage: '计算溶液的酸碱度。', principle: 'pH 为氢离子浓度的负对数；pH<7 为酸性，pH=7 为中性，pH>7 为碱性。' },
-    { id: 'chem_massfrac', category: '化学', name: '溶质质量分数', expression: 'ω = (m质 / m液) × 100%', usage: '计算溶液中溶质的质量分数。', principle: '溶质质量分数等于溶质质量与溶液总质量之比。' }
-  ],
+  // ---------- 数学·新增 ----------
+  { id: 'math_vieta', category: '数学', name: '韦达定理', expression: 'x₁ + x₂ = -b/a，x₁·x₂ = c/a', usage: '已知一元二次方程 ax²+bx+c=0 的系数，求两根之和与两根之积。', principle: '一元二次方程两根之和等于 -b/a，两根之积等于 c/a，揭示了根与系数的关系，是研究方程根的常用工具。' },
+  { id: 'math_binomial', category: '数学', name: '二项式定理', expression: '(a+b)ⁿ = Σ Cₙᵏ·aⁿ⁻ᵏ·bᵏ (k=0..n)', usage: '展开二项式 (a+b)ⁿ 的各项，求指定项或系数。', principle: '二项式的 n 次幂展开共有 n+1 项，各项系数为组合数 Cₙᵏ，即从 n 个中取 k 个的组合数。' },
+  { id: 'math_logbase', category: '数学', name: '对数换底公式', expression: 'logₐb = lgb / lga = lnb / lna', usage: '将任意底的对数换为常用对数或自然对数进行计算。', principle: '利用换底公式可将任意底的对数转化为同底对数之比，便于用计算器求值，是换底计算的基础。' },
+  { id: 'math_arith_term', category: '数学', name: '等差数列通项公式', expression: 'aₙ = a₁ + (n-1)d', usage: '已知首项 a₁ 和公差 d，求等差数列第 n 项。', principle: '等差数列每一项与前一项之差（公差 d）相等，第 n 项等于首项加上 (n-1) 个公差。' },
+  { id: 'math_geom_term', category: '数学', name: '等比数列通项公式', expression: 'aₙ = a₁·qⁿ⁻¹', usage: '已知首项 a₁ 和公比 q，求等比数列第 n 项。', principle: '等比数列每一项与前一项之比（公比 q）相等，第 n 项等于首项乘以公比的 (n-1) 次幂。' },
+  { id: 'math_cone_vol', category: '数学', name: '圆锥体积', expression: 'V = ⅓πr²h', usage: '已知底面半径 r 和高 h，求圆锥的体积。', principle: '圆锥体积等于同底等高圆柱体积的三分之一，可由祖暅原理或积分推导。' },
+  { id: 'math_sphere_vol', category: '数学', name: '球体积', expression: 'V = (4/3)πr³', usage: '已知半径 r，求球体的体积。', principle: '由积分或祖暅原理推导，球体积与半径的立方成正比，π 为圆周率。' },
+  { id: 'math_sphere_area', category: '数学', name: '球表面积', expression: 'S = 4πr²', usage: '已知半径 r，求球的表面积。', principle: '球的表面积等于大圆面积的四倍，可由微分思想将球面分割为无数小圆推导。' },
+  { id: 'math_sector_area', category: '数学', name: '扇形面积', expression: 'S = ½r²θ = nπr²/360', usage: '已知半径 r 和圆心角 θ（弧度）或 n（度），求扇形面积。', principle: '扇形是圆的一部分，其面积与圆心角成正比；θ 为弧度制圆心角，n 为角度制圆心角。' },
+  { id: 'math_arc_len', category: '数学', name: '弧长公式', expression: 'l = rθ = nπr/180', usage: '已知半径 r 和圆心角，求弧长。', principle: '弧长等于半径乘以圆心角的弧度数；采用角度制时需先用 nπ/180 换算为弧度。' },
+  { id: 'math_trap_area', category: '数学', name: '梯形面积', expression: 'S = ½(a + b)·h', usage: '已知上底 a、下底 b 和高 h，求梯形面积。', principle: '梯形面积等于上下底之和与高乘积的一半，可由两个全等梯形拼成平行四边形推导。' },
+  { id: 'math_para_area', category: '数学', name: '平行四边形面积', expression: 'S = a·h', usage: '已知底边 a 和对应高 h，求平行四边形面积。', principle: '平行四边形面积等于底乘以高；可通过割补法将平行四边形转化为矩形来理解。' },
+  { id: 'math_midseg', category: '数学', name: '中位线定理', expression: '梯形中位线 = ½(a+b)；三角形中位线 = ½c', usage: '求梯形或三角形中位线的长度。', principle: '梯形的中位线平行于两底且等于两底之和的一半；三角形的中位线平行于第三边且等于第三边的一半。' },
+  { id: 'math_pt_line', category: '数学', name: '点到直线距离', expression: 'd = |Ax₀ + By₀ + C| / √(A² + B²)', usage: '求点 (x₀, y₀) 到直线 Ax + By + C = 0 的距离。', principle: '利用直线的法向量推导，距离等于将点坐标代入方程所得值的绝对值除以法向量 (A,B) 的模长。' },
+  { id: 'math_pt_dist', category: '数学', name: '两点间距离', expression: 'd = √((x₂-x₁)² + (y₂-y₁)²)', usage: '求平面上两点 (x₁,y₁) 与 (x₂,y₂) 之间的距离。', principle: '由勾股定理推广到坐标平面，两坐标差平方和再开方即为两点距离。' },
+  { id: 'math_slope', category: '数学', name: '斜率公式', expression: 'k = (y₂-y₁) / (x₂-x₁)', usage: '求过两点 (x₁,y₁)、(x₂,y₂) 的直线斜率。', principle: '斜率表示直线的倾斜程度，等于纵坐标差与横坐标差之比；当 x₁=x₂ 时斜率不存在。' },
+  { id: 'math_log_prop', category: '数学', name: '对数性质', expression: 'logₐ(MN)=logₐM+logₐN，logₐ(M/N)=logₐM-logₐN，logₐMⁿ=n·logₐM', usage: '进行对数的运算、化简与变形。', principle: '积的对数等于对数之和，商的对数等于对数之差，幂的对数等于指数乘以对数，是对数运算的基本法则。' },
+  { id: 'math_exp_rule', category: '数学', name: '指数运算法则', expression: 'aᵐ·aⁿ=aᵐ⁺ⁿ，aᵐ÷aⁿ=aᵐ⁻ⁿ，(aᵐ)ⁿ=aᵐⁿ，(ab)ⁿ=aⁿbⁿ', usage: '进行幂的运算与化简。', principle: '同底数幂相乘底数不变指数相加，相除指数相减；幂的乘方指数相乘；积的幂等于各因数幂之积。' },
+  { id: 'math_abs_ineq', category: '数学', name: '绝对值不等式', expression: '|x| ≤ a ⟺ -a ≤ x ≤ a (a>0)', usage: '解含绝对值的不等式，求未知数取值范围。', principle: '绝对值表示数轴上的距离；|x|≤a 表示 x 到原点距离不超过 a，对应闭区间 [-a, a]。' },
+  { id: 'math_mean_ineq', category: '数学', name: '均值不等式', expression: 'a + b ≥ 2√(ab) (a>0, b>0)', usage: '求代数式的最值或证明不等式。', principle: '两个正数的算术平均数不小于几何平均数，当且仅当两数相等时取等号，是求最值的重要工具。' },
+
+  // ========== 物理（原有 10 + 新增 20 = 30 条）==========
+
+  // ---------- 物理·原有 ----------
+  { id: 'phy_newton2', category: '物理', name: '牛顿第二定律', expression: 'F = ma', usage: '已知质量和加速度求合外力，或已知力求加速度。', principle: '物体加速度与所受合外力成正比，与质量成反比，方向与合力方向相同。' },
+  { id: 'phy_ohm', category: '物理', name: '欧姆定律', expression: 'I = U / R', usage: '已知电压和电阻求电流。', principle: '导体中的电流与两端电压成正比，与电阻成反比。' },
+  { id: 'phy_kinetic', category: '物理', name: '动能', expression: 'Ek = ½mv²', usage: '计算物体由于运动而具有的动能。', principle: '动能与质量成正比，与速度的平方成正比。' },
+  { id: 'phy_potential', category: '物理', name: '重力势能', expression: 'Ep = mgh', usage: '计算物体相对某参考面的重力势能。', principle: '物体由于被举高而具有的能量；h 为相对参考面的高度，g 为重力加速度。' },
+  { id: 'phy_work', category: '物理', name: '功', expression: 'W = Fs cosθ', usage: '计算恒力对物体所做的功。', principle: '功等于力、位移及两者夹角余弦的乘积；θ 为力与位移方向的夹角。' },
+  { id: 'phy_power', category: '物理', name: '功率', expression: 'P = W / t = Fv', usage: '计算做功的快慢。', principle: '功率等于单位时间内所做的功；匀速运动时也等于力与速度的乘积。' },
+  { id: 'phy_hooke', category: '物理', name: '胡克定律', expression: 'F = kx', usage: '计算弹簧弹力或形变量。', principle: '在弹性限度内，弹力与形变量成正比；k 为弹簧的劲度系数。' },
+  { id: 'phy_gravity', category: '物理', name: '万有引力定律', expression: 'F = G·m₁m₂ / r²', usage: '计算两个质点间的万有引力。', principle: '任意两个有质量的物体间存在引力，与质量乘积成正比，与距离平方成反比。' },
+  { id: 'phy_joule', category: '物理', name: '焦耳定律', expression: 'Q = I²Rt', usage: '计算电流通过导体产生的热量。', principle: '电流通过导体产生的热量与电流平方、电阻和通电时间成正比。' },
+  { id: 'phy_buoyancy', category: '物理', name: '浮力', expression: 'F浮 = ρ液·g·V排', usage: '计算浸在液体中的物体所受浮力。', principle: '浮力等于物体排开液体所受的重力；ρ液 为液体密度，V排 为排开液体的体积。' },
+
+  // ---------- 物理·新增 ----------
+  { id: 'phy_momentum', category: '物理', name: '动量守恒定律', expression: 'm₁v₁ + m₂v₂ = m₁v₁′ + m₂v₂′', usage: '系统不受外力或合外力为零时，求碰撞前后的速度关系。', principle: '系统不受外力或所受合外力为零时，总动量保持不变，是自然界最基本的守恒定律之一。' },
+  { id: 'phy_mech_energy', category: '物理', name: '机械能守恒定律', expression: 'Ek₁ + Ep₁ = Ek₂ + Ep₂', usage: '只有重力（或弹力）做功时，求物体的速度或高度。', principle: '在只有重力或弹力做功的情形下，物体的动能和势能相互转化，机械能总量保持不变。' },
+  { id: 'phy_shm', category: '物理', name: '简谐运动周期', expression: '弹簧振子 T = 2π√(m/k)；单摆 T = 2π√(L/g)', usage: '求弹簧振子或单摆的振动周期。', principle: '简谐运动的周期由系统本身性质决定；弹簧振子与质量、劲度系数有关，单摆与摆长、重力加速度有关。' },
+  { id: 'phy_wave_speed', category: '物理', name: '波速公式', expression: 'v = λ/T = λf', usage: '已知波长、周期或频率，求机械波的传播速度。', principle: '波速等于波长与频率的乘积，也等于波长除以周期；机械波的波速由介质性质决定。' },
+  { id: 'phy_refraction', category: '物理', name: '折射定律', expression: 'n₁sinθ₁ = n₂sinθ₂', usage: '求光线折射时的入射角或折射角。', principle: '光从一种介质进入另一种介质时，入射角的正弦与折射角的正弦之比等于两介质折射率之比。' },
+  { id: 'phy_critical', category: '物理', name: '临界角公式', expression: 'sinC = 1/n', usage: '求光从光密介质射向光疏介质时发生全反射的临界角。', principle: '当折射角等于 90° 时的入射角叫临界角；sinC 等于光疏介质与光密介质折射率之比。' },
+  { id: 'phy_ideal_gas2', category: '物理', name: '理想气体状态方程（补充）', expression: 'PV/T = 恒量（一定质量）', usage: '一定质量理想气体在不同状态间变化时，求压强、体积或温度。', principle: '一定质量的理想气体，压强与体积的乘积与热力学温度之比为常数，是 PV=nRT 在质量不变时的变形。' },
+  { id: 'phy_heat', category: '物理', name: '热量计算', expression: 'Q = cmΔt', usage: '计算物体吸收或放出的热量。', principle: '物体吸收或放出的热量与质量、比热容和温度变化量成正比；c 为比热容，Δt 为温度变化。' },
+  { id: 'phy_specific_heat', category: '物理', name: '比热容', expression: 'c = Q / (m·Δt)', usage: '由热量、质量和温度变化求物质的比热容。', principle: '比热容是物质的一种特性，表示单位质量物质升高单位温度所吸收的热量，与物质种类和状态有关。' },
+  { id: 'phy_res_series', category: '物理', name: '串联电阻', expression: 'R = R₁ + R₂ + … + Rₙ', usage: '求串联电路的总电阻。', principle: '串联电路中电流处处相等，总电阻等于各分电阻之和，总电阻大于任一分电阻。' },
+  { id: 'phy_res_parallel', category: '物理', name: '并联电阻', expression: '1/R = 1/R₁ + 1/R₂ + … + 1/Rₙ', usage: '求并联电路的总电阻。', principle: '并联电路各支路电压相等，总电阻的倒数等于各分电阻倒数之和，总电阻小于任一分电阻。' },
+  { id: 'phy_cap_series', category: '物理', name: '串联电容', expression: '1/C = 1/C₁ + 1/C₂ + … + 1/Cₙ', usage: '求串联电容器的总电容。', principle: '串联电容总电压等于各电容电压之和，总电容的倒数等于各电容倒数之和，总电容小于任一分电容。' },
+  { id: 'phy_cap_parallel', category: '物理', name: '并联电容', expression: 'C = C₁ + C₂ + … + Cₙ', usage: '求并联电容器的总电容。', principle: '并联电容各电容两端电压相等，总电容等于各分电容之和，总电容大于任一分电容。' },
+  { id: 'phy_elec_power', category: '物理', name: '电功率', expression: 'P = UI = I²R = U²/R', usage: '计算用电器的电功率。', principle: '电功率等于电压与电流的乘积；结合欧姆定律还可表示为 I²R 或 U²/R。' },
+  { id: 'phy_flux', category: '物理', name: '磁通量', expression: 'Φ = B·S·cosθ', usage: '计算穿过某面积的磁通量。', principle: '磁通量表示穿过某面积的磁感线条数，等于磁感应强度、面积及两者夹角余弦的乘积。' },
+  { id: 'phy_lorentz', category: '物理', name: '洛伦兹力', expression: 'F = qvB sinθ', usage: '计算运动电荷在磁场中所受的力。', principle: '磁场对运动电荷的作用力叫洛伦兹力，方向由左手定则判断，大小与电荷量、速度、磁感应强度及夹角有关。' },
+  { id: 'phy_faraday', category: '物理', name: '法拉第电磁感应定律', expression: 'E = n·ΔΦ/Δt', usage: '计算线圈中的感应电动势。', principle: '闭合电路中感应电动势的大小与穿过电路的磁通量变化率成正比；n 为线圈匝数。' },
+  { id: 'phy_light_speed', category: '物理', name: '光速公式', expression: 'c = λf = λ/T', usage: '求光的波长、频率或周期。', principle: '真空中光速 c 约为 3×10⁸ m/s，等于波长与频率的乘积，是电磁波的基本关系。' },
+  { id: 'phy_double_slit', category: '物理', name: '双缝干涉', expression: 'Δx = L·λ/d', usage: '求双缝干涉相邻明（暗）条纹间距。', principle: '相邻干涉条纹间距与波长、双缝到屏的距离成正比，与双缝间距成反比。' },
+  { id: 'phy_photoelectric', category: '物理', name: '光电效应方程', expression: 'Ekm = hν - W', usage: '求光电子的最大初动能。', principle: '光子能量 hν 减去金属逸出功 W 等于光电子的最大初动能；爱因斯坦借此解释了光电效应。' },
+
+  // ========== 化学（原有 5 + 新增 10 = 15 条）==========
+
+  // ---------- 化学·原有 ----------
+  { id: 'chem_balance', category: '化学', name: '化学方程式配平', expression: 'aA + bB → cC + dD', usage: '书写并配平化学反应方程式。', principle: '遵循质量守恒定律，反应前后各元素的原子种类和数目不变。' },
+  { id: 'chem_mole', category: '化学', name: '摩尔质量公式', expression: 'n = m / M', usage: '在物质的量、质量和摩尔质量之间换算。', principle: '物质的量等于质量除以摩尔质量；n 单位为 mol，M 单位为 g/mol。' },
+  { id: 'chem_gas', category: '化学', name: '理想气体状态方程', expression: 'PV = nRT', usage: '计算理想气体的压强、体积、温度等关系。', principle: '理想气体的压强与体积乘积等于物质的量、气体常数 R 与热力学温度 T 的乘积。' },
+  { id: 'chem_ph', category: '化学', name: 'pH 计算', expression: 'pH = -lg[H⁺]', usage: '计算溶液的酸碱度。', principle: 'pH 为氢离子浓度的负对数；pH<7 为酸性，pH=7 为中性，pH>7 为碱性。' },
+  { id: 'chem_massfrac', category: '化学', name: '溶质质量分数', expression: 'ω = (m质 / m液) × 100%', usage: '计算溶液中溶质的质量分数。', principle: '溶质质量分数等于溶质质量与溶液总质量之比。' },
+
+  // ---------- 化学·新增 ----------
+  { id: 'chem_molar_conc', category: '化学', name: '物质的量浓度', expression: 'c = n / V', usage: '计算溶液中溶质的物质的量浓度。', principle: '物质的量浓度等于溶质的物质的量除以溶液体积；c 单位为 mol/L，是配制溶液的常用物理量。' },
+  { id: 'chem_dilution', category: '化学', name: '稀释定律', expression: 'c₁V₁ = c₂V₂', usage: '溶液稀释前后浓度的换算。', principle: '稀释前后溶质的物质的量不变，故浓溶液浓度与体积之积等于稀溶液浓度与体积之积。' },
+  { id: 'chem_ideal_gas2', category: '化学', name: '理想气体状态方程（补充）', expression: 'PM = ρRT', usage: '由气体密度、压强和温度求摩尔质量。', principle: '由 PV=nRT 与 n=m/M 推导而得，PM=ρRT 将气体密度 ρ 与摩尔质量 M 联系起来。' },
+  { id: 'chem_equilibrium', category: '化学', name: '化学平衡常数', expression: 'K = [C]ᶜ[D]ᵈ / ([A]ᵃ[B]ᵇ)', usage: '计算可逆反应达到平衡时各物质浓度间的关系。', principle: '一定温度下，可逆反应达到平衡时，生成物浓度幂之积与反应物浓度幂之积的比值为常数，仅随温度变化。' },
+  { id: 'chem_ionization', category: '化学', name: '电离平衡常数', expression: 'Ka = [H⁺][A⁻] / [HA]', usage: '计算弱酸（或弱碱）的电离程度。', principle: '弱电解质电离达到平衡时，离子浓度幂之积与未电离分子浓度之比为电离常数，温度一定时为定值。' },
+  { id: 'chem_ksp', category: '化学', name: '溶度积常数', expression: 'Ksp = [A]ᵃ·[B]ᵇ（以 AₐBᵦ 型为例）', usage: '判断难溶电解质的沉淀与溶解方向。', principle: '一定温度下，难溶电解质饱和溶液中各离子浓度幂的乘积为溶度积常数；用浓度商 Q 与 Ksp 比较可判断沉淀方向。' },
+  { id: 'chem_redox', category: '化学', name: '氧化还原反应配平', expression: '化合价升高总数 = 化合价降低总数', usage: '配平氧化还原反应方程式。', principle: '氧化还原反应中电子转移守恒，化合价升高的总数等于降低的总数，据此确定各物质化学计量数。' },
+  { id: 'chem_rate', category: '化学', name: '化学反应速率', expression: 'v = Δc / Δt', usage: '计算化学反应的平均速率。', principle: '化学反应速率等于单位时间内反应物或生成物浓度的变化量；通常取正值，可用任一物质表示。' },
+  { id: 'chem_activation', category: '化学', name: '活化能', expression: 'k = A·exp(-Eₐ / RT)', usage: '研究温度对反应速率常数的影响。', principle: '活化能是反应所需的最低能量阈值；阿伦尼乌斯公式表明温度升高时反应速率常数 k 增大，活化能越低反应越快。' },
+  { id: 'chem_hess', category: '化学', name: '盖斯定律', expression: 'ΔH = ΔH₁ + ΔH₂', usage: '由已知反应的焓变求未知反应的焓变。', principle: '化学反应的反应热只与始态和终态有关，而与反应途径无关；可将已知反应加和求出未知反应的焓变。' }
+],
 
   _currentCat: null,
 
@@ -4716,8 +4778,122 @@ const PoemCard = {
     { title: '浣溪沙', author: '晏殊', dynasty: '宋', text: '一曲新词酒一杯，去年天气旧亭台。\n夕阳西下几时回？\n无可奈何花落去，似曾相识燕归来。\n小园香径独徘徊。', analysis: '由春景引发对时光流逝的惆怅，"无可奈何花落去"对仗工整，蕴含着对人生无常的哲理思考。' },
     { title: '蝶恋花', author: '柳永', dynasty: '宋', text: '伫倚危楼风细细，望极春愁，黯黯生天际。\n草色烟光残照里，无言谁会凭阑意。\n拟把疏狂图一醉，对酒当歌，强乐还无味。\n衣带渐宽终不悔，为伊消得人憔悴。', analysis: '抒写相思之苦，"衣带渐宽终不悔，为伊消得人憔悴"成为执着爱情的千古名句，深情而不悔。' },
     { title: '雨霖铃', author: '柳永', dynasty: '宋', text: '寒蝉凄切，对长亭晚，骤雨初歇。\n都门帐饮无绪，留恋处，兰舟催发。\n执手相看泪眼，竟无语凝噎。\n念去去，千里烟波，暮霭沉沉楚天阔。\n多情自古伤离别，更那堪，冷落清秋节！\n今宵酒醒何处？杨柳岸，晓风残月。\n此去经年，应是良辰好景虚设。\n便纵有千种风情，更与何人说？', analysis: '写离别的凄婉缠绵，"杨柳岸晓风残月"为千古名句，将离愁别绪渲染到了极致。' },
-    { title: '虞美人', author: '李煜', dynasty: '五代', text: '春花秋月何时了？往事知多少。\n小楼昨夜又东风，故国不堪回首月明中。\n雕栏玉砌应犹在，只是朱颜改。\n问君能有几多愁？恰似一江春水向东流。', analysis: '以春水东流喻愁之深广，将亡国之痛写得滔滔不绝、真挚深沉，是词史上不朽的名作。' }
-  ],
+    { title: '虞美人', author: '李煜', dynasty: '五代', text: '春花秋月何时了？往事知多少。\n小楼昨夜又东风，故国不堪回首月明中。\n雕栏玉砌应犹在，只是朱颜改。\n问君能有几多愁？恰似一江春水向东流。', analysis: '以春水东流喻愁之深广，将亡国之痛写得滔滔不绝、真挚深沉，是词史上不朽的名作。' },
+  
+    // ----- 扩充诗词库（来自唐诗三百首与宋词三百首）-----
+    { title: '静夜思', author: '李白', dynasty: '唐', text: '床前明月光，\n疑是地上霜。\n举头望明月，\n低头思故乡。', analysis: '写诗人在异乡夜晚看到月光思念家乡，语言简单却格外动人。' },
+    { title: '春晓', author: '孟浩然', dynasty: '唐', text: '春眠不觉晓，\n处处闻啼鸟。\n夜来风雨声，\n花落知多少。', analysis: '写春天早晨醒来听见鸟鸣、又想到昨夜风雨打落了多少花，清新自然。' },
+    { title: '登鹳雀楼', author: '王之涣', dynasty: '唐', text: '白日依山尽，\n黄河入海流。\n欲穷千里目，\n更上一层楼。', analysis: '写登高远望的壮阔景色，也告诉我们要想看得更远，就要站得更高。' },
+    { title: '望庐山瀑布', author: '李白', dynasty: '唐', text: '日照香炉生紫烟，\n遥看瀑布挂前川。\n飞流直下三千尺，\n疑是银河落九天。', analysis: '用夸张的手法写庐山瀑布的壮观，想象奇特、气势磅礴。' },
+    { title: '黄鹤楼', author: '崔颢', dynasty: '唐', text: '昔人已乘黄鹤去，此地空余黄鹤楼。\n黄鹤一去不复返，白云千载空悠悠。\n晴川历历汉阳树，芳草萋萋鹦鹉洲。\n日暮乡关何处是？烟波江上使人愁。', analysis: '写登楼所见美景和浓浓的思乡之情，被誉为唐代七律第一。' },
+    { title: '枫桥夜泊', author: '张继', dynasty: '唐', text: '月落乌啼霜满天，\n江枫渔火对愁眠。\n姑苏城外寒山寺，\n夜半钟声到客船。', analysis: '写夜泊枫桥的孤寂心情，寒山寺的钟声更添一份乡愁。' },
+    { title: '江雪', author: '柳宗元', dynasty: '唐', text: '千山鸟飞绝，\n万径人踪灭。\n孤舟蓑笠翁，\n独钓寒江雪。', analysis: '写大雪天里一位老翁独自垂钓的画面，透出孤高清冷的意境。' },
+    { title: '江南春', author: '杜牧', dynasty: '唐', text: '千里莺啼绿映红，\n水村山郭酒旗风。\n南朝四百八十寺，\n多少楼台烟雨中。', analysis: '写江南春天的明丽景色，也借南朝寺庙感慨历史沧桑。' },
+    { title: '相思', author: '王维', dynasty: '唐', text: '红豆生南国，\n春来发几枝。\n愿君多采撷，\n此物最相思。', analysis: '借红豆表达对友人的思念，语浅情深。' },
+    { title: '杂诗', author: '王维', dynasty: '唐', text: '君自故乡来，\n应知故乡事。\n来日绮窗前，\n寒梅著花未？', analysis: '遇到故乡来的人，急切地问自家窗前的梅花开了没有，见思乡之深。' },
+    { title: '游子吟', author: '孟郊', dynasty: '唐', text: '慈母手中线，游子身上衣。\n临行密密缝，意恐迟迟归。\n谁言寸草心，报得三春晖。', analysis: '写母亲为远行儿子缝衣的深情，歌颂了伟大的母爱。' },
+    { title: '登乐游原', author: '李商隐', dynasty: '唐', text: '向晚意不适，\n驱车登古原。\n夕阳无限好，\n只是近黄昏。', analysis: '写夕阳虽美却接近黄昏，感叹美好时光总是短暂。' },
+    { title: '望岳', author: '杜甫', dynasty: '唐', text: '岱宗夫如何？齐鲁青未了。\n造化钟神秀，阴阳割昏晓。\n荡胸生曾云，决眦入归鸟。\n会当凌绝顶，一览众山小。', analysis: '写泰山的雄伟壮丽，表达青年杜甫不怕困难、勇攀高峰的豪情。' },
+    { title: '春望', author: '杜甫', dynasty: '唐', text: '国破山河在，城春草木深。\n感时花溅泪，恨别鸟惊心。\n烽火连三月，家书抵万金。\n白头搔更短，浑欲不胜簪。', analysis: '写战乱中长安的荒凉和思念家人的痛苦，忧国忧民之情深切。' },
+    { title: '绝句', author: '杜甫', dynasty: '唐', text: '两个黄鹂鸣翠柳，一行白鹭上青天。\n窗含西岭千秋雪，门泊东吴万里船。', analysis: '用四种颜色和景物画出春天明快的画面，清新生动。' },
+    { title: '闻官军收河南河北', author: '杜甫', dynasty: '唐', text: '剑外忽传收蓟北，初闻涕泪满衣裳。\n却看妻子愁何在，漫卷诗书喜欲狂。\n白日放歌须纵酒，青春作伴好还乡。\n即从巴峡穿巫峡，便下襄阳向洛阳。', analysis: '听到官军收复失地，诗人喜极而泣急着回乡，被称为他生平第一快诗。' },
+    { title: '赋得古原草送别', author: '白居易', dynasty: '唐', text: '离离原上草，一岁一枯荣。\n野火烧不尽，春风吹又生。\n远芳侵古道，晴翠接荒城。\n又送王孙去，萋萋满别情。', analysis: '写野草顽强的生命力，也借萋萋芳草表达送别的不舍。' },
+    { title: '暮江吟', author: '白居易', dynasty: '唐', text: '一道残阳铺水中，半江瑟瑟半江红。\n可怜九月初三夜，露似真珠月似弓。', analysis: '写傍晚到夜晚江面的美丽变化，色彩柔和动人。' },
+    { title: '钱塘湖春行', author: '白居易', dynasty: '唐', text: '孤山寺北贾亭西，水面初平云脚低。\n几处早莺争暖树，谁家新燕啄春泥。\n乱花渐欲迷人眼，浅草才能没马蹄。\n最爱湖东行不足，绿杨阴里白沙堤。', analysis: '写西湖早春的明媚风光，充满生机和喜悦。' },
+    { title: '悯农', author: '李绅', dynasty: '唐', text: '锄禾日当午，\n汗滴禾下土。\n谁知盘中餐，\n粒粒皆辛苦。', analysis: '写农民劳作的辛苦，提醒人们要珍惜粮食。' },
+    { title: '清明', author: '杜牧', dynasty: '唐', text: '清明时节雨纷纷，\n路上行人欲断魂。\n借问酒家何处有，\n牧童遥指杏花村。', analysis: '写清明细雨中行人的愁苦和对酒家的向往，意境优美。' },
+    { title: '山行', author: '杜牧', dynasty: '唐', text: '远上寒山石径斜，\n白云生处有人家。\n停车坐爱枫林晚，\n霜叶红于二月花。', analysis: '写秋天山间的美景，最爱经霜的红叶比春花还鲜艳。' },
+    { title: '泊秦淮', author: '杜牧', dynasty: '唐', text: '烟笼寒水月笼沙，\n夜泊秦淮近酒家。\n商女不知亡国恨，\n隔江犹唱后庭花。', analysis: '夜泊秦淮听到歌女唱亡国之音，借古讽今表达对国事的忧虑。' },
+    { title: '秋夕', author: '杜牧', dynasty: '唐', text: '银烛秋光冷画屏，\n轻罗小扇扑流萤。\n天阶夜色凉如水，\n卧看牵牛织女星。', analysis: '写秋夜宫女的孤寂生活，借看牛郎织女星暗含相思之苦。' },
+    { title: '送元二使安西', author: '王维', dynasty: '唐', text: '渭城朝雨浥轻尘，客舍青青柳色新。\n劝君更尽一杯酒，西出阳关无故人。', analysis: '写清晨雨后送别友人，劝酒一杯尽显依依惜别之情。' },
+    { title: '九月九日忆山东兄弟', author: '王维', dynasty: '唐', text: '独在异乡为异客，每逢佳节倍思亲。\n遥知兄弟登高处，遍插茱萸少一人。', analysis: '写独自在外过节加倍思念亲人，想象兄弟登高时少了自家一个。' },
+    { title: '鹿柴', author: '王维', dynasty: '唐', text: '空山不见人，\n但闻人语响。\n返景入深林，\n复照青苔上。', analysis: '写空山深林的幽静，用声音和光影衬托出一份禅意。' },
+    { title: '竹里馆', author: '王维', dynasty: '唐', text: '独坐幽篁里，\n弹琴复长啸。\n深林人不知，\n明月来相照。', analysis: '写独自在竹林弹琴的清幽自在，明月作伴更显超脱。' },
+    { title: '莲花坞', author: '王维', dynasty: '唐', text: '日日采莲去，\n洲长多暮归。\n弄篙莫溅水，\n畏湿红莲衣。', analysis: '写采莲女傍晚归来小心翼翼怕打湿衣裳，清新可爱。' },
+    { title: '出塞', author: '王昌龄', dynasty: '唐', text: '秦时明月汉时关，\n万里长征人未还。\n但使龙城飞将在，\n不教胡马度阴山。', analysis: '写边塞的苍凉和将士久戍不归，盼望良将保家卫国。' },
+    { title: '芙蓉楼送辛渐', author: '王昌龄', dynasty: '唐', text: '寒雨连江夜入吴，\n平明送客楚山孤。\n洛阳亲友如相问，\n一片冰心在玉壶。', analysis: '送别友人并以冰心玉壶自喻，表明自己清白高洁的心志。' },
+    { title: '从军行', author: '王昌龄', dynasty: '唐', text: '青海长云暗雪山，\n孤城遥望玉门关。\n黄沙百战穿金甲，\n不破楼兰终不还。', analysis: '写边塞将士百战不破楼兰誓不还家的豪情壮志。' },
+    { title: '凉州词', author: '王翰', dynasty: '唐', text: '葡萄美酒夜光杯，\n欲饮琵琶马上催。\n醉卧沙场君莫笑，\n古来征战几人回。', analysis: '写将士饮美酒出征前的豪迈，也透出战争的悲壮。' },
+    { title: '凉州词', author: '王之涣', dynasty: '唐', text: '黄河远上白云间，\n一片孤城万仞山。\n羌笛何须怨杨柳，\n春风不度玉门关。', analysis: '写边塞的雄浑苍凉，春风不到玉门关更显戍边之苦。' },
+    { title: '回乡偶书', author: '贺知章', dynasty: '唐', text: '少小离家老大回，\n乡音无改鬓毛衰。\n儿童相见不相识，\n笑问客从何处来。', analysis: '写少小离家老大回的感慨，孩子不识反问客从何处来，令人唏嘘。' },
+    { title: '咏柳', author: '贺知章', dynasty: '唐', text: '碧玉妆成一树高，\n万条垂下绿丝绦。\n不知细叶谁裁出，\n二月春风似剪刀。', analysis: '把春风比作剪刀裁出柳叶，想象新奇、生机盎然。' },
+    { title: '逢雪宿芙蓉山主人', author: '刘长卿', dynasty: '唐', text: '日暮苍山远，\n天寒白屋贫。\n柴门闻犬吠，\n风雪夜归人。', analysis: '写雪夜投宿时听到犬吠、主人冒雪归来，画面清冷又温暖。' },
+    { title: '送灵澈上人', author: '刘长卿', dynasty: '唐', text: '苍苍竹林寺，\n杳杳钟声晚。\n荷笠带斜阳，\n青山独归远。', analysis: '写傍晚送僧人归山，钟声斜阳里透出清幽淡远。' },
+    { title: '弹琴', author: '刘长卿', dynasty: '唐', text: '泠泠七弦上，\n静听松风寒。\n古调虽自爱，\n今人多不弹。', analysis: '借古调无人弹奏，感叹高雅的事物不被世人欣赏。' },
+    { title: '送上人', author: '刘长卿', dynasty: '唐', text: '孤云将野鹤，\n岂向人间住。\n莫买沃洲山，\n时人已知处。', analysis: '借孤云野鹤劝僧人别再到人尽皆知的地方隐居，调侃中见超脱。' },
+    { title: '秋夜寄丘员外', author: '韦应物', dynasty: '唐', text: '怀君属秋夜，\n散步咏凉天。\n空山松子落，\n幽人应未眠。', analysis: '秋夜散步怀念友人，想到山中松子落地时他也还没睡。' },
+    { title: '淮上喜会梁川故人', author: '韦应物', dynasty: '唐', text: '江汉曾为客，相逢每醉还。\n浮云一别后，流水十年间。\n欢笑情如旧，萧疏鬓已斑。\n何因不归去，淮上有秋山。', analysis: '写久别重逢的喜悦，欢笑如旧却已鬓发斑白，感慨时光。' },
+    { title: '赋得暮雨送李胄', author: '韦应物', dynasty: '唐', text: '楚江微雨里，建业暮钟时。\n漠漠帆来重，冥冥鸟去迟。\n海门深不见，浦树远含滋。\n相送情无限，沾襟比散丝。', analysis: '写暮雨中送别友人，烟雨迷蒙更添离愁别绪。' },
+    { title: '酬程延秋夜即事见赠', author: '韩翃', dynasty: '唐', text: '长簟迎风早，空城澹月华。\n星河秋一雁，砧杵夜千家。\n节候看应晚，心期卧已赊。\n向来吟秀句，不觉已鸣鸦。', analysis: '写秋夜空城月光和千家捣衣声，酬答友人诗作情意深厚。' },
+    { title: '无题', author: '李商隐', dynasty: '唐', text: '相见时难别亦难，东风无力百花残。\n春蚕到死丝方尽，蜡炬成灰泪始干。\n晓镜但愁云鬓改，夜吟应觉月光寒。\n蓬山此去无多路，青鸟殷勤为探看。', analysis: '写相见难别更难的深情，以春蚕蜡炬比喻至死不渝的爱。' },
+    { title: '锦瑟', author: '李商隐', dynasty: '唐', text: '锦瑟无端五十弦，一弦一柱思华年。\n庄生晓梦迷蝴蝶，望帝春心托杜鹃。\n沧海月明珠有泪，蓝田日暖玉生烟。\n此情可待成追忆，只是当时已惘然。', analysis: '借锦瑟追忆往事，意境朦胧凄美，写尽人生怅惘。' },
+    { title: '夜雨寄北', author: '李商隐', dynasty: '唐', text: '君问归期未有期，\n巴山夜雨涨秋池。\n何当共剪西窗烛，\n却话巴山夜雨时。', analysis: '写雨夜思念远方之人，盼着将来重逢共话今夜巴山夜雨。' },
+    { title: '嫦娥', author: '李商隐', dynasty: '唐', text: '云母屏风烛影深，\n长河渐落晓星沉。\n嫦娥应悔偷灵药，\n碧海青天夜夜心。', analysis: '借嫦娥独守月宫的孤寂，写身处高处却寂寞难耐的心境。' },
+    { title: '凉思', author: '李商隐', dynasty: '唐', text: '客去波平槛，蝉休露满枝。\n永怀当此节，倚立自移时。\n北斗兼春远，南陵寓使迟。\n天涯占梦数，疑误有新知。', analysis: '写秋夜思念远方之人，又疑心对方是否有了新知己。' },
+    { title: '北青萝', author: '李商隐', dynasty: '唐', text: '残阳西入崦，茅屋访孤僧。\n落叶人何在，寒云路几层。\n独敲初夜磬，闲倚一枝藤。\n世界微尘里，吾宁爱与憎。', analysis: '写寻访孤僧所见的清幽，感叹大千世界不过微尘，何必爱憎。' },
+    { title: '春泛若耶溪', author: '綦毋潜', dynasty: '唐', text: '幽意无断绝，此去随所偶。\n晚风吹行舟，花路入溪口。\n际夜转西壑，隔山望南斗。\n潭烟飞溶溶，林月低向后。\n生事且弥漫，愿为持竿叟。', analysis: '写春夜泛舟溪上的清幽自在，流露归隐江湖的心愿。' },
+    { title: '寻西山隐者不遇', author: '丘为', dynasty: '唐', text: '绝顶一茅茨，直上三十里。\n叩关无僮仆，窥室唯案几。\n若非巾柴车，应是钓秋水。\n差池不相见，黾勉空仰止。\n草色新雨中，松声晚窗里。\n及兹契幽绝，自足荡心耳。\n虽无宾主意，颇得清净理。\n兴尽方下山，何必待之子。', analysis: '写上山访隐者未遇，却从清幽山景中得到一份清净领悟。' },
+    { title: '阁夜', author: '杜甫', dynasty: '唐', text: '岁暮阴阳催短景，天涯霜雪霁寒宵。\n五更鼓角声悲壮，三峡星河影动摇。\n野哭千家闻战伐，夷歌数处起渔樵。\n卧龙跃马终黄土，人事音书漫寂寥。', analysis: '写冬夜夔州所闻所感，鼓角战伐中透出人生寂寥的感慨。' },
+    { title: '登高', author: '杜甫', dynasty: '唐', text: '风急天高猿啸哀，渚清沙白鸟飞回。\n无边落木萧萧下，不尽长江滚滚来。\n万里悲秋常作客，百年多病独登台。\n艰难苦恨繁霜鬓，潦倒新停浊酒杯。', analysis: '写秋日登高所见的萧瑟和自己年老多病漂泊的悲愁，气象悲壮。' },
+    { title: '梦李白二首·其二', author: '杜甫', dynasty: '唐', text: '浮云终日行，游子久不至。\n三夜频梦君，情亲见君意。\n告归常局促，苦道来不易。\n江湖多风波，舟楫恐失坠。\n出门搔白首，若负平生志。\n冠盖满京华，斯人独憔悴。\n孰云网恢恢，将老身反累。\n千秋万岁名，寂寞身后事。', analysis: '写连日梦见李白，担忧他遭贬受苦，为友人的命运深深不平。' },
+    { title: '月夜忆舍弟', author: '杜甫', dynasty: '唐', text: '戍鼓断人行，边秋一雁声。\n露从今夜白，月是故乡明。\n有弟皆分散，无家问死生。\n寄书长不达，况乃未休兵。', analysis: '写战乱中与兄弟失散、生死未卜的牵挂，故乡月格外牵动人心。' },
+    { title: '天末怀李白', author: '杜甫', dynasty: '唐', text: '凉风起天末，君子意如何。\n鸿雁几时到，江湖秋水多。\n文章憎命达，魑魅喜人过。\n应共冤魂语，投诗赠汨罗。', analysis: '秋风起时思念被贬的李白，感叹文才出众的人往往命运坎坷。' },
+    { title: '别房太尉墓', author: '杜甫', dynasty: '唐', text: '他乡复行役，驻马别孤坟。\n近泪无干土，低空有断云。\n对棋陪谢傅，把剑觅徐君。\n唯见林花落，莺啼送客闻。', analysis: '写路过故友坟前祭拜的悲痛，追忆往昔知遇之情。' },
+    { title: '奉济驿重送严公四韵', author: '杜甫', dynasty: '唐', text: '远送从此别，青山空复情。\n几时杯重把，昨夜月同行。\n列郡讴歌惜，三朝出入荣。\n江村独归处，寂寞养残生。', analysis: '写远送严武分别后的不舍与孤寂，惜别之情真挚动人。' },
+    { title: '旅夜书怀', author: '杜甫', dynasty: '唐', text: '细草微风岸，危樯独夜舟。\n星垂平野阔，月涌大江流。\n名岂文章著，官应老病休。\n飘飘何所似，天地一沙鸥。', analysis: '写夜泊舟中所见辽阔江景，感叹自己漂泊如天地间一只沙鸥。' },
+    { title: '登岳阳楼', author: '杜甫', dynasty: '唐', text: '昔闻洞庭水，今上岳阳楼。\n吴楚东南坼，乾坤日夜浮。\n亲朋无一字，老病有孤舟。\n戎马关山北，凭轩涕泗流。', analysis: '写登楼远眺洞庭的壮阔，又因战乱和身世飘零而落泪。' },
+    { title: '月夜', author: '杜甫', dynasty: '唐', text: '今夜鄜州月，闺中只独看。\n遥怜小儿女，未解忆长安。\n香雾云鬟湿，清辉玉臂寒。\n何时倚虚幌，双照泪痕干。', analysis: '被俘中望月思念妻儿，想象妻子独自看月盼自己归来的情景。' },
+    { title: '春宿左省', author: '杜甫', dynasty: '唐', text: '花隐掖垣暮，啾啾栖鸟过。\n星临万户动，月傍九霄多。\n不寝听金钥，因风想玉珂。\n明朝有封事，数问夜如何。', analysis: '写值夜时不敢安睡，惦记着明天要上奏事，勤谨又忠心。' },
+    { title: '至德二载甫自京金光门出', author: '杜甫', dynasty: '唐', text: '此道昔归顺，西郊胡正繁。\n至今残破胆，应有未招魂。\n近侍归京邑，移官岂至尊。\n无才日衰老，驻马望千门。', analysis: '重过当年逃出长安的金光门，回忆惊险往事，感慨贬谪无奈。' },
+    { title: '水槛遣心二首·其一', author: '杜甫', dynasty: '唐', text: '去郭轩楹敞，无村眺望赊。\n澄江平少岸，幽树晚多花。\n细雨鱼儿出，微风燕子斜。\n城中十万户，此地两三家。', analysis: '写草堂水边的清幽闲适，细雨微风里透出悠然心境。' },
+    { title: '蜀相', author: '杜甫', dynasty: '唐', text: '丞相祠堂何处寻，锦官城外柏森森。\n映阶碧草自春色，隔叶黄鹂空好音。\n三顾频烦天下计，两朝开济老臣心。\n出师未捷身先死，长使英雄泪满襟。', analysis: '写寻访武侯祠，追思诸葛亮鞠躬尽瘁却壮志未酬，令人惋惜。' },
+    { title: '客至', author: '杜甫', dynasty: '唐', text: '舍南舍北皆春水，但见群鸥日日来。\n花径不曾缘客扫，蓬门今始为君开。\n盘飧市远无兼味，樽酒家贫只旧醅。\n肯与邻翁相对饮，隔篱呼取尽余杯。', analysis: '写家中清贫却热情待客的真挚，朴实中见主人情意。' },
+    { title: '野望', author: '杜甫', dynasty: '唐', text: '西山白雪三城戍，南浦清江万里桥。\n海内风尘诸弟隔，天涯涕泪一身遥。\n惟将迟暮供多病，未有涓埃答圣朝。\n跨马出郊时极目，不堪人事日萧条。', analysis: '写跨马出郊远望，因战乱与兄弟分离、年老多病而满怀愁苦。' },
+    { title: '登楼', author: '杜甫', dynasty: '唐', text: '花近高楼伤客心，万方多难此登临。\n锦江春色来天地，玉垒浮云变古今。\n北极朝廷终不改，西山寇盗莫相侵。\n可怜后主还祠庙，日暮聊为梁甫吟。', analysis: '登楼远望伤于时局多难，借后主讽喻，忧国之情深沉。' },
+    { title: '宿府', author: '杜甫', dynasty: '唐', text: '清秋幕府井梧寒，独宿江城蜡炬残。\n永夜角声悲自语，中天月色好谁看。\n风尘荏苒音书绝，关塞萧条行路难。\n已忍伶俜十年事，强移栖息一枝安。', analysis: '写秋夜独宿幕府的孤寂，长夜角声里满是漂泊悲凉。' },
+    { title: '咏怀古迹五首·其三', author: '杜甫', dynasty: '唐', text: '群山万壑赴荆门，生长明妃尚有村。\n一去紫台连朔漠，独留青冢向黄昏。\n画图省识春风面，环佩空归月夜魂。\n千载琵琶作胡语，分明怨恨曲中论。', analysis: '借咏王昭君远嫁和亲的怨恨，感叹她的不幸与千古幽怨。' },
+    { title: '八阵图', author: '杜甫', dynasty: '唐', text: '功盖三分国，\n名成八阵图。\n江流石不转，\n遗恨失吞吴。', analysis: '赞诸葛亮功盖三分，又惋惜他未能实现吞吴统一的大志。' },
+    { title: '古柏行', author: '杜甫', dynasty: '唐', text: '孔明庙前有老柏，柯如青铜根如石。\n霜皮溜雨四十围，黛色参天二千尺。\n君臣已与时际会，树木犹为人爱惜。\n云来气接巫峡长，月出寒通雪山白。\n忆昨路绕锦亭东，先主武侯同閟宫。\n崔嵬枝干郊原古，窈窕丹青户牖空。\n落落盘踞虽得地，冥冥孤高多烈风。\n扶持自是神明力，正直原因造化功。\n大厦如倾要梁栋，万牛回首丘山重。\n不露文章世已惊，未辞剪伐谁能送。\n苦心未免容蝼蚁，香叶终经宿鸾凤。\n志士幽人莫怨嗟，古来材大难为用。', analysis: '借孔明庙前古柏的挺拔孤高，感叹大材往往难以被世所用。' },
+    { title: '水调歌头', author: '苏轼', dynasty: '宋', text: '明月几时有？把酒问青天。\n不知天上宫阙，今夕是何年。\n我欲乘风归去，又恐琼楼玉宇，高处不胜寒。\n起舞弄清影，何似在人间。\n转朱阁，低绮户，照无眠。\n不应有恨，何事长向别时圆？\n人有悲欢离合，月有阴晴圆缺，此事古难全。\n但愿人长久，千里共婵娟。', analysis: '中秋赏月怀念弟弟，借月之圆缺感叹人间聚散，最后祝愿天下人长久。' },
+    { title: '念奴娇·赤壁怀古', author: '苏轼', dynasty: '宋', text: '大江东去，浪淘尽，千古风流人物。\n故垒西边，人道是，三国周郎赤壁。\n乱石穿空，惊涛拍岸，卷起千堆雪。\n江山如画，一时多少豪杰。\n遥想公瑾当年，小乔初嫁了，雄姿英发。\n羽扇纶巾，谈笑间，樯橹灰飞烟灭。\n故国神游，多情应笑我，早生华发。\n人生如梦，一尊还酹江月。', analysis: '借赤壁古战场怀古，赞周瑜英姿，感叹自己早生白发、人生如梦。' },
+    { title: '江城子·密州出猎', author: '苏轼', dynasty: '宋', text: '老夫聊发少年狂，左牵黄，右擎苍，锦帽貂裘，千骑卷平冈。\n为报倾城随太守，亲射虎，看孙郎。\n酒酣胸胆尚开张，鬓微霜，又何妨！\n持节云中，何日遣冯唐？\n会挽雕弓如满月，西北望，射天狼。', analysis: '写出猎时豪情满怀，渴望被重用去抗敌立功，是豪放词的名篇。' },
+    { title: '江城子·乙卯正月二十日夜记梦', author: '苏轼', dynasty: '宋', text: '十年生死两茫茫，不思量，自难忘。\n千里孤坟，无处话凄凉。\n纵使相逢应不识，尘满面，鬓如霜。\n夜来幽梦忽还乡，小轩窗，正梳妆。\n相顾无言，惟有泪千行。\n料得年年肠断处，明月夜，短松冈。', analysis: '梦见亡妻，写十年阴阳相隔的思念，梦里相见却只能泪千行。' },
+    { title: '蝶恋花·春景', author: '苏轼', dynasty: '宋', text: '花褪残红青杏小。燕子飞时，绿水人家绕。\n枝上柳绵吹又少，天涯何处无芳草。\n墙里秋千墙外道。墙外行人，墙里佳人笑。\n笑渐不闻声渐悄，多情却被无情恼。', analysis: '写暮春景色和墙里墙外的趣味，多情的人总被无情所烦恼。' },
+    { title: '卜算子·黄州定慧院寓居作', author: '苏轼', dynasty: '宋', text: '缺月挂疏桐，漏断人初静。\n谁见幽人独往来，缥缈孤鸿影。\n惊起却回头，有恨无人省。\n拣尽寒枝不肯栖，寂寞沙洲冷。', analysis: '借孤鸿不肯栖寒枝，写自己贬谪中的孤独与清高自守。' },
+    { title: '浣溪沙', author: '苏轼', dynasty: '宋', text: '山下兰芽短浸溪，松间沙路净无泥，萧萧暮雨子规啼。\n谁道人生无再少？门前流水尚能西！休将白发唱黄鸡。', analysis: '见溪水西流而感慨，鼓励人别因年老就悲观，要积极面对生活。' },
+    { title: '定风波·莫听穿林打叶声', author: '苏轼', dynasty: '宋', text: '莫听穿林打叶声，何妨吟啸且徐行。\n竹杖芒鞋轻胜马，谁怕？一蓑烟雨任平生。\n料峭春风吹酒醒，微冷，山头斜照却相迎。\n回首向来萧瑟处，归去，也无风雨也无晴。', analysis: '遇雨不慌、从容前行，借雨写人生风雨中的豁达与洒脱。' },
+    { title: '雨霖铃', author: '柳永', dynasty: '宋', text: '寒蝉凄切，对长亭晚，骤雨初歇。\n都门帐饮无绪，留恋处，兰舟催发。\n执手相看泪眼，竟无语凝噎。\n念去去，千里烟波，暮霭沉沉楚天阔。\n多情自古伤离别，更那堪，冷落清秋节！\n今宵酒醒何处？杨柳岸，晓风残月。\n此去经年，应是良辰好景虚设。\n便纵有千种风情，更与何人说？', analysis: '写秋日离别的不舍，想象酒醒后只见杨柳残月，离愁极浓。' },
+    { title: '蝶恋花·伫倚危楼风细细', author: '柳永', dynasty: '宋', text: '伫倚危楼风细细，望极春愁，黯黯生天际。\n草色烟光残照里，无言谁会凭阑意。\n拟把疏狂图一醉，对酒当歌，强乐还无味。\n衣带渐宽终不悔，为伊消得人憔悴。', analysis: '写为思念心上人而日渐消瘦，却始终无怨无悔，情真意切。' },
+    { title: '望海潮', author: '柳永', dynasty: '宋', text: '东南形胜，三吴都会，钱塘自古繁华。\n烟柳画桥，风帘翠幕，参差十万人家。\n云树绕堤沙，怒涛卷霜雪，天堑无涯。\n市列珠玑，户盈罗绮，竞豪奢。\n重湖叠巘清嘉，有三秋桂子，十里荷花。\n羌管弄晴，菱歌泛夜，嬉嬉钓叟莲娃。\n千骑拥高牙，乘醉听箫鼓，吟赏烟霞。\n异日图将好景，归去凤池夸。', analysis: '铺写杭州的繁华美丽，西湖桂荷、市井富庶，气象万千。' },
+    { title: '八声甘州', author: '柳永', dynasty: '宋', text: '对潇潇暮雨洒江天，一番洗清秋。\n渐霜风凄紧，关河冷落，残照当楼。\n是处红衰翠减，苒苒物华休。\n惟有长江水，无语东流。\n不忍登高临远，望故乡渺邈，归思难收。\n叹年来踪迹，何事苦淹留？\n想佳人妆楼颙望，误几回、天际识归舟。\n争知我，倚阑干处，正恁凝愁！', analysis: '写暮秋江天萧瑟和登高思乡，又想象佳人登楼盼望归舟，相思绵长。' },
+    { title: '声声慢', author: '李清照', dynasty: '宋', text: '寻寻觅觅，冷冷清清，凄凄惨惨戚戚。\n乍暖还寒时候，最难将息。\n三杯两盏淡酒，怎敌他、晚来风急！\n雁过也，正伤心，却是旧时相识。\n满地黄花堆积，憔悴损，如今有谁堪摘？\n守着窗儿，独自怎生得黑！\n梧桐更兼细雨，到黄昏、点点滴滴。\n这次第，怎一个愁字了得！', analysis: '写晚年孤苦凄凉的境况，叠词开头把愁苦渲染得淋漓尽致。' },
+    { title: '一剪梅', author: '李清照', dynasty: '宋', text: '红藕香残玉簟秋。轻解罗裳，独上兰舟。\n云中谁寄锦书来？雁字回时，月满西楼。\n花自飘零水自流。一种相思，两处闲愁。\n此情无计可消除，才下眉头，却上心头。', analysis: '写丈夫外出后的相思，愁绪从眉头转到心头，挥之不去。' },
+    { title: '如梦令', author: '李清照', dynasty: '宋', text: '昨夜雨疏风骤，浓睡不消残酒。\n试问卷帘人，却道海棠依旧。\n知否，知否？应是绿肥红瘦。', analysis: '写一夜风雨后问花事，得知海棠依旧却点破应是绿多红少，惜春情深。' },
+    { title: '醉花阴', author: '李清照', dynasty: '宋', text: '薄雾浓云愁永昼，瑞脑消金兽。\n佳节又重阳，玉枕纱厨，半夜凉初透。\n东篱把酒黄昏后，有暗香盈袖。\n莫道不消魂，帘卷西风，人比黄花瘦。', analysis: '重阳思念丈夫，借把酒赏菊写相思，愁得人比黄花还瘦。' },
+    { title: '武陵春', author: '李清照', dynasty: '宋', text: '风住尘香花已尽，日晚倦梳头。\n物是人非事事休，欲语泪先流。\n闻说双溪春尚好，也拟泛轻舟。\n只恐双溪舴艋舟，载不动许多愁。', analysis: '写国破家亡后的满腹哀愁，愁重得连小船都载不动。' },
+    { title: '永遇乐·京口北固亭怀古', author: '辛弃疾', dynasty: '宋', text: '千古江山，英雄无觅，孙仲谋处。\n舞榭歌台，风流总被，雨打风吹去。\n斜阳草树，寻常巷陌，人道寄奴曾住。\n想当年，金戈铁马，气吞万里如虎。\n元嘉草草，封狼居胥，赢得仓皇北顾。\n四十三年，望中犹记，烽火扬州路。\n可堪回首，佛狸祠下，一片神鸦社鼓。\n凭谁问，廉颇老矣，尚能饭否？', analysis: '登北固亭怀古，借孙权刘裕赞英雄，讽谏当政勿草率北伐，自叹壮志难酬。' },
+    { title: '青玉案·元夕', author: '辛弃疾', dynasty: '宋', text: '东风夜放花千树，更吹落，星如雨。\n宝马雕车香满路。凤箫声动，玉壶光转，一夜鱼龙舞。\n蛾儿雪柳黄金缕，笑语盈盈暗香去。\n众里寻他千百度，蓦然回首，那人却在，灯火阑珊处。', analysis: '写元宵灯会的繁华热闹，最后笔锋一转，写灯火阑珊处那个孤高的人。' },
+    { title: '破阵子·为陈同甫赋壮词以寄之', author: '辛弃疾', dynasty: '宋', text: '醉里挑灯看剑，梦回吹角连营。\n八百里分麾下炙，五十弦翻塞外声，沙场秋点兵。\n马作的卢飞快，弓如霹雳弦惊。\n了却君王天下事，赢得生前身后名。可怜白发生！', analysis: '写梦回军营点兵杀敌的壮志，结尾却叹白发已生、壮志难酬。' },
+    { title: '西江月·夜行黄沙道中', author: '辛弃疾', dynasty: '宋', text: '明月别枝惊鹊，清风半夜鸣蝉。\n稻花香里说丰年，听取蛙声一片。\n七八个星天外，两三点雨山前。\n旧时茅店社林边，路转溪桥忽见。', analysis: '写夏夜乡村的清新景色，稻花香里蛙声一片，透出丰收的喜悦。' },
+    { title: '丑奴儿·书博山道中壁', author: '辛弃疾', dynasty: '宋', text: '少年不识愁滋味，爱上层楼。\n爱上层楼，为赋新词强说愁。\n而今识尽愁滋味，欲说还休。\n欲说还休，却道天凉好个秋。', analysis: '写年少时不懂愁偏说愁，历经沧桑后真有愁却说不出口，对比深刻。' },
+    { title: '鹧鸪天·代人赋', author: '辛弃疾', dynasty: '宋', text: '晚日寒鸦一片愁，柳塘新绿却温柔。\n若教眼底无离恨，不信人间有白头。\n肠已断，泪难收，相思重上小红楼。\n情知已被山遮断，频倚阑干不自由。', analysis: '代写离愁，眼看夕阳寒鸦引发愁绪，明知望不见仍频倚阑干。' },
+    { title: '摸鱼儿·更能消几番风雨', author: '辛弃疾', dynasty: '宋', text: '更能消、几番风雨，匆匆春又归去。\n惜春长怕花开早，何况落红无数。\n春且住，见说道、天涯芳草无归路。\n怨春不语。算只有殷勤，画檐蛛网，尽日惹飞絮。\n长门事，准拟佳期又误。蛾眉曾有人妒。\n千金纵买相如赋，脉脉此情谁诉？\n君莫舞，君不见、玉环飞燕皆尘土！\n闲愁最苦。休去倚危栏，斜阳正在、烟柳断肠处。', analysis: '借惜春和陈皇后事，写被排挤闲置的失意，含蓄表达对国事的忧愤。' },
+    { title: '满江红·写怀', author: '岳飞', dynasty: '宋', text: '怒发冲冠，凭栏处、潇潇雨歇。\n抬望眼，仰天长啸，壮怀激烈。\n三十功名尘与土，八千里路云和月。\n莫等闲，白了少年头，空悲切！\n靖康耻，犹未雪。臣子恨，何时灭！\n驾长车，踏破贺兰山缺。\n壮志饥餐胡虏肉，笑谈渴饮匈奴血。\n待从头、收拾旧山河，朝天阙。', analysis: '写精忠报国、雪耻复国的豪情壮志，也警人莫虚度年华。' },
+    { title: '小重山·昨夜寒蛩不住鸣', author: '岳飞', dynasty: '宋', text: '昨夜寒蛩不住鸣。惊回千里梦，已三更。\n起来独自绕阶行。人悄悄，帘外月胧明。\n白首为功名。旧山松竹老，阻归程。\n将欲心事付瑶琴。知音少，弦断有谁听？', analysis: '写壮志难酬的孤闷，满腹心事无人懂，知音稀少更添寂寞。' },
+    { title: '踏莎行', author: '欧阳修', dynasty: '宋', text: '候馆梅残，溪桥柳细。草薰风暖摇征辔。\n离愁渐远渐无穷，迢迢不断如春水。\n寸寸柔肠，盈盈粉泪。楼高莫近危阑倚。\n平芜尽处是春山，行人更在春山外。', analysis: '写行人远去的离愁，像春水般绵长，又写家中人登楼远望的牵挂。' },
+    { title: '蝶恋花·庭院深深深几许', author: '欧阳修', dynasty: '宋', text: '庭院深深深几许？杨柳堆烟，帘幕无重数。\n玉勒雕鞍游冶处，楼高不见章台路。\n雨横风狂三月暮。门掩黄昏，无计留春住。\n泪眼问花花不语，乱红飞过秋千去。', analysis: '写深闺女子的孤独和留春不住的伤感，泪眼问花催人落泪。' },
+    { title: '采桑子·群芳过后西湖好', author: '欧阳修', dynasty: '宋', text: '群芳过后西湖好，狼籍残红，飞絮蒙蒙，垂柳阑干尽日风。\n笙歌散尽游人去，始觉春空。垂下帘栊，双燕归来细雨中。', analysis: '写暮春西湖花落后的宁静之美，游人散去后独享一份清幽。' },
+    { title: '浣溪沙·一曲新词酒一杯', author: '晏殊', dynasty: '宋', text: '一曲新词酒一杯，去年天气旧亭台。夕阳西下几时回？\n无可奈何花落去，似曾相识燕归来。小园香径独徘徊。', analysis: '写对时光流逝的淡淡伤感，花落燕归、无可奈何中含着哲思。' },
+    { title: '蝶恋花·槛菊愁烟兰泣露', author: '晏殊', dynasty: '宋', text: '槛菊愁烟兰泣露，罗幕轻寒，燕子双飞去。\n明月不谙离恨苦，斜光到晓穿朱户。\n昨夜西风凋碧树，独上高楼，望尽天涯路。\n欲寄彩笺兼尺素，山长水阔知何处？', analysis: '写秋日离愁，独上高楼望尽天涯路，想寄书信却不知寄往何处。' },
+    { title: '破阵子·春景', author: '晏殊', dynasty: '宋', text: '燕子来时新社，梨花落后清明。\n池上碧苔三四点，叶底黄鹂一两声。日长飞絮轻。\n巧笑东邻女伴，采桑径里逢迎。\n疑怪昨宵春梦好，元是今朝斗草赢。笑从双脸生。', analysis: '写春日少女采桑斗草的欢乐场景，清新活泼、充满生活气息。' },
+    { title: '玉楼春·春恨', author: '晏殊', dynasty: '宋', text: '绿杨芳草长亭路，年少抛人容易去。\n楼头残梦五更钟，花底离愁三月雨。\n无情不似多情苦，一寸还成千万缕。\n天涯地角有穷时，只有相思无尽处。', analysis: '写离别后的相思之苦，感叹多情比无情更苦，相思绵绵无尽。' },
+    { title: '临江仙·梦后楼台高锁', author: '晏几道', dynasty: '宋', text: '梦后楼台高锁，酒醒帘幕低垂。去年春恨却来时。\n落花人独立，微雨燕双飞。\n记得小蘋初见，两重心字罗衣。琵琶弦上说相思。\n当时明月在，曾照彩云归。', analysis: '写酒醒后思念歌女小蘋，落花独立、微雨双飞，今昔对比动人。' },
+    { title: '鹧鸪天·彩袖殷勤捧玉钟', author: '晏几道', dynasty: '宋', text: '彩袖殷勤捧玉钟，当年拚却醉颜红。\n舞低杨柳楼心月，歌尽桃花扇底风。\n从别后，忆相逢，几回魂梦与君同。\n今宵剩把银釭照，犹恐相逢是梦中。', analysis: '写久别重逢又疑在梦中的惊喜，今昔歌舞之乐与离别相思交织。' },
+    { title: '踏莎行·小径红稀', author: '晏几道', dynasty: '宋', text: '小径红稀，芳郊绿遍。高台树色阴阴见。\n春风不解禁杨花，蒙蒙乱扑行人面。\n翠叶藏莺，朱帘隔燕。炉香静逐游丝转。\n一场愁梦酒醒时，斜阳却照深深院。', analysis: '写暮春庭院的清幽和酒醒后的淡淡愁绪，杨花乱扑更添闲愁。' },
+    { title: '虞美人·春花秋月何时了', author: '李煜', dynasty: '五代', text: '春花秋月何时了？往事知多少。\n小楼昨夜又东风，故国不堪回首月明中。\n雕栏玉砌应犹在，只是朱颜改。\n问君能有几多愁？恰似一江春水向东流。', analysis: '写亡国之君对故国的思念和悔恨，以春水喻愁，绵绵无尽。' },
+    { title: '相见欢·无言独上西楼', author: '李煜', dynasty: '五代', text: '无言独上西楼，月如钩。寂寞梧桐深院锁清秋。\n剪不断，理还乱，是离愁。别是一般滋味在心头。', analysis: '写亡国后的孤寂和离愁，把抽象的愁写成剪不断理还乱的滋味。' },
+    { title: '浪淘沙·帘外雨潺潺', author: '李煜', dynasty: '五代', text: '帘外雨潺潺，春意阑珊。罗衾不耐五更寒。\n梦里不知身是客，一晌贪欢。\n独自莫凭栏，无限江山，别时容易见时难。\n流水落花春去也，天上人间。', analysis: '写囚徒生活梦中贪欢、醒后凄凉，感叹故国难返、春去人亡。' },
+],
 
   _currentIndex: 0,
 
@@ -4734,26 +4910,82 @@ const PoemCard = {
     return a;
   },
 
-  // 每天固定一首（日期种子），同一天打开结果一致
-  init() {
+  // 每天固定一首：先尝试 jinrishici API，失败用本地日期种子
+  async init() {
     const dateStr = todayStr();
-    const cached = Store.get(`poem_${dateStr}`, -1);
-    if (cached >= 0 && cached < this.POEMS.length) {
-      this._currentIndex = cached;
+    const cached = Store.get(`poem_${dateStr}`, null);
+    if (cached && cached.source === 'api') {
+      this._currentPoem = cached.poem;
+      this._resetAnalysis();
+      this._renderPoemObj(this._currentPoem);
+      return;
+    }
+    // 尝试从 jinrishici API 获取
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch('https://v1.jinrishici.com/all.json', { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.content) {
+          this._currentPoem = {
+            title: data.origin && data.origin.title ? data.origin.title : '每日一诗',
+            author: data.author || '佚名',
+            dynasty: data.dynasty || '',
+            text: data.origin && data.origin.content ? data.origin.content.join('\n') : data.content,
+            analysis: data.origin && data.origin.translate ? data.origin.translate : '品读古诗词之美，感受古人智慧。'
+          };
+          Store.set(`poem_${dateStr}`, { source: 'api', poem: this._currentPoem });
+          this._resetAnalysis();
+          this._renderPoemObj(this._currentPoem);
+          return;
+        }
+      }
+    } catch (e) { /* fall through to local */ }
+    // 本地数据兜底
+    const localCached = Store.get(`poem_local_${dateStr}`, -1);
+    if (localCached >= 0 && localCached < this.POEMS.length) {
+      this._currentIndex = localCached;
     } else {
       const indices = this._seededShuffle(
         this.POEMS.map((_, i) => i),
         dateStr
       );
       this._currentIndex = indices[0];
-      Store.set(`poem_${dateStr}`, this._currentIndex);
+      Store.set(`poem_local_${dateStr}`, this._currentIndex);
     }
+    this._currentPoem = null;
     this._resetAnalysis();
     this._renderPoem(this._currentIndex);
   },
 
-  // 手动换一首（随机且不重复当前）
-  refresh() {
+  // 手动换一首：先试 API，失败用本地随机
+  async refresh() {
+    // 尝试 API
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch('https://v1.jinrishici.com/all.json', { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.content) {
+          this._currentPoem = {
+            title: data.origin && data.origin.title ? data.origin.title : '每日一诗',
+            author: data.author || '佚名',
+            dynasty: data.dynasty || '',
+            text: data.origin && data.origin.content ? data.origin.content.join('\n') : data.content,
+            analysis: data.origin && data.origin.translate ? data.origin.translate : '品读古诗词之美，感受古人智慧。'
+          };
+          this._resetAnalysis();
+          this._renderPoemObj(this._currentPoem);
+          showToast('为你换了一首新诗 📜');
+          return;
+        }
+      }
+    } catch (e) { /* fall through to local */ }
+    // 本地随机
     if (this.POEMS.length <= 1) {
       this._currentIndex = 0;
     } else {
@@ -4763,6 +4995,7 @@ const PoemCard = {
       } while (idx === this._currentIndex);
       this._currentIndex = idx;
     }
+    this._currentPoem = null;
     this._resetAnalysis();
     this._renderPoem(this._currentIndex);
     showToast('为你换了一首新诗 📜');
@@ -4781,12 +5014,17 @@ const PoemCard = {
   _renderPoem(idx) {
     const poem = this.POEMS[idx];
     if (!poem) return;
+    this._renderPoemObj(poem);
+  },
+
+  _renderPoemObj(poem) {
+    if (!poem) return;
     const titleEl = document.getElementById('poemTitle');
     const authorEl = document.getElementById('poemAuthor');
     const textEl = document.getElementById('poemText');
     const analysisEl = document.getElementById('poemAnalysis');
     if (titleEl) titleEl.textContent = poem.title;
-    if (authorEl) authorEl.textContent = `${poem.dynasty} · ${poem.author}`;
+    if (authorEl) authorEl.textContent = `${poem.dynasty ? poem.dynasty + ' · ' : ''}${poem.author}`;
     if (textEl) textEl.innerHTML = poem.text.replace(/\n/g, '<br>');
     if (analysisEl) analysisEl.textContent = poem.analysis;
   },
@@ -4854,8 +5092,135 @@ const LifeTip = {
     '剥大蒜前泡水几分钟更易剥皮',
     '米饭夹生时用筷子戳孔再焖一会',
     '用保鲜膜包住香蕉柄可保鲜更久',
-    '炖肉时加几片橘子皮可去腥提鲜'
-  ],
+    '炖肉时加几片橘子皮可去腥提鲜',
+  
+    // ----- 扩充生活常识库 -----
+    '炒菜盐放多了，加片土豆能吸咸味。',
+    '煮饭加几滴醋，米饭更白更香。',
+    '炖肉先大火煮开再小火慢炖更烂。',
+    '煎鱼前把锅烧热再放油，鱼皮不破。',
+    '切洋葱前放冰箱冷藏，切时不易流泪。',
+    '煮饺子水里加点盐，饺子不易粘连。',
+    '炒鸡蛋加少许温水，炒出来更嫩。',
+    '煮面条水开点些凉水，面更筋道。',
+    '蒸馒头开锅后再计时，馒头更暄。',
+    '切肥肉前刀沾热水，切起来更省力。',
+    '炖豆角先焯水，去除毒素更安全。',
+    '煮绿豆加几滴柠檬汁，颜色更鲜绿。',
+    '炸花生米凉油下锅，不易糊更酥。',
+    '做汤太咸可加块豆腐或土豆救场。',
+    '炒茄子先用盐腌出水，省油不上色。',
+    '煮海带加几滴醋，更易煮软。',
+    '切辣椒后用食用油洗手能去辣。',
+    '蒸鱼水开再上锅，鱼肉更鲜嫩。',
+    '和面加个鸡蛋，面条更劲道不易断。',
+    '炒藕片边炒边加水，颜色不发黑。',
+    '白鞋脏了用牙膏刷，白得发亮。',
+    '玻璃杯用醋擦一遍，干后不留水痕。',
+    '水壶水垢倒点醋煮开，轻松除垢。',
+    '不锈钢锈迹用番茄酱涂擦可去除。',
+    '砧板撒盐搓柠檬，去味又杀菌。',
+    '下水道异味倒点小苏打加醋可除。',
+    '花洒堵塞泡白醋一夜，孔眼畅通。',
+    '镜面喷点洗洁精水，洗澡不起雾。',
+    '抹布油腻加小苏打煮，去油焕新。',
+    '瓷砖缝发霉涂点消毒液可变白。',
+    '衣服上奶渍先用冷水洗再用洗涤剂。',
+    '口香糖粘衣服可用冰块冷冻后撕掉。',
+    '菜刀切腥物后擦生姜，能去腥味。',
+    '微波炉放碗水煮柠檬，油污易擦。',
+    '银饰发黑用牙膏轻搓，恢复光亮。',
+    '油锅起火盖锅盖关火，千万别泼水。',
+    '拖地水里加几滴柔顺剂，不易落灰。',
+    '马桶顽固污垢倒可乐静置再刷。',
+    '键盘缝灰尘用便签粘性面清扫。',
+    '快递单用湿巾或水抹掉个人信息。',
+    '标签撕不掉用吹风机吹热再撕。',
+    '马桶堵了用皮搋子压几下通常能通。',
+    '手机进水先别开机，埋大米吸湿。',
+    '旧牙刷刷缝隙卫生死角很实用。',
+    '切开的苹果泡淡盐水，不易变色。',
+    '剩饭加热洒点水盖盖子，更软乎。',
+    '久坐每小时起身活动五分钟。',
+    '饭后漱口或嚼无糖口香糖护牙。',
+    '看屏幕每二十分钟望远处二十秒。',
+    '睡前少喝水，减少起夜睡得香。',
+    '晒太阳补充维生素D，有助补钙。',
+    '刷牙别太用力，牙釉质会受损。',
+    '感冒多喝温水多休息，别滥用抗生素。',
+    '起床先喝杯温水，唤醒肠胃。',
+    '枕头高度约一拳高，保护颈椎。',
+    '运动后别猛喝冰水，会伤肠胃。',
+    '鼻子不通按迎香穴，能缓解。',
+    '眼睛酸热敷几分钟更舒服。',
+    '睡前泡脚助眠，水温别太烫。',
+    '喝蜂蜜水别用开水，营养会破坏。',
+    '吃撑了揉揉肚子散步助消化。',
+    '鼻出血低头捏鼻翼，千万别仰头。',
+    '烫伤立刻冲冷水十几分钟再就医。',
+    '落枕别硬扭，热敷后慢慢活动。',
+    '出门关燃气阀，别忘拔电器插头。',
+    '插座别超负荷使用，防止起火。',
+    '雷雨天远离大树和空旷地带。',
+    '煤气泄漏先开窗关阀，别动电器。',
+    '乘扶梯握紧扶手，别低头看手机。',
+    '过马路走斑马线，先看左再看右。',
+    '骑行戴头盔，夜间开前后灯。',
+    '小孩别单独留在家中或车里。',
+    '高层窗边别放可攀爬物品，防坠。',
+    '充电器不用就拔，发热别捂着。',
+    '老人浴室装扶手和防滑垫。',
+    '食物中毒立即催吐并就医。',
+    '冻肉别用热水解冻，冷藏更安全。',
+    '开车系安全带，后排也要系。',
+    '走夜路尽量走人多灯亮处。',
+    '电器待机也耗电，不用就断电。',
+    '空调设二十六度，省电又舒适。',
+    '洗澡水流开小些，节水又省钱。',
+    '米面少量多次买，避免生虫霉变。',
+    '旧毛巾当抹布，废物利用。',
+    '逛超市前列清单，避免冲动消费。',
+    '买反季衣服，价格更便宜。',
+    '手机充满电及时拔，保护电池。',
+    '用剩肥皂头加水融化成洗手液。',
+    '淘米水浇花，营养又节水。',
+    '网购先比价再看券，省一笔是一笔。',
+    '衣服有小破洞早补，别等变大。',
+    '新鞋磨脚处涂蜡烛或贴胶布。',
+    '拉链卡住涂铅笔芯或肥皂更顺滑。',
+    '瓶盖拧不开垫块橡皮或戴胶手套。',
+    '钉钉子前抹点肥皂，木头不裂。',
+    '插头难拔用橡皮筋绕一圈再拉。',
+    '耳机线松松缠绕，不易折断。',
+    '牙膏皮剪开还能用好几天。',
+    '切葱花时刀蘸水，不辣眼睛。',
+    '切水果前刀和案板用开水烫一下。',
+    '皮鞋打皱用熨斗垫布熨一下可展平。',
+    '白衣服发黄用淘米水泡后再洗。',
+    '花瓶里加片阿司匹林，花开更久。',
+    '葡萄用面粉水搅洗，脏东西易脱落。',
+    '煮鸡蛋加点盐，剥壳更轻松。',
+    '春天多通风晒被，防螨防潮。',
+    '夏天出汗多补点盐和钾。',
+    '秋燥多吃梨和蜂蜜润肺。',
+    '冬天晨练等太阳出来再出门。',
+    '三伏天别贪凉，少吃冰护脾胃。',
+    '换季衣物先洗晒再收，防霉防虫。',
+    '夏天午睡半小时，下午更有精神。',
+    '冬天睡前泡脚，驱寒助眠。',
+    '梅雨季放除湿盒或开空调除湿。',
+    '春天易过敏，出门戴口罩防花粉。',
+    '秋天少辛辣多酸，养阴润燥。',
+    '夏天空调别直吹，盖好肚子。',
+    '冬天多晒太阳，心情也更好。',
+    '伏天喝绿豆汤，清热又解暑。',
+    '立秋后别猛贴秋膘，清淡为佳。',
+    '冬天嘴唇干别舔，涂润唇膏更管用。',
+    '春捂秋冻要适度，别一味硬扛。',
+    '夏天剩菜及时冷藏，别过夜常温。',
+    '饭前便后用流动水和肥皂洗手。',
+    '牙刷三个月换一次，刷毛开叉就该换。',
+],
 
   _currentIndex: 0,
 
@@ -4871,25 +5236,66 @@ const LifeTip = {
     return a;
   },
 
-  // 每天固定一条（日期种子）
-  init() {
+  // 每天固定一条：先试 60s API tip，失败用本地日期种子
+  async init() {
     const dateStr = todayStr();
-    const cached = Store.get(`lifetip_${dateStr}`, -1);
-    if (cached >= 0 && cached < this.TIPS.length) {
-      this._currentIndex = cached;
-    } else {
-      const indices = this._seededShuffle(
-        this.TIPS.map((_, i) => i),
-        dateStr
-      );
-      this._currentIndex = indices[0];
-      Store.set(`lifetip_${dateStr}`, this._currentIndex);
+    const cached = Store.get(`lifetip_${dateStr}`, null);
+    if (cached !== null) {
+      if (cached.source === 'api' && cached.text) {
+        this._currentText = cached.text;
+        this._render();
+        return;
+      }
+      if (cached.source === 'local' && cached.index >= 0) {
+        this._currentIndex = cached.index;
+        this._render();
+        return;
+      }
     }
+    // 尝试 60s API
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch('https://60s.viki.moe/v2/60s', { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.data && data.data.tip) {
+          this._currentText = data.data.tip;
+          Store.set(`lifetip_${dateStr}`, { source: 'api', text: this._currentText });
+          this._render();
+          return;
+        }
+      }
+    } catch (e) { /* fall through */ }
+    // 本地兜底
+    const indices = this._seededShuffle(
+      this.TIPS.map((_, i) => i),
+      dateStr
+    );
+    this._currentIndex = indices[0];
+    Store.set(`lifetip_${dateStr}`, { source: 'local', index: this._currentIndex });
     this._render();
   },
 
   // 随机换一条（不重复当前）
-  refresh() {
+  async refresh() {
+    // 尝试 60s API 获取新 tip
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch('https://60s.viki.moe/v2/60s', { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.data && data.data.tip && data.data.tip !== this._currentText) {
+          this._currentText = data.data.tip;
+          this._render();
+          return;
+        }
+      }
+    } catch (e) { /* fall through */ }
+    // 本地随机
     if (this.TIPS.length <= 1) {
       this._currentIndex = 0;
     } else {
@@ -4899,13 +5305,18 @@ const LifeTip = {
       } while (idx === this._currentIndex);
       this._currentIndex = idx;
     }
+    this._currentText = null;
     this._render();
   },
 
   _render() {
     const el = document.getElementById('lifeTipContent');
     if (!el) return;
-    el.textContent = this.TIPS[this._currentIndex];
+    if (this._currentText) {
+      el.textContent = this._currentText;
+    } else {
+      el.textContent = this.TIPS[this._currentIndex];
+    }
   }
 };
 
@@ -4944,8 +5355,94 @@ const Joke = {
     '从前有个人叫小蔡，被扔进火锅变成了菜。',
     '小明问爸爸：为什么别人爸爸那么有钱？爸爸：因为他爸有钱。',
     '一天有个鸡蛋去松花江游泳，变成了皮蛋。',
-    '老师说考试不能作弊，小明说：我这叫参考。'
-  ],
+    '老师说考试不能作弊，小明说：我这叫参考。',
+  
+    // ----- 扩充笑话库 -----
+    '我问电风扇我丑吗，它摇了一晚上头。',
+    '减肥从明天开始，今天先吃饱才有劲。',
+    '钱不是问题，问题是我没钱。',
+    '我不是胖，我是可爱到膨胀。',
+    '早睡早起身体好，晚睡晚起心情好。',
+    '老师问我为何迟到，我说我起晚了。',
+    '我的钱包像洋葱，剥着剥着就流泪。',
+    '蚊子吸我的血，我吸蚊子的命。',
+    '都说岁月是把杀猪刀，我看像猪饲料。',
+    '我不是在发呆，我是在重启大脑。',
+    '再不疯狂就老了，再不复习就挂科了。',
+    '我单身是因质量太好，没人配得上。',
+    '吃饭是为了活着，我活着是为了吃。',
+    '我并非秃顶，我是聪明绝顶。',
+    '失败乃成功之母，可它爹总不来。',
+    '人家有的是背景，我有的是背影。',
+    '钱花光了，幻想还在。',
+    '数学题就像前任，怎么想都想不通。',
+    '早起的鸟儿有虫吃，早起的虫儿被吃。',
+    '我每天最大的运动量，是胡思乱想。',
+    '床啊你放开我，我还要去上班。',
+    '别人赚钱像呼吸，我赚钱像憋气。',
+    '我不是懒，我是节能模式。',
+    '考完试我对答案，答案对我摇头。',
+    '我记性像金鱼，可记仇却很清楚。',
+    '电脑为何会感冒，因为窗口开太多。',
+    '蚊子最讲义气，吸血还送你个包。',
+    '我穷得只剩钱了，全是硬币。',
+    '医生说我胃不好，以后只能吃软饭。',
+    '拖延症又犯了，明天再治。',
+    '我离成功，只差一个亿。',
+    '鱼说：淹死的都是会游泳的。',
+    '我不爱运动，怕累着地球。',
+    '我饭量大得连自己都害怕。',
+    '钱包鼓的时候，心也跟着鼓。',
+    '考试靠实力，蒙题靠运气。',
+    '我有个特长，就是特别短。',
+    '今天被狗追，它没我跑得快，我赢了。',
+    '胖子最大的悲哀，喘气都嫌累。',
+    '我不抽烟，主要是没钱买。',
+    '我最大的优点，是缺点不多。',
+    '失眠去数羊，数着数着饿了。',
+    '我的银行卡比脸还干净。',
+    '书为何会生气，因为被翻烂了。',
+    '我不丑，我只是不帅。',
+    '冬天洗澡要快，慢了就成冰棍了。',
+    '我总忘带伞，因为天总下雨。',
+    '我数学不好，可花钱算得特别清。',
+    '杯子为何会哭，因为它碎了心。',
+    '我的理想是躺着还能赚钱。',
+    '鱼离不开水，我离不开床。',
+    '我笑点低，是怕别人笑不出来。',
+    '我的存款像血压，时高时低老心慌。',
+    '蚊子爱叮我，大概是我血甜。',
+    '减肥口号喊得响，肉掉锅里了。',
+    '我总迟到，因为时间不等人。',
+    '猪八戒照镜子，里外不是人。',
+    '我的厨艺，是把厨房当实验室。',
+    '我不爱出门，因为外面全是人。',
+    '冰箱说：你老开我门，我冷得慌。',
+    '我英语不好，可OK说得贼溜。',
+    '我头发少，被烦恼薅光了。',
+    '今天没挨骂，差点不适应。',
+    '我的方向感，左右不分前后通吃。',
+    '我不爱逛街，因为钱包会哭。',
+    '我睡觉打呼噜，邻居说我像拖拉机。',
+    '我不养猫，怕它看不起我。',
+    '我的座右铭，能坐着绝不站着。',
+    '我数学差，因为题不讲道理。',
+    '我种的菜，草比菜长得好。',
+    '我不爱加班，太阳都下班了。',
+    '我的目标，活到老吃到老。',
+    '我不买彩票，怕中不了还伤心。',
+    '我跑步，跑两步喘三口。',
+    '我总忘事，因为脑子在清缓存。',
+    '存款密码忘了，钱倒是保住了。',
+    '我不怕鬼，穷鬼见得多了。',
+    '我唱歌跑调，跑到邻居家了。',
+    '我不爱看电影，因为票太贵。',
+    '我的假期，比眨眼还快。',
+    '我不挑食，主要是没钱挑。',
+    '我写作业像挤牙膏，一点一点来。',
+    '书到用时方恨少，钱到月底方恨少。',
+    '我饭卡掉了，肚子也跟着掉了。',
+],
 
   _currentIndex: 0,
 
@@ -5007,13 +5504,16 @@ const HotNews = {
   _scrollTimer: null,
   _loading: false,
 
-  // 尝试获取热点新闻：tenapi → vvhan → 兜底提示
+  // 尝试获取热点新闻：60s API → tenapi → vvhan → 兜底提示
   async init() {
     this._stopScroll();
     if (this._loading) return;
     this._loading = true;
     try {
-      let items = await this._tryTenapi();
+      let items = await this._try60s();
+      if (!items || items.length === 0) {
+        items = await this._tryTenapi();
+      }
       if (!items || items.length === 0) {
         items = await this._tryVvhan();
       }
@@ -5055,7 +5555,22 @@ const HotNews = {
     }
   },
 
-  // 第一数据源：tenapi.cn 头条热榜
+  // 第一数据源：60s.viki.moe 每天60秒读懂世界
+  async _try60s() {
+    try {
+      const data = await this._fetchJson('https://60s.viki.moe/v2/60s', 8000);
+      if (!data || !data.data || !Array.isArray(data.data.news)) return [];
+      return data.data.news.map((title, i) => ({
+        title: title,
+        hot: '',
+        category: ''
+      }));
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // 第二数据源：tenapi.cn 头条热榜
   async _tryTenapi() {
     try {
       const data = await this._fetchJson('https://tenapi.cn/v2/toutiaohot');
