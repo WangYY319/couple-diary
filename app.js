@@ -2057,10 +2057,40 @@ const Share = {
     const data = Store.getDay(ds) || {};
     const d = new Date(ds);
     const dateCN = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+
+    // 收集随机问答数据
+    const questions = Store.get(`quiz_q_${ds}`, []);
+    const taoAnswers = Store.get(`quiz_a_${ds}_TAO`, []);
+    const yanAnswers = Store.get(`quiz_a_${ds}_YAN`, []);
+
+    let quizText = '';
+    if (questions.length > 0) {
+      quizText += '\n🎲 随机问答\n';
+      questions.forEach((q, i) => {
+        quizText += `${i + 1}. ${q.q}\n`;
+        quizText += `   🐱 TAO: `;
+        if (i < taoAnswers.length) {
+          quizText += `${String.fromCharCode(65 + taoAnswers[i])}. ${q.a[taoAnswers[i]]}`;
+        } else {
+          quizText += '未作答';
+        }
+        quizText += '\n   🐶 YAN: ';
+        if (i < yanAnswers.length) {
+          quizText += `${String.fromCharCode(65 + yanAnswers[i])}. ${q.a[yanAnswers[i]]}`;
+        } else {
+          quizText += '未作答';
+        }
+        if (i < taoAnswers.length && i < yanAnswers.length) {
+          quizText += taoAnswers[i] === yanAnswers[i] ? ' 💕' : ' 🤔';
+        }
+        quizText += '\n';
+      });
+    }
+
     return {
       url: location.href,
       title: 'TAO & YAN 相处日记',
-      desc: `${dateCN} · 我们的甜蜜记录 💕`,
+      desc: `${dateCN} · 我们的甜蜜记录 💕${quizText}`,
       date: ds
     };
   },
@@ -2155,7 +2185,7 @@ const Download = {
 
     const canvas = document.createElement('canvas');
     canvas.width = 800;
-    canvas.height = 1200;
+    canvas.height = 1600;
     const ctx = canvas.getContext('2d');
 
     const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -2263,6 +2293,81 @@ const Download = {
     ctx.font = '20px sans-serif';
     ctx.fillStyle = '#22c55e';
     ctx.fillText('🌙 两人都已晚安', 60, y);
+    y += 50;
+
+    // 随机问答报告
+    const quizQuestions = Store.get(`quiz_q_${dateStr}`, []);
+    const taoQuizAnswers = Store.get(`quiz_a_${dateStr}_TAO`, []);
+    const yanQuizAnswers = Store.get(`quiz_a_${dateStr}_YAN`, []);
+
+    if (quizQuestions.length > 0) {
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.beginPath();
+      ctx.moveTo(60, y);
+      ctx.lineTo(canvas.width - 60, y);
+      ctx.stroke();
+      y += 40;
+
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText('🎲 随机问答', 60, y);
+      y += 36;
+
+      const taoDone = taoQuizAnswers.length >= 5;
+      const yanDone = yanQuizAnswers.length >= 5;
+      ctx.font = '14px sans-serif';
+      ctx.fillStyle = '#888';
+      ctx.fillText(`🐱 TAO: ${taoQuizAnswers.length}/5 ${taoDone ? '✅' : ''}  🐶 YAN: ${yanQuizAnswers.length}/5 ${yanDone ? '✅' : ''}`, 60, y);
+      y += 34;
+
+      quizQuestions.forEach((q, i) => {
+        // 问题
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillStyle = '#333';
+        y = this.wrapText(ctx, `${i + 1}. ${q.q}`, 60, y, canvas.width - 120, 22) + 24;
+
+        // TAO 答案
+        ctx.font = 'bold 15px sans-serif';
+        ctx.fillStyle = '#0e5fb0';
+        ctx.fillText('🐱 TAO:', 80, y);
+        ctx.font = '15px sans-serif';
+        ctx.fillStyle = '#555';
+        if (i < taoQuizAnswers.length) {
+          const choice = taoQuizAnswers[i];
+          y = this.wrapText(ctx, `${String.fromCharCode(65 + choice)}. ${q.a[choice]}`, 160, y, canvas.width - 220, 20) + 22;
+        } else {
+          ctx.fillStyle = '#ccc';
+          ctx.fillText('未作答', 160, y);
+          y += 22;
+        }
+
+        // YAN 答案
+        ctx.font = 'bold 15px sans-serif';
+        ctx.fillStyle = '#b8224f';
+        ctx.fillText('🐶 YAN:', 80, y);
+        ctx.font = '15px sans-serif';
+        ctx.fillStyle = '#555';
+        if (i < yanQuizAnswers.length) {
+          const choice = yanQuizAnswers[i];
+          y = this.wrapText(ctx, `${String.fromCharCode(65 + choice)}. ${q.a[choice]}`, 160, y, canvas.width - 220, 20) + 22;
+        } else {
+          ctx.fillStyle = '#ccc';
+          ctx.fillText('未作答', 160, y);
+          y += 22;
+        }
+
+        // 默契度
+        if (i < taoQuizAnswers.length && i < yanQuizAnswers.length) {
+          const same = taoQuizAnswers[i] === yanQuizAnswers[i];
+          ctx.font = '13px sans-serif';
+          ctx.fillStyle = same ? '#22c55e' : '#f59e0b';
+          ctx.fillText(same ? '💕 默契一致' : '🤔 意见不同', 160, y);
+          y += 22;
+        }
+
+        y += 10;
+      });
+    }
 
     ctx.font = '14px sans-serif';
     ctx.fillStyle = '#bbb';
