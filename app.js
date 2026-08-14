@@ -313,6 +313,7 @@ const Cloud = {
         this.heartbeat();
         this.syncToday();
         this.syncPhotos();
+        this.syncVoices();
       }
     }, 30000); // 30 秒
   },
@@ -666,6 +667,79 @@ const Cloud = {
       Store.set('cloudBgAt', Date.now());
       return blob;
     } catch (e) { return null; }
+  },
+
+  // ====== 录音云同步 ======
+
+  // 上传录音列表到云端
+  async pushVoiceList() {
+    if (!this.pairCode) return;
+    const voiceMeta = VoiceRecord.voices.map(v => ({
+      id: v.id,
+      role: v.role,
+      timestamp: v.timestamp,
+      duration: v.duration,
+      read: v.read
+    }));
+    try {
+      await fetch(this._url('voices_list'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(voiceMeta)
+      });
+    } catch (e) { /* ignore */ }
+  },
+
+  // 从云端同步录音
+  async syncVoices() {
+    if (!this.pairCode) return;
+
+    // 获取云端录音列表
+    let remoteVoices;
+    try {
+      const r = await fetch(this._url('voices_list'));
+      if (!r.ok) return;
+      remoteVoices = await r.json();
+    } catch (e) { return; }
+
+    if (!remoteVoices || !Array.isArray(remoteVoices)) return;
+
+    const localIds = VoiceRecord.voices.map(v => v.id);
+    let newVoices = false;
+
+    // 下载本地没有的录音
+    for (const meta of remoteVoices) {
+      if (!localIds.includes(meta.id)) {
+        const blob = await this.downloadFile(`voices/${meta.id}`);
+        if (blob) {
+          VoiceRecord.voices.push({
+            id: meta.id,
+            role: meta.role,
+            blob,
+            timestamp: meta.timestamp,
+            duration: meta.duration,
+            read: false // 对方的录音标记为未读
+          });
+          await VoiceRecord.saveAll();
+          newVoices = true;
+        }
+      }
+    }
+
+    // 上传本地有但云端没有的录音
+    for (const v of VoiceRecord.voices) {
+      if (!remoteVoices.find(r => r.id === v.id)) {
+        await this.uploadFile(v.blob, `voices/${v.id}`);
+      }
+    }
+
+    // 更新云端录音列表
+    await this.pushVoiceList();
+
+    if (newVoices) {
+      VoiceRecord.render();
+      showToast('对方发来了新语音 🎤');
+    }
   }
 };
 
@@ -780,6 +854,7 @@ const App = {
     Cloud.syncAll().then(() => {
       Cloud.syncQuizVocab();
       Cloud.syncPhotos();
+      Cloud.syncVoices();
       Cloud.startPolling();
       showToast('已配对成功，开始你们的日记吧 💕');
     });
@@ -2751,7 +2826,13 @@ const VoiceRecord = {
     this.voices.push(record);
     await this.saveAll();
     this.render();
-    showToast(`录音已保存 (${this.seconds}秒) 🎤`);
+    showToast(`录音已保存 (${this.seconds}秒) 🎤 正在同步给对方...`);
+    // 云同步录音给对方
+    if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+      Cloud.uploadFile(blob, `voices/${id}`).then(() => {
+        Cloud.pushVoiceList();
+      });
+    }
   },
 
   async _openDB() {
