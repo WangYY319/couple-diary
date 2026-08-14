@@ -2886,7 +2886,7 @@ const DetailMenu = {
   TAB_SECTIONS: {
     0: [
       { icon: '🎭', name: '角色选择', selector: '.role-card' },
-      { icon: '💌', name: '今日甜蜜', selector: '.sweet-card, .card:nth-child(2)' },
+      { icon: '💌', name: '甜蜜文案', selector: '.sweet-card, .card:nth-child(2)' },
       { icon: '🎵', name: '音乐播放', selector: '.music-card, .card:nth-child(3)' },
       { icon: '📊', name: '本周数据透视', selector: '.data-pivot-card' }
     ],
