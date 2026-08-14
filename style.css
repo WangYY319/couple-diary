@@ -4574,17 +4574,6 @@ html, body {
   overflow: hidden;
 }
 
-.hotnews-cat-tag {
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: var(--theme-light);
-  color: var(--theme-primary);
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
 .hotnews-hot {
   font-size: 11px;
   color: var(--text-muted);

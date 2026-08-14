@@ -6889,16 +6889,23 @@ const HotNews = {
     }
   },
 
-  // 根据关键词匹配分类
+  // 根据关键词匹配分类（按匹配数最多的分类归类，减少重叠）
   _categorize(item) {
     const text = (item.title || '') + (item.category || '') + (item.hot || '');
+    let bestCat = null;
+    let bestScore = 0;
     for (const [cat, keywords] of Object.entries(this.CAT_KEYWORDS)) {
-      if (keywords.some(k => text.includes(k))) {
-        return cat;
+      let score = 0;
+      for (const k of keywords) {
+        if (text.includes(k)) score++;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestCat = cat;
       }
     }
-    // 默认归入时政
-    return '时政';
+    // 无匹配则归入时政
+    return bestCat || '时政';
   },
 
   // 切换分类
@@ -6915,16 +6922,11 @@ const HotNews = {
     this._render();
   },
 
-  // 筛选当前分类的新闻，不足则用其他分类补齐
+  // 筛选当前分类的新闻，仅显示该分类的条目，不混入其他分类
   _filterByCat(cat) {
     const matched = this._items.filter(it => it.category === cat);
-    if (matched.length >= 5) {
-      this._catItems = matched.slice(0, 10);
-    } else {
-      // 不足5条，用其他分类补齐至10条
-      const others = this._items.filter(it => it.category !== cat);
-      this._catItems = [...matched, ...others].slice(0, 10);
-    }
+    // 仅取该分类的条目，最多6条
+    this._catItems = matched.slice(0, 6);
     // 编号
     this._catItems = this._catItems.map((it, i) => ({
       ...it,
