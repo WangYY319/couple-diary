@@ -1240,21 +1240,41 @@ const App = {
     const theme = role === 'TAO' ? 'blue' : 'pink';
     this.applyTheme(theme);
 
-    // 已配对：直接进入应用
-    if (Cloud.isPaired()) {
-      document.getElementById('entryScreen').classList.add('hidden');
-      setTimeout(() => {
-        document.getElementById('entryScreen').style.display = 'none';
-        this.enterApp();
-      }, 400);
-    } else {
-      // 未配对：跳到配对页
-      document.getElementById('entryScreen').classList.add('hidden');
-      setTimeout(() => {
-        document.getElementById('entryScreen').style.display = 'none';
-        this.showPairScreen();
-      }, 400);
-    }
+    // TAOYAN 字母逐一跳动效果
+    this._playEntryTitleAnimation(() => {
+      // 已配对：直接进入应用
+      if (Cloud.isPaired()) {
+        document.getElementById('entryScreen').classList.add('hidden');
+        setTimeout(() => {
+          document.getElementById('entryScreen').style.display = 'none';
+          this.enterApp();
+        }, 400);
+      } else {
+        // 未配对：跳到配对页
+        document.getElementById('entryScreen').classList.add('hidden');
+        setTimeout(() => {
+          document.getElementById('entryScreen').style.display = 'none';
+          this.showPairScreen();
+        }, 400);
+      }
+    });
+  },
+
+  // TAOYAN 标题字母逐一跳动动画
+  _playEntryTitleAnimation(callback) {
+    const titleEl = document.getElementById('entryTitle');
+    if (!titleEl) { if (callback) callback(); return; }
+    const letters = ['T', 'A', 'O', 'Y', 'A', 'N'];
+    // 构建逐字 span
+    titleEl.innerHTML = letters.map((ch, i) => {
+      const color = i < 3 ? '#1b7fe3' : '#e8296a';
+      return `<span class="entry-letter" style="color:${color};-webkit-text-fill-color:${color};animation-delay:${i * 0.12}s">${ch}</span>`;
+    }).join('');
+    // 动画结束后恢复并回调
+    const totalDuration = letters.length * 120 + 700;
+    setTimeout(() => {
+      if (callback) callback();
+    }, totalDuration);
   },
 
   // 配对成功后进入应用

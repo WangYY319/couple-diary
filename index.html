@@ -39,7 +39,7 @@
 
 <!-- 入口选择页 -->
 <div class="entry-screen" id="entryScreen">
-  <div class="entry-title">TAO &amp; YAN</div>
+  <div class="entry-title" id="entryTitle">TAO &amp; YAN</div>
   <div class="entry-subtitle">相处日记 💕 请选择进入名称</div>
   <div class="entry-buttons">
     <button class="entry-btn" data-role="TAO" onclick="App.selectRole('TAO')">
@@ -246,6 +246,7 @@
         </div>
       </div>
 
+      <div class="tab-bottom-hint">宝宝，到底啦～</div>
     </div>
     <div class="tab-page" id="tab-1" data-tab="1">
       <!-- 打卡问好（爱心） -->
@@ -312,6 +313,7 @@
           <button class="letter-export-btn" onclick="LetterBox.exportAll()" title="导出分享">📤</button>
         </div>
       </div>
+      <div class="tab-bottom-hint">宝宝，到底啦～</div>
     </div>
 
     <!-- ====== Tab 2: 总览（原有所有界面） ====== -->
@@ -446,6 +448,7 @@
 
       <!-- 下载按钮 -->
       <button class="download-btn" id="downloadBtn" style="display:none" onclick="Download.downloadCard()">📥 下载当日卡片</button>
+      <div class="tab-bottom-hint">宝宝，到底啦～</div>
     </div>
 
     <!-- ====== Tab 3: 娱乐 ====== -->
@@ -618,6 +621,7 @@
         <div class="landmark-grid" id="landmarkGrid"></div>
       </div>
 
+      <div class="tab-bottom-hint">宝宝，到底啦～</div>
     </div>
 
   </main>
