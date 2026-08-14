@@ -203,10 +203,12 @@
         <div class="music-file-row">
           <input type="file" id="musicFileInput" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac" style="display:none" onchange="MusicPlayer.loadFile(this)">
           <label class="music-file-btn" for="musicFileInput">📂 上传本地音乐</label>
+          <button class="music-file-btn" onclick="MusicPlayer.forceSyncMusic()" style="background:none;border:1px solid var(--theme-border);color:var(--theme-accent);cursor:pointer;">🔄 同步对方音乐</button>
         </div>
         <div class="music-player-area" id="musicPlayerArea" style="display:none">
           <div class="music-info">
             <span class="music-title" id="musicTitle">未知曲目</span>
+            <button class="music-sync-btn" onclick="MusicPlayer.forceSyncMusic()" title="同步对方音乐">🔄</button>
           </div>
           <div class="music-controls">
             <button class="music-play-btn" id="musicPlayBtn" onclick="MusicPlayer.toggle()">

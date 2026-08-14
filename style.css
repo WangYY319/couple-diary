@@ -2491,6 +2491,23 @@ html, body {
   max-width: 220px;
 }
 
+.music-sync-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 50%;
+  opacity: 0.5;
+  transition: opacity 0.2s, transform 0.3s;
+  -webkit-tap-highlight-color: transparent;
+}
+.music-sync-btn:active {
+  opacity: 1;
+  transform: rotate(180deg);
+}
+
 .music-controls {
   display: flex;
   align-items: center;
