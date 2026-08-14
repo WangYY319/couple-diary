@@ -1222,6 +1222,8 @@ const App = {
       Setting.refreshStatus();
       Setting.startStatusPolling();
     }
+    // 恢复自定义主题颜色
+    Setting.restoreTheme();
   },
 
   showPairScreen() {
@@ -1358,9 +1360,15 @@ const App = {
 
   applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    const colorMap = { blue: '#1b7fe3', pink: '#e8296a' };
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = colorMap[theme];
+    // 如果有自定义主题，覆盖默认主题色
+    const customTheme = Store.get('customTheme', null);
+    if (customTheme && typeof Setting !== 'undefined') {
+      Setting._applyThemeVars(customTheme);
+    } else {
+      const colorMap = { blue: '#1b7fe3', pink: '#e8296a' };
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = colorMap[theme];
+    }
     const mascot = theme === 'blue' ? '🐱' : '🐶';
     ['greet', 'words', 'wish', 'night'].forEach(card => {
       const el = document.getElementById('mascot-' + card);
@@ -2911,6 +2919,22 @@ const Background = {
 
 // ====== 设置模块 ======
 const Setting = {
+  // 预设主题色盘：12种精心搭配的色调
+  THEME_PRESETS: [
+    { name: '蓝',   primary: '#1b7fe3', accent: '#0e5fb0', light: '#a8d8fb', bg: '#d8ebfc', rgb: '27,127,227' },
+    { name: '粉',   primary: '#e8296a', accent: '#b8224f', light: '#fbb8cf', bg: '#fbd5e8', rgb: '232,41,106' },
+    { name: '紫',   primary: '#8b5cf6', accent: '#6d28d9', light: '#c4b5fd', bg: '#ede9fe', rgb: '139,92,246' },
+    { name: '青',   primary: '#06b6d4', accent: '#0e7490', light: '#a5f3fc', bg: '#cffafe', rgb: '6,182,212' },
+    { name: '绿',   primary: '#10b981', accent: '#047857', light: '#a7f3d0', bg: '#d1fae5', rgb: '16,185,129' },
+    { name: '橙',   primary: '#f97316', accent: '#c2410c', light: '#fed7aa', bg: '#ffedd5', rgb: '249,115,22' },
+    { name: '红',   primary: '#ef4444', accent: '#b91c1c', light: '#fecaca', bg: '#fee2e2', rgb: '239,68,68' },
+    { name: '靛',   primary: '#6366f1', accent: '#4338ca', light: '#c7d2fe', bg: '#e0e7ff', rgb: '99,102,241' },
+    { name: '棕',   primary: '#a16207', accent: '#713f12', light: '#fde68a', bg: '#fef9c3', rgb: '161,98,7' },
+    { name: '玫',   primary: '#ec4899', accent: '#be185d', light: '#fbcfe8', bg: '#fce7f3', rgb: '236,72,153' },
+    { name: '翠',   primary: '#059669', accent: '#064e3b', light: '#a7f3d0', bg: '#d1fae5', rgb: '5,150,105' },
+    { name: '灰',   primary: '#475569', accent: '#1e293b', light: '#cbd5e1', bg: '#e2e8f0', rgb: '71,85,105' }
+  ],
+
   open() {
     Background.load().then(() => {
       document.getElementById('settingMask').classList.add('show');
@@ -2925,6 +2949,8 @@ const Setting = {
       });
       // 恢复背景图显示程度
       this.restoreBgOpacity();
+      // 渲染主题调色盘
+      this.renderThemePalette();
     });
   },
 
@@ -3048,6 +3074,143 @@ const Setting = {
     if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
       CloudSync.set('bgOpacity', val);
     }
+  },
+
+  // ====== 主题颜色管理 ======
+
+  // 渲染调色盘
+  renderThemePalette() {
+    const container = document.getElementById('themePalette');
+    if (!container) return;
+    const savedTheme = Store.get('customTheme', null);
+    container.innerHTML = '';
+    this.THEME_PRESETS.forEach((preset, idx) => {
+      const chip = document.createElement('div');
+      chip.className = 'theme-color-chip';
+      chip.style.background = preset.primary;
+      chip.textContent = preset.name;
+      chip.dataset.idx = idx;
+      // 判断是否为当前选中
+      if (savedTheme && savedTheme.primary === preset.primary) {
+        chip.classList.add('active');
+      } else if (!savedTheme && preset.name === '蓝' && App.currentRole === 'TAO') {
+        chip.classList.add('active');
+      } else if (!savedTheme && preset.name === '粉' && App.currentRole === 'YAN') {
+        chip.classList.add('active');
+      }
+      chip.addEventListener('click', () => this.applyPresetTheme(idx));
+      container.appendChild(chip);
+    });
+    // 恢复自定义颜色选择器
+    const picker = document.getElementById('themeColorPicker');
+    if (picker) {
+      picker.value = savedTheme ? savedTheme.primary : (App.currentRole === 'TAO' ? '#1b7fe3' : '#e8296a');
+    }
+  },
+
+  // 应用预设主题
+  applyPresetTheme(idx) {
+    const preset = this.THEME_PRESETS[idx];
+    this._applyThemeVars(preset);
+    Store.set('customTheme', preset);
+    Store.set('customThemeIdx', idx);
+    // 更新调色盘高亮
+    document.querySelectorAll('.theme-color-chip').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.theme-color-chip[data-idx="${idx}"]`)?.classList.add('active');
+    // 更新颜色选择器
+    const picker = document.getElementById('themeColorPicker');
+    if (picker) picker.value = preset.primary;
+    showToast(`主题已切换为「${preset.name}」`);
+  },
+
+  // 自定义颜色 → 自动生成配套色系
+  applyCustomTheme(hex) {
+    const rgb = this._hexToRgb(hex);
+    const r = rgb.r, g = rgb.g, b = rgb.b;
+    // accent: 加深30%
+    const accent = this._rgbToHex(
+      Math.max(0, Math.round(r * 0.7)),
+      Math.max(0, Math.round(g * 0.7)),
+      Math.max(0, Math.round(b * 0.7))
+    );
+    // light: 混合白色70%
+    const light = this._rgbToHex(
+      Math.round(r + (255 - r) * 0.7),
+      Math.round(g + (255 - g) * 0.7),
+      Math.round(b + (255 - b) * 0.7)
+    );
+    // bg: 混合白色85%
+    const bg = this._rgbToHex(
+      Math.round(r + (255 - r) * 0.85),
+      Math.round(g + (255 - g) * 0.85),
+      Math.round(b + (255 - b) * 0.85)
+    );
+    const preset = {
+      name: '自',
+      primary: hex,
+      accent: accent,
+      light: light,
+      bg: bg,
+      rgb: `${r},${g},${b}`
+    };
+    this._applyThemeVars(preset);
+    Store.set('customTheme', preset);
+    // 取消预设高亮
+    document.querySelectorAll('.theme-color-chip').forEach(c => c.classList.remove('active'));
+  },
+
+  // 将主题变量应用到 :root
+  _applyThemeVars(preset) {
+    const root = document.documentElement;
+    root.style.setProperty('--theme-primary', preset.primary);
+    root.style.setProperty('--theme-accent', preset.accent);
+    root.style.setProperty('--theme-light', preset.light);
+    root.style.setProperty('--theme-bg', preset.bg);
+    root.style.setProperty('--theme-rgb', preset.rgb);
+    // 更新 meta theme-color
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = preset.primary;
+  },
+
+  // 恢复默认主题（按角色）
+  resetTheme() {
+    Store.remove('customTheme');
+    Store.remove('customThemeIdx');
+    const root = document.documentElement;
+    // 清除内联样式，恢复 CSS 默认
+    root.style.removeProperty('--theme-primary');
+    root.style.removeProperty('--theme-accent');
+    root.style.removeProperty('--theme-light');
+    root.style.removeProperty('--theme-bg');
+    root.style.removeProperty('--theme-rgb');
+    // 重新应用角色默认主题
+    const theme = App.currentRole === 'TAO' ? 'blue' : 'pink';
+    App.applyTheme(theme);
+    // 重新渲染调色盘
+    this.renderThemePalette();
+    showToast('已恢复默认主题');
+  },
+
+  // 启动时恢复保存的主题
+  restoreTheme() {
+    const saved = Store.get('customTheme', null);
+    if (saved) {
+      this._applyThemeVars(saved);
+    }
+  },
+
+  // 颜色工具
+  _hexToRgb(hex) {
+    hex = hex.replace('#', '');
+    return {
+      r: parseInt(hex.substring(0, 2), 16),
+      g: parseInt(hex.substring(2, 4), 16),
+      b: parseInt(hex.substring(4, 6), 16)
+    };
+  },
+  _rgbToHex(r, g, b) {
+    const toHex = (n) => n.toString(16).padStart(2, '0');
+    return '#' + toHex(r) + toHex(g) + toHex(b);
   },
 
   close(ev) {

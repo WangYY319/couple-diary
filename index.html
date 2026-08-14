@@ -45,12 +45,10 @@
     <button class="entry-btn" data-role="TAO" onclick="App.selectRole('TAO')">
       <span class="emoji">🐱</span>
       <span class="name">TAO</span>
-      <span class="desc">浅蓝主题</span>
     </button>
     <button class="entry-btn" data-role="YAN" onclick="App.selectRole('YAN')">
       <span class="emoji">🐶</span>
       <span class="name">YAN</span>
-      <span class="desc">浅粉主题</span>
     </button>
   </div>
 </div>
@@ -164,27 +162,27 @@
 
     <!-- ====== Tab 0: 首页（角色+音乐+文案） ====== -->
     <div class="tab-page active" id="tab-0" data-tab="0">
-      <!-- 角色选择 + 在线状态合并 -->
+      <!-- 角色信息 + 在线状态合并 -->
       <div class="card role-card">
-        <div class="card-title"><span class="icon">🎭</span> 角色选择</div>
+        <div class="card-title"><span class="icon">🎭</span> 角色信息</div>
         <div class="role-pair-row">
-          <button class="role-pair-item tao" id="pillTAO" onclick="Setting.switchRoleTo('TAO')">
-            <div class="role-avatar-wrap" id="avatarWrapTAO" onclick="AvatarPicker.open('TAO'); event.stopPropagation();">
+          <div class="role-pair-item tao" id="pillTAO">
+            <div class="role-avatar-wrap" id="avatarWrapTAO" onclick="AvatarPicker.open('TAO');">
               <img class="role-avatar-img" id="avatarImgTAO" style="display:none" />
               <span class="role-avatar-placeholder" id="avatarPlaceholderTAO">🐱</span>
             </div>
             <span class="role-pair-name">TAO</span>
             <span class="role-pair-dot off" id="homeDotTAO"></span>
-          </button>
+          </div>
           <span class="role-pair-connector">❤</span>
-          <button class="role-pair-item yan" id="pillYAN" onclick="Setting.switchRoleTo('YAN')">
-            <div class="role-avatar-wrap" id="avatarWrapYAN" onclick="AvatarPicker.open('YAN'); event.stopPropagation();">
+          <div class="role-pair-item yan" id="pillYAN">
+            <div class="role-avatar-wrap" id="avatarWrapYAN" onclick="AvatarPicker.open('YAN');">
               <img class="role-avatar-img" id="avatarImgYAN" style="display:none" />
               <span class="role-avatar-placeholder" id="avatarPlaceholderYAN">🐶</span>
             </div>
             <span class="role-pair-name">YAN</span>
             <span class="role-pair-dot off" id="homeDotYAN"></span>
-          </button>
+          </div>
         </div>
         <!-- 在线时长统计（无边框） -->
         <div class="online-duration-row">
@@ -730,6 +728,16 @@
       <div class="setting-sub-label">背景图显示程度</div>
       <input type="range" id="bgOpacity" class="setting-range" min="20" max="100" value="100" oninput="Setting.setBgOpacity(this.value)">
       <div class="setting-range-label" id="bgOpacityLabel">100%</div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">主题颜色</div>
+      <div class="setting-desc">选择喜欢的色调，可自定义调整</div>
+      <div class="theme-palette" id="themePalette"></div>
+      <div class="setting-sub-label">自定义颜色</div>
+      <div class="theme-custom-row">
+        <input type="color" id="themeColorPicker" class="theme-color-picker" oninput="Setting.applyCustomTheme(this.value)">
+        <button class="setting-btn" onclick="Setting.resetTheme()">恢复默认</button>
+      </div>
     </div>
     <button class="setting-cancel" onclick="Setting.close()">关闭</button>
   </div>
