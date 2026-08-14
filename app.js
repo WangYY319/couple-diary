@@ -985,11 +985,11 @@ const App = {
     Pair.showSwitchView();
   },
 
-  // 解除配对
-  unpair() {
-    Cloud.unpair();
+  // 解除配对（不清除打卡数据，仅断开配对连接）
+  async unpair() {
+    await Cloud.unpair();
     Store.remove('role');
-    Store.remove('days');
+    // 不删除 days 数据，保留历史打卡记录
     this.currentRole = null;
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('pairScreen').style.display = 'none';
@@ -997,7 +997,7 @@ const App = {
     const entry = document.getElementById('entryScreen');
     entry.style.display = 'flex';
     entry.classList.remove('hidden');
-    showToast('已解除配对');
+    showToast('已解除配对，打卡记录已保留');
   },
 
   enterApp() {
@@ -2496,7 +2496,7 @@ const Setting = {
   },
 
   unpair() {
-    if (!confirm('确定要解除配对吗？将清除所有本地数据并退出')) {
+    if (!confirm('确定要解除配对吗？\n\n⚠️ 解除后双方将无法同步数据\n✅ 你的打卡记录会保留，不会丢失')) {
       return;
     }
     App.unpair();
