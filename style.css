@@ -5025,24 +5025,20 @@ html, body {
 /* 刷新按钮 */
 .formula-refresh-btn {
   position: absolute;
-  bottom: 8px;
+  bottom: 6px;
   right: 8px;
-  width: 32px;
-  height: 32px;
   border: none;
-  border-radius: 50%;
-  background: var(--theme-light);
+  background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.3;
   transition: all 0.3s;
+  padding: 2px 4px;
 }
 
-.formula-refresh-btn:hover {
-  background: var(--theme-primary);
-  color: #fff;
+.formula-refresh-btn:active {
+  opacity: 0.8;
   transform: rotate(180deg);
 }
 
@@ -5291,28 +5287,22 @@ html, body {
 
 .poem-refresh-btn {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  bottom: 6px;
+  right: 8px;
   border: none;
-  border-radius: 50%;
-  background: var(--theme-light);
+  background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.3;
+  transition: all 0.3s;
+  padding: 2px 4px;
   z-index: 2;
 }
 
-.poem-refresh-btn:hover {
-  background: var(--theme-primary);
-  color: #fff;
-  transform: rotate(180deg) scale(1.05);
+.poem-refresh-btn:active {
+  opacity: 0.8;
+  transform: rotate(180deg);
 }
 
 /* ============================
@@ -5330,28 +5320,22 @@ html, body {
 
 .history-refresh-btn {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  bottom: 6px;
+  right: 8px;
   border: none;
-  border-radius: 50%;
-  background: var(--theme-light);
+  background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.3;
+  transition: all 0.3s;
+  padding: 2px 4px;
   z-index: 2;
 }
 
-.history-refresh-btn:hover {
-  background: var(--theme-primary);
-  color: #fff;
-  transform: rotate(180deg) scale(1.05);
+.history-refresh-btn:active {
+  opacity: 0.8;
+  transform: rotate(180deg);
 }
 
 /* ============================
@@ -5369,28 +5353,22 @@ html, body {
 
 .geo-refresh-btn {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  bottom: 6px;
+  right: 8px;
   border: none;
-  border-radius: 50%;
-  background: var(--theme-light);
+  background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.3;
+  transition: all 0.3s;
+  padding: 2px 4px;
   z-index: 2;
 }
 
-.geo-refresh-btn:hover {
-  background: var(--theme-primary);
-  color: #fff;
-  transform: rotate(180deg) scale(1.05);
+.geo-refresh-btn:active {
+  opacity: 0.8;
+  transform: rotate(180deg);
 }
 
 /* ============================
@@ -5408,28 +5386,22 @@ html, body {
 
 .life-tip-refresh-btn {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  bottom: 6px;
+  right: 8px;
   border: none;
-  border-radius: 50%;
-  background: var(--theme-light);
+  background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.3;
+  transition: all 0.3s;
+  padding: 2px 4px;
   z-index: 2;
 }
 
-.life-tip-refresh-btn:hover {
-  background: var(--theme-primary);
-  color: #fff;
-  transform: rotate(180deg) scale(1.05);
+.life-tip-refresh-btn:active {
+  opacity: 0.8;
+  transform: rotate(180deg);
 }
 
 /* ============================
@@ -5447,28 +5419,22 @@ html, body {
 
 .joke-refresh-btn {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  bottom: 6px;
+  right: 8px;
   border: none;
-  border-radius: 50%;
-  background: var(--theme-light);
+  background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.3;
+  transition: all 0.3s;
+  padding: 2px 4px;
   z-index: 2;
 }
 
-.joke-refresh-btn:hover {
-  background: var(--theme-primary);
-  color: #fff;
-  transform: rotate(180deg) scale(1.05);
+.joke-refresh-btn:active {
+  opacity: 0.8;
+  transform: rotate(180deg);
 }
 
 /* ============================
@@ -5482,6 +5448,17 @@ html, body {
   margin-bottom: 8px;
   text-align: center;
 }
+
+.landmark-stats {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.landmark-stats .ls-tao { color: #1b7fe3; }
+.landmark-stats .ls-yan { color: #e8296a; }
 
 .landmark-grid {
   display: grid;

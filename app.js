@@ -8482,12 +8482,27 @@ const LandmarkCheckin = {
     Store.set('landmark_checkins', data);
   },
 
+  // 渲染打卡统计
+  _renderStats(data) {
+    const el = document.getElementById('landmarkStats');
+    if (!el) return;
+    let taoCount = 0, yanCount = 0;
+    Object.values(data).forEach(state => {
+      if (state.tao) taoCount++;
+      if (state.yan) yanCount++;
+    });
+    el.innerHTML = `<span class="ls-tao">🐱 ${taoCount}</span><span class="ls-yan">🐶 ${yanCount}</span>`;
+  },
+
   // 渲染省份网格
   render() {
     const grid = document.getElementById('landmarkGrid');
     if (!grid) return;
     const data = this._getData();
     grid.innerHTML = '';
+
+    // 更新统计数量
+    this._renderStats(data);
 
     this.PROVINCES.forEach((prov, idx) => {
       const key = prov.name;
