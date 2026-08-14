@@ -3166,7 +3166,6 @@ const DetailMenu = {
       let html = '';
       sections.forEach((sec, idx) => {
         html += `<div class="detail-menu-item" onclick="DetailMenu.scrollTo(${idx})">
-          <span class="item-icon">${sec.icon}</span>
           <span class="item-name">${sec.name}</span>
           <span class="item-arrow">›</span>
         </div>`;
