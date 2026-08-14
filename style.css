@@ -3954,25 +3954,6 @@ html, body {
   font-size: 13px;
 }
 
-.hotnews-controls {
-  text-align: center;
-  margin-top: 8px;
-}
-
-.hotnews-pause-btn {
-  border: none;
-  background: none;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 12px;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.hotnews-pause-btn:hover {
-  opacity: 1;
-}
-
 /* ============================
    数理化公式
    ============================ */

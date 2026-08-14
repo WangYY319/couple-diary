@@ -6170,9 +6170,6 @@ const HotNews = {
       }));
       this._offset = 0;
       this._isPaused = false;
-      this._updatePauseBtn();
-      const pauseBtn = document.getElementById('hotnewsPauseBtn');
-      if (pauseBtn) pauseBtn.style.display = '';
       this._render();
       this._startScroll();
     } finally {
@@ -6312,30 +6309,11 @@ const HotNews = {
     this._currentScrollY = 0;
   },
 
-  // 暂停 / 继续自动滚动
-  togglePause() {
-    this._isPaused = !this._isPaused;
-    if (this._isPaused) {
-      this._stopScroll();
-    } else {
-      this._startScroll();
-    }
-    this._updatePauseBtn();
-  },
-
-  _updatePauseBtn() {
-    const btn = document.getElementById('hotnewsPauseBtn');
-    if (!btn) return;
-    btn.textContent = this._isPaused ? '▶️' : '⏸️';
-  },
-
   _showFallback() {
     const container = document.getElementById('hotnewsContainer');
     if (container) {
       container.innerHTML = '<div class="hotnews-placeholder">暂无法获取热点新闻</div>';
     }
-    const btn = document.getElementById('hotnewsPauseBtn');
-    if (btn) btn.style.display = 'none';
   }
 };
 
