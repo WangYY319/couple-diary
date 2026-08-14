@@ -2438,6 +2438,123 @@ html, body {
 }
 
 /* ============================
+   首页：数据透视（周维度柱状图）
+   ============================ */
+.data-pivot-card {
+  padding: 14px 16px;
+}
+
+.pivot-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+}
+
+.pivot-tab {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.pivot-tab.active {
+  color: var(--theme-primary);
+  font-weight: 700;
+  border-bottom-color: var(--theme-primary);
+}
+
+.pivot-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 100px;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.pivot-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+}
+
+.pivot-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 72px;
+  width: 100%;
+  justify-content: center;
+}
+
+.pivot-bar {
+  width: 8px;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.5s ease;
+  position: relative;
+}
+
+.pivot-bar.tao {
+  background: #1b7fe3;
+}
+
+.pivot-bar.yan {
+  background: #e8296a;
+}
+
+.pivot-bar.empty {
+  background: rgba(0, 0, 0, 0.06);
+  height: 2px !important;
+}
+
+.pivot-bar-val {
+  font-size: 8px;
+  color: var(--text-muted);
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.pivot-bar:hover .pivot-bar-val {
+  opacity: 1;
+}
+
+.pivot-day-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.pivot-day-label.today {
+  color: var(--theme-primary);
+  font-weight: 700;
+}
+
+.pivot-legend {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.pivot-leg-tao { color: #1b7fe3; font-weight: 600; }
+.pivot-leg-yan { color: #e8296a; font-weight: 600; }
+
+/* ============================
    首页：在线时长统计（无边框彩色延伸线）
    ============================ */
 .online-duration-row {

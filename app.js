@@ -1055,6 +1055,7 @@ const App = {
     ExerciseTime.init();
     HistoryCard.init();
     GeoCard.init();
+    DataPivot.render();
     // 首页在线时长统计
     OnlineDuration.refresh();
     // 首页在线状态刷新
@@ -2836,6 +2837,7 @@ const TabNav = {
     if (tabIndex === 0) {
       this.updateRoleDisplay();
       OnlineDuration.refresh();
+      DataPivot.render();
       Setting.refreshStatus();
       Setting.startStatusPolling();
     } else {
@@ -2873,7 +2875,8 @@ const DetailMenu = {
     0: [
       { icon: '🎭', name: '角色选择', selector: '.role-card' },
       { icon: '💌', name: '今日甜蜜', selector: '.sweet-card, .card:nth-child(2)' },
-      { icon: '🎵', name: '音乐播放', selector: '.music-card, .card:nth-child(3)' }
+      { icon: '🎵', name: '音乐播放', selector: '.music-card, .card:nth-child(3)' },
+      { icon: '📊', name: '本周数据透视', selector: '.data-pivot-card' }
     ],
     1: [
       { icon: '❤️', name: '爱心打卡', selector: '.greet-card, .card:nth-child(1)' },
@@ -3063,6 +3066,118 @@ const OnlineDuration = {
   _todayStr() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+};
+
+// ====== 数据透视模块（本周柱状图） ======
+const DataPivot = {
+  _currentMetric: 'online', // online | exercise | vocab
+  _weekDays: [], // 本周7天的日期字符串
+
+  // 获取本周7天日期（周一到周日）
+  _getWeekDays() {
+    const today = new Date();
+    const dayOfWeek = today.getDay() || 7; // 周日=7
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - dayOfWeek + 1);
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      days.push({
+        dateStr: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'),
+        label: ['一', '二', '三', '四', '五', '六', '日'][i],
+        isToday: false
+      });
+    }
+    const todayStr = this._todayStr();
+    days.forEach(d => { d.isToday = (d.dateStr === todayStr); });
+    return days;
+  },
+
+  _todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  },
+
+  // 获取某天某角色的数据
+  _getDayValue(dateStr, role, metric) {
+    const key = role.toLowerCase();
+    if (metric === 'online') {
+      const data = Store.get('online_duration', {});
+      const day = data[dateStr];
+      if (!day) return 0;
+      return Math.round((day[key] || 0) / 60); // 秒转分钟
+    } else if (metric === 'exercise') {
+      const data = Store.get('exercise_time', {});
+      const day = data[dateStr];
+      if (!day) return 0;
+      return day[key] || 0;
+    } else if (metric === 'vocab') {
+      return Store.get(`vocab_count_${dateStr}_${role}`, 0);
+    }
+    return 0;
+  },
+
+  // 获取本周最大值用于归一化
+  _getMaxValue(metric) {
+    let max = 0;
+    this._weekDays.forEach(day => {
+      ['TAO', 'YAN'].forEach(role => {
+        const v = this._getDayValue(day.dateStr, role, metric);
+        if (v > max) max = v;
+      });
+    });
+    return max || 1;
+  },
+
+  // 格式化显示值
+  _formatValue(val, metric) {
+    if (val === 0) return '';
+    if (metric === 'online') return val + 'm';
+    if (metric === 'exercise') return val + 'm';
+    if (metric === 'vocab') return val;
+    return val;
+  },
+
+  switch(metric) {
+    this._currentMetric = metric;
+    // 更新tab样式
+    document.querySelectorAll('.pivot-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.metric === metric);
+    });
+    this.render();
+  },
+
+  render() {
+    this._weekDays = this._getWeekDays();
+    const chartEl = document.getElementById('pivotChart');
+    if (!chartEl) return;
+
+    const metric = this._currentMetric;
+    const maxVal = this._getMaxValue(metric);
+    const barMaxHeight = 72; // px
+
+    let html = '';
+    this._weekDays.forEach(day => {
+      const taoVal = this._getDayValue(day.dateStr, 'TAO', metric);
+      const yanVal = this._getDayValue(day.dateStr, 'YAN', metric);
+      const taoHeight = taoVal > 0 ? Math.max(3, (taoVal / maxVal) * barMaxHeight) : 0;
+      const yanHeight = yanVal > 0 ? Math.max(3, (yanVal / maxVal) * barMaxHeight) : 0;
+
+      html += `<div class="pivot-day">
+        <div class="pivot-bars">
+          <div class="pivot-bar ${taoVal > 0 ? 'tao' : 'empty'}" style="height:${taoHeight}px">
+            ${taoVal > 0 ? `<span class="pivot-bar-val">${this._formatValue(taoVal, metric)}</span>` : ''}
+          </div>
+          <div class="pivot-bar ${yanVal > 0 ? 'yan' : 'empty'}" style="height:${yanHeight}px">
+            ${yanVal > 0 ? `<span class="pivot-bar-val">${this._formatValue(yanVal, metric)}</span>` : ''}
+          </div>
+        </div>
+        <span class="pivot-day-label ${day.isToday ? 'today' : ''}">${day.label}</span>
+      </div>`;
+    });
+    chartEl.innerHTML = html;
   }
 };
 
