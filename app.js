@@ -416,6 +416,10 @@ const Cloud = {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
         }
+        // 尝试拉取云端音乐（静默，有新音乐才更新）
+        if (typeof MusicPlayer !== 'undefined' && MusicPlayer._tryPullCloudMusic) {
+          MusicPlayer._tryPullCloudMusic();
+        }
       }
     }, 30000); // 30 秒
   },
@@ -718,12 +722,15 @@ const Cloud = {
     try {
       // 先上传文件
       await this.uploadFile(blob, 'music/file');
+      const uploadedAt = Date.now();
       // 再存储音乐信息
       await fetch(this._url('music_info'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, size: blob.size, type: blob.type, uploadedAt: Date.now() })
+        body: JSON.stringify({ name, size: blob.size, type: blob.type, uploadedAt })
       });
+      // 标记本地已拥有此音乐，避免重复下载
+      Store.set('cloudMusicAt', uploadedAt);
     } catch (e) { /* ignore */ }
   },
 
@@ -1021,6 +1028,15 @@ const App = {
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && Cloud.isPaired() && !App.isHistory) {
         Cloud.syncAll();
+        Cloud.syncPhotos();
+        Cloud.syncVoices();
+        if (typeof CloudSync !== 'undefined') {
+          CloudSync.syncOnlineDuration();
+          CloudSync.syncLetters();
+        }
+        if (typeof MusicPlayer !== 'undefined' && MusicPlayer._tryPullCloudMusic) {
+          MusicPlayer._tryPullCloudMusic();
+        }
       }
     });
 
@@ -1101,6 +1117,10 @@ const App = {
         CloudSync.syncOnlineDuration();
         CloudSync.syncLetters();
       }
+      // 尝试拉取云端音乐
+      if (typeof MusicPlayer !== 'undefined' && MusicPlayer._tryPullCloudMusic) {
+        MusicPlayer._tryPullCloudMusic();
+      }
       showToast('已配对成功，开始你们的日记吧 💕');
     });
   },
@@ -1161,10 +1181,16 @@ const App = {
       Cloud.heartbeat();
       Cloud.syncAll().then(() => {
         Cloud.startPolling();
-        // 同步在线时长和信件
+        // 即时同步照片、语音、信件、在线时长
+        Cloud.syncPhotos();
+        Cloud.syncVoices();
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
+        }
+        // 尝试拉取云端音乐
+        if (typeof MusicPlayer !== 'undefined' && MusicPlayer._tryPullCloudMusic) {
+          MusicPlayer._tryPullCloudMusic();
         }
       });
     }
@@ -3184,7 +3210,7 @@ const VoiceRecord = {
       blob,
       timestamp: Date.now(),
       duration: this.seconds,
-      read: false
+      readBy: {} // 各角色独立记录已读状态
     };
     this.voices.push(record);
     await this.saveAll();
