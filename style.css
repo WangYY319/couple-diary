@@ -4712,6 +4712,55 @@ html, body {
   font-weight: 500;
 }
 
+/* === 晚安卡片暗灰模式（双方都打卡后） === */
+#card-night.night-complete {
+  background: linear-gradient(135deg, #2c2c3a, #1e1e2a);
+  border-color: #3a3a4a;
+  transition: background 0.6s ease, border-color 0.6s ease;
+}
+
+#card-night.night-complete .card-title {
+  color: #b0b0c0;
+}
+
+#card-night.night-complete .card-title .icon {
+  filter: brightness(0.8) saturate(0.5);
+}
+
+#card-night.night-complete .goodnight-area {
+  background: rgba(255,255,255,0.03);
+}
+
+#card-night.night-complete .gn-pair-item {
+  opacity: 0.6;
+}
+
+#card-night.night-complete .gn-pair-item.checked {
+  color: #7a8aaf;
+  text-shadow: 0 0 8px rgba(122,138,175,0.3);
+}
+
+#card-night.night-complete .gn-pair-item.tao-gn.checked {
+  color: #5a8acc;
+}
+
+#card-night.night-complete .gn-pair-item.yan-gn.checked {
+  color: #c46a8a;
+}
+
+#card-night.night-complete .gn-pair-divider {
+  color: #6a6a7a;
+}
+
+#card-night.night-complete .night-reveal-text {
+  color: #c8c8d8;
+  text-shadow: 0 0 12px rgba(200,200,216,0.2);
+}
+
+#card-night.night-complete .goodnight-text-display {
+  color: #888;
+}
+
 /* ============================
    热点新闻
    ============================ */

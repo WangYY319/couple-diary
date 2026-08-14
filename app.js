@@ -1982,15 +1982,18 @@ const Cards = {
       display.classList.remove('done');
     }
 
-    // 双方都打卡后，浮现文字
+    // 双方都打卡后，浮现文字 + 卡片切换暗灰模式
+    const nightCard = document.getElementById('card-night');
     if (reveal) {
       if (bothDone) {
         reveal.innerHTML = `<div class="night-reveal-text">✨ 今夜我们互道晚安，好梦相伴 💕</div>`;
         reveal.style.display = 'block';
         reveal.classList.add('reveal-show');
+        if (nightCard) nightCard.classList.add('night-complete');
       } else {
         reveal.style.display = 'none';
         reveal.classList.remove('reveal-show');
+        if (nightCard) nightCard.classList.remove('night-complete');
       }
     }
   },
