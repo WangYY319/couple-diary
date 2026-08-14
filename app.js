@@ -3216,7 +3216,7 @@ const DetailMenu = {
       { icon: '📚', name: '英语刷词', selector: '.vocab-card, .card:nth-child(2)' },
       { icon: '💪', name: '运动健身', selector: '.exercise-card, .card:nth-child(3)' },
       { icon: '📰', name: '热点新闻', selector: '.hotnews-card, .card:nth-child(4)' },
-      { icon: '🔬', name: '数理化公式', selector: '.formula-card, .card:nth-child(5)' },
+      { icon: '🔬', name: '数理化', selector: '.formula-card, .card:nth-child(5)' },
       { icon: '📜', name: '唐宋诗词', selector: '.poem-card, .card:nth-child(6)' },
       { icon: '🏛️', name: '历史文化', selector: '.history-card, .card:nth-child(7)' },
       { icon: '🗺️', name: '中国地理', selector: '.geo-card, .card:nth-child(8)' },
@@ -5897,16 +5897,93 @@ const FormulaCard = {
 
   _currentCat: null,
   _daySeed: null,
+  _currentType: 'formula',
+  _knowledgeOffset: 0,
 
-  // 每日自动显示一条：数学/物理/化学各一条
+  // 数理化常识数据：数学/物理/化学各一组
+  KNOWLEDGE: [
+    // ========== 数学常识 ==========
+    { category: '数学', title: '黄金分割比', text: '黄金分割比 φ ≈ 0.618，是将一线段分为两部分使较短与较长之比等于较长与全线段之比。在建筑、绘画、自然界中广泛出现，被认为是最美的比例。' },
+    { category: '数学', title: '圆周率 π', text: 'π 是圆周长与直径的比值，是无理数也是超越数，约等于 3.14159。中国古代祖冲之将 π 精确到 3.1415926，领先世界近千年。' },
+    { category: '数学', title: '自然常数 e', text: 'e ≈ 2.71828，是自然对数的底数，在复利计算、人口增长、放射性衰变等自然现象中频繁出现，是最重要的数学常数之一。' },
+    { category: '数学', title: '零的发明', text: '零的概念最早由古印度数学家发明，约公元5世纪。零的引入使位值制记数法成为可能，是数学史上最伟大的发明之一。' },
+    { category: '数学', title: '费马大定理', text: '当 n>2 时，方程 xⁿ+yⁿ=zⁿ 没有正整数解。费马在1637年提出，直到1994年才被怀尔斯证明，历时357年。' },
+    { category: '数学', title: '哥德巴赫猜想', text: '任一大于2的偶数都可表示为两个素数之和。1742年提出至今未被完全证明，是数论中最著名的未解难题之一。' },
+    { category: '数学', title: '欧拉公式', text: 'e^(iπ)+1=0，将数学中最重要的五个常数 e、i、π、1、0 用一个等式联系起来，被誉为"最美数学公式"。' },
+    { category: '数学', title: '勾股数', text: '满足 a²+b²=c² 的正整数组如 (3,4,5)、(5,12,13)。古巴比伦人在近4000年前就已掌握勾股数的使用。' },
+    { category: '数学', title: '无穷大的层级', text: '康托尔证明了无穷大也有大小之分：自然数的无穷和实数的无穷不是同一级别，实数比自然数"更多"。' },
+    { category: '数学', title: '概率论的起源', text: '概率论起源于17世纪帕斯卡和费马关于骰子赌博问题的通信，现已发展为广泛应用于科学、工程、金融的重要数学分支。' },
+
+    // ========== 物理常识 ==========
+    { category: '物理', title: '光速是宇宙速度上限', text: '真空中光速 c ≈ 3×10⁸ m/s 是宇宙中信息传递的最高速度。根据爱因斯坦狭义相对论，任何有质量的物体都无法达到光速。' },
+    { category: '物理', title: '绝对零度', text: '绝对零度 -273.15°C（0K）是温度的理论下限，此时分子热运动停止。虽然可以无限接近，但热力学第三定律表明绝对零度不可达到。' },
+    { category: '物理', title: '水的反常膨胀', text: '水在4°C时密度最大，低于4°C时体积反而膨胀。这一反常性质使冰浮在水面上，保护了水下的生命，对地球生态至关重要。' },
+    { category: '物理', title: '布朗运动', text: '1827年布朗在显微镜下观察到花粉颗粒在水中做无规则运动。爱因斯坦在1905年对此作出理论解释，证实了分子的存在。' },
+    { category: '物理', title: '多普勒效应', text: '当波源与观察者相对运动时，观察到的频率会发生变化。接近时频率升高（如救护车靠近时声音变尖），远离时频率降低。' },
+    { category: '物理', title: '虹的形成', text: '雨后阳光经水滴折射和反射形成彩虹。红光偏折角度约42°，紫光约40°，因此彩虹外圈为红色、内圈为紫色。' },
+    { category: '物理', title: '超导现象', text: '某些材料在温度降到临界温度以下时电阻突然变为零，称为超导。1911年由昂内斯发现汞的超导电性，现已发现多种超导材料。' },
+    { category: '物理', title: '黑洞', text: '黑洞是引力极强的天体，连光都无法逃逸。其边界称为事件视界。2019年人类首次拍摄到黑洞照片，验证了爱因斯坦广义相对论。' },
+    { category: '物理', title: '宇宙微波背景辐射', text: '宇宙大爆炸残留的辐射，温度约2.7K，1964年被偶然发现，是支持大爆炸理论的最有力证据之一。' },
+    { category: '物理', title: '量子纠缠', text: '两个粒子一旦产生纠缠，无论相距多远，对其中一个的测量会瞬间影响另一个的状态。爱因斯坦称之为"鬼魅般的超距作用"。' },
+
+    // ========== 化学常识 ==========
+    { category: '化学', title: '元素周期表', text: '1869年门捷列夫发表元素周期表，按原子序数排列元素并揭示周期性规律。他甚至预言了当时尚未发现的元素（如镓、锗）的性质。' },
+    { category: '化学', title: '水的化学式', text: 'H₂O 由两个氢原子和一个氧原子组成，呈V形分子结构。水是地球上最特殊的溶剂，被称为"万能溶剂"，是生命存在的基础。' },
+    { category: '化学', title: '酸碱指示剂', text: '石蕊遇酸变红、遇碱变蓝；酚酞在酸性中无色、碱性中变红。这些指示剂常用于快速判断溶液的酸碱性。' },
+    { category: '化学', title: '稀有气体', text: '氦、氖、氩、氪、氙、氡等元素化学性质极不活泼，曾被称为"惰性气体"。霓虹灯中充入氖气发出红光，氦气用于气球填充。' },
+    { category: '化学', title: '碳的同素异形体', text: '碳元素可形成金刚石（硬度最大）、石墨（润滑导电）、石墨烯（单层碳原子，强度极高）和富勒烯等多种形态，性质差异巨大。' },
+    { category: '化学', title: '焰色反应', text: '不同金属离子在火焰中呈现不同颜色：钠呈黄色、钾呈紫色、铜呈绿色、钙呈橙红色。这一特性常用于鉴定金属离子。' },
+    { category: '化学', title: '臭氧层的作用', text: '距地面20-30km的臭氧层能吸收大部分紫外线，保护地球生物。氟利昂等物质会破坏臭氧层，导致"臭氧空洞"。' },
+    { category: '化学', title: '合金的奥秘', text: '合金是将两种或多种金属（或金属与非金属）熔合而成，如黄铜（铜锌合金）、不锈钢（铁铬合金）。合金通常比纯金属硬度更大、熔点更低。' },
+    { category: '化学', title: '催化剂', text: '催化剂能改变反应速率但本身不被消耗。如二氧化锰催化双氧水分解、铁催化合成氨。人体内的酶也是生物催化剂。' },
+    { category: '化学', title: 'pH 试纸', text: 'pH 试纸浸有混合指示剂，在不同 pH 下显示不同颜色。pH 1-3 呈红色（强酸），pH 7 呈黄绿色（中性），pH 11-14 呈深紫（强碱）。' }
+  ],
+
+  // 每日自动显示：公式和常识都按日期种子选取
   init() {
+    this._currentType = 'formula';
+    this._updateTabUI();
+    this._renderFormula();
+  },
+
+  // 切换公式/常识类型
+  switchType(type) {
+    this._currentType = type;
+    this._updateTabUI();
+    if (type === 'formula') {
+      this._renderFormula();
+    } else {
+      this._renderKnowledge();
+    }
+  },
+
+  // 更新标签激活状态
+  _updateTabUI() {
+    document.querySelectorAll('.formula-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.type === this._currentType);
+    });
+    const row = document.getElementById('formulaCategoryRow');
+    const detail = document.getElementById('formulaDetail');
+    const knowledge = document.getElementById('formulaKnowledge');
+    if (this._currentType === 'formula') {
+      if (row) row.style.display = '';
+      if (detail) detail.style.display = 'none';
+      if (knowledge) knowledge.style.display = 'none';
+    } else {
+      if (row) row.style.display = 'none';
+      if (detail) detail.style.display = 'none';
+      if (knowledge) knowledge.style.display = '';
+    }
+  },
+
+  // 渲染公式列表（数学/物理/化学各一条）
+  _renderFormula() {
     const detail = document.getElementById('formulaDetail');
     if (detail) detail.style.display = 'none';
     const row = document.getElementById('formulaCategoryRow');
     if (!row) return;
     row.style.display = '';
     const cats = ['数学', '物理', '化学'];
-    // 按日期种子选取每天不同的公式
     const seed = this._getDaySeed();
     let html = '';
     cats.forEach(cat => {
@@ -5924,6 +6001,40 @@ const FormulaCard = {
     row.innerHTML = html;
   },
 
+  // 渲染常识（数学/物理/化学各一条，每日更新）
+  _renderKnowledge() {
+    const container = document.getElementById('formulaKnowledgeContent');
+    if (!container) return;
+    const cats = ['数学', '物理', '化学'];
+    const seed = this._getDaySeed();
+    let html = '';
+    cats.forEach(cat => {
+      const list = this.KNOWLEDGE.filter(k => k.category === cat);
+      const idx = (seed + this._knowledgeOffset) % list.length;
+      const k = list[idx];
+      html += `<div class="formula-knowledge-item">
+        <div class="formula-knowledge-cat">${k.category}</div>
+        <div class="formula-knowledge-title">${k.title}</div>
+        <div class="formula-knowledge-text">${k.text}</div>
+      </div>`;
+    });
+    container.innerHTML = html;
+  },
+
+  // 刷新：根据当前类型刷新内容
+  refresh() {
+    if (this._currentType === 'formula') {
+      // 公式刷新：改变日期种子偏移
+      this._renderFormula();
+      showToast('已刷新公式 🔬');
+    } else {
+      // 常识刷新：偏移+1，换一批
+      this._knowledgeOffset++;
+      this._renderKnowledge();
+      showToast('已刷新常识 📖');
+    }
+  },
+
   _getDaySeed() {
     const d = new Date();
     return d.getFullYear() * 1000 + (d.getMonth() + 1) * 40 + d.getDate();
@@ -5931,7 +6042,7 @@ const FormulaCard = {
 
   // 兼容旧方法
   showCategory(cat) {
-    this.init();
+    this._renderFormula();
   },
 
   // 显示某条公式的详情（解析）
@@ -5957,7 +6068,7 @@ const FormulaCard = {
   backToList() {
     const detail = document.getElementById('formulaDetail');
     if (detail) detail.style.display = 'none';
-    this.init();
+    this._renderFormula();
   }
 };
 

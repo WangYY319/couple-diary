@@ -4672,6 +4672,100 @@ html, body {
   font-size: 13px;
 }
 
+/* 数理化：公式/常识切换标签 */
+.formula-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.formula-tab {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+  font-weight: 500;
+}
+
+.formula-tab.active {
+  color: var(--theme-primary);
+  font-weight: 700;
+}
+
+.formula-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: var(--theme-primary);
+  border-radius: 2px;
+}
+
+/* 常识内容区 */
+.formula-knowledge {
+  padding: 4px 0;
+}
+
+.formula-knowledge-item {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: var(--theme-light);
+  transition: all 0.2s;
+}
+
+.formula-knowledge-cat {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--theme-primary);
+  margin-bottom: 4px;
+}
+
+.formula-knowledge-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.formula-knowledge-text {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-main);
+}
+
+/* 刷新按钮 */
+.formula-refresh-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--theme-light);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.formula-refresh-btn:hover {
+  background: var(--theme-primary);
+  color: #fff;
+  transform: rotate(180deg);
+}
+
 /* ============================
    番茄管理
    ============================ */
@@ -4880,6 +4974,11 @@ html, body {
 }
 
 .poem-card { position: relative; padding-bottom: 40px; min-height: auto; }
+
+/* 诗词卡片标题居中，与左侧板块标题区分 */
+.poem-card .card-title {
+  justify-content: center;
+}
 
 /* 已阅标记（通用） */
 .read-badge,
