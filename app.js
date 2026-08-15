@@ -1097,7 +1097,7 @@ const CloudSync = {
     await this.set('pomodoro_count', localData);
   },
 
-  // 同步地标打卡数据：合并双方打卡状态
+  // 同步地标打卡数据：基于时间戳的合并（解决取消打卡被覆盖的问题）
   _landmarkSyncing: false,
   async syncLandmarks() {
     if (!Cloud.pairCode) return;
@@ -1117,20 +1117,34 @@ const CloudSync = {
         return;
       }
 
-      let changed = false;
-      // 合并：对每个地标，取双方的 OR 值（任一方打卡即为打卡）
+      // 基于时间戳的合并：每个角色的状态取时间戳最新的值
       const allKeys = new Set([...Object.keys(localData), ...Object.keys(remoteData)]);
+      let changed = false;
       allKeys.forEach(key => {
         if (!localData[key] || typeof localData[key] !== 'object') {
-          localData[key] = { tao: false, yan: false };
+          localData[key] = { tao: false, yan: false, tao_ts: 0, yan_ts: 0 };
           changed = true;
         }
+        // 确保本地有时间戳字段
+        if (localData[key].tao_ts === undefined) localData[key].tao_ts = 0;
+        if (localData[key].yan_ts === undefined) localData[key].yan_ts = 0;
+
         if (remoteData[key] && typeof remoteData[key] === 'object') {
-          for (const role of ['tao', 'yan']) {
-            if (remoteData[key][role] === true && !localData[key][role]) {
-              localData[key][role] = true;
-              changed = true;
-            }
+          // 确保远端有时间戳字段
+          const remoteTsTao = remoteData[key].tao_ts || 0;
+          const remoteTsYan = remoteData[key].yan_ts || 0;
+
+          // TAO: 取时间戳最新的值
+          if (remoteTsTao > localData[key].tao_ts) {
+            localData[key].tao = !!remoteData[key].tao;
+            localData[key].tao_ts = remoteTsTao;
+            changed = true;
+          }
+          // YAN: 取时间戳最新的值
+          if (remoteTsYan > localData[key].yan_ts) {
+            localData[key].yan = !!remoteData[key].yan;
+            localData[key].yan_ts = remoteTsYan;
+            changed = true;
           }
         }
       });
@@ -1345,6 +1359,7 @@ const App = {
         CloudSync.syncExerciseTime();
         CloudSync.syncBgOpacity();
         CloudSync.syncPomodoro();
+        CloudSync.syncLandmarks();
         ReadMark.syncAll();
         RoleName.syncFromCloud();
       }
@@ -1430,6 +1445,11 @@ const App = {
     Background.load();
     RoleName.init();
 
+    // 恢复已保存的字体设置
+    if (typeof Setting !== 'undefined') {
+      Setting.restoreFont();
+    }
+
     // 进入时同步（仅当本地有数据时才拉取云端，避免拉回已清除的旧数据）
     if (Cloud.isPaired()) {
       Cloud.heartbeat();
@@ -1445,6 +1465,7 @@ const App = {
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
+          CloudSync.syncLandmarks();
           ReadMark.syncAll();
           RoleName.syncFromCloud();
         }
@@ -1858,6 +1879,23 @@ const Calendar = {
       cardHtml += `<div class="dc-row"><span class="dc-label">🌙 晚安打卡</span><div class="dc-badges">${nightItems.join('')}</div></div>`;
     }
 
+    // 在线时长（无论是否有打卡记录都显示）
+    const onlineData = Store.get('online_duration', {});
+    const dayOnline = onlineData[dateStr] || { tao: 0, yan: 0 };
+    const formatDuration = (seconds) => {
+      const mins = Math.floor(seconds / 60);
+      const hours = Math.floor(mins / 60);
+      if (hours > 0) return `${hours}h${mins % 60}m`;
+      if (mins > 0) return `${mins}m`;
+      return '0m';
+    };
+    const taoName = (typeof RoleName !== 'undefined' ? RoleName.get().TAO : 'TAO');
+    const yanName = (typeof RoleName !== 'undefined' ? RoleName.get().YAN : 'YAN');
+    cardHtml += `<div class="dc-row"><span class="dc-label">⏱️ 在线时长</span><div class="dc-online-times">
+      <span class="dc-online-tao">${taoName}: ${formatDuration(dayOnline.tao)}</span>
+      <span class="dc-online-yan">${yanName}: ${formatDuration(dayOnline.yan)}</span>
+    </div></div>`;
+
     cardHtml += '</div></div>';
     overlay.innerHTML = cardHtml;
     document.body.appendChild(overlay);
@@ -2206,16 +2244,20 @@ const Cards = {
 
   clickStates: {},
 
-  handleClick(cardType) {
+  handleClick(cardType, event) {
     if (App.isHistory) return;
     const data = this.getDayData();
     const role = App.currentRole.toLowerCase();
+
+    // 获取点击坐标
+    const clickX = event ? (event.clientX || (event.touches && event.touches[0] ? event.touches[0].clientX : 0)) : 0;
+    const clickY = event ? (event.clientY || (event.touches && event.touches[0] ? event.touches[0].clientY : 0)) : 0;
 
     // 发射爱心：已打卡后不可取消，双方都完成后直接返回
     if (cardType === 'greet') {
       if (data.greet[role]) {
         // 已打卡，触发小心心冒出效果但不取消
-        this.spawnHearts();
+        this.spawnHearts(clickX, clickY);
         return;
       }
       if (data.greet.tao && data.greet.yan) return;
@@ -2229,7 +2271,7 @@ const Cards = {
 
     if (now - lastClick < 350) {
       this.doCheckin(cardType, role);
-      this.spawnHearts();
+      this.spawnHearts(clickX, clickY);
       this.clickStates[key] = 0;
     } else {
       const cardEl = document.getElementById('card-' + cardType);
@@ -2292,29 +2334,43 @@ const Cards = {
   },
 
   // 小心心冒出动画
-  spawnHearts() {
-    const cardEl = document.getElementById('card-greet');
-    if (!cardEl) return;
-    const rect = cardEl.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height * 0.4;
+  spawnHearts(x, y) {
+    // 浅色系爱心颜色（柔和氛围感）
+    const lightColors = [
+      'rgba(255,182,193,0.7)',  // 浅粉
+      'rgba(255,218,185,0.7)',  // 浅桃
+      'rgba(221,160,221,0.7)',  // 浅紫
+      'rgba(176,224,230,0.7)',  // 浅蓝
+      'rgba(152,251,152,0.7)',  // 浅绿
+      'rgba(255,240,180,0.7)',  // 浅黄
+      'rgba(255,200,220,0.7)',  // 浅玫
+      'rgba(200,220,255,0.7)',  // 浅天蓝
+    ];
 
-    const colors = ['#e8296a', '#1b7fe3', '#ff6b9d', '#5bc0eb', '#f06292', '#4fc3f7'];
-    for (let i = 0; i < 8; i++) {
-      const heart = document.createElement('div');
-      heart.className = 'floating-heart';
-      heart.textContent = '❤';
-      heart.style.left = (cx + (Math.random() - 0.5) * 60) + 'px';
-      heart.style.top = cy + 'px';
-      heart.style.color = colors[i % colors.length];
-      heart.style.fontSize = (14 + Math.random() * 14) + 'px';
-      heart.style.setProperty('--dx', ((Math.random() - 0.5) * 120) + 'px');
-      heart.style.setProperty('--dy', (-80 - Math.random() * 60) + 'px');
-      heart.style.setProperty('--rot', ((Math.random() - 0.5) * 60) + 'deg');
-      heart.style.animationDelay = (i * 60) + 'ms';
-      document.body.appendChild(heart);
-      setTimeout(() => heart.remove(), 1800);
-    }
+    // 每次双击只产生一个爱心
+    const heart = document.createElement('div');
+    heart.className = 'floating-heart';
+    heart.textContent = '❤';
+
+    // 使用点击位置，加微小随机偏移
+    const offsetX = (Math.random() - 0.5) * 20;
+    heart.style.left = (x + offsetX) + 'px';
+    heart.style.top = y + 'px';
+
+    // 随机浅色
+    heart.style.color = lightColors[Math.floor(Math.random() * lightColors.length)];
+
+    // 随机大小（20px ~ 48px）
+    const size = 20 + Math.random() * 28;
+    heart.style.fontSize = size + 'px';
+
+    // 向上飘的位移
+    heart.style.setProperty('--dx', ((Math.random() - 0.5) * 60) + 'px');
+    heart.style.setProperty('--dy', (-100 - Math.random() * 80) + 'px');
+    heart.style.setProperty('--rot', ((Math.random() - 0.5) * 30) + 'deg');
+
+    document.body.appendChild(heart);
+    setTimeout(() => heart.remove(), 2200);
   },
 
   bindEditBoxes() {
@@ -3206,7 +3262,53 @@ const Setting = {
       this.restoreBgOpacity();
       // 渲染主题调色盘
       this.renderThemePalette();
+      // 渲染字体选择
+      this.renderFontSelector();
     });
+  },
+
+  // 字体定义
+  FONT_PRESETS: {
+    default: { name: '默认', family: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif' },
+    kai:     { name: '楷体', family: '"KaiTi", "STKaiti", "楷体", "DFKai-SB", "BiauKai", cursive, serif' },
+    song:    { name: '宋体', family: '"SimSun", "Songti SC", "宋体", "Noto Serif SC", Georgia, serif' },
+    mono:    { name: '等宽', family: '"Courier New", Courier, "DejaVu Sans Mono", monospace' },
+    round:   { name: '圆体', family: '"Varela Round", "Quicksand", "Comic Sans MS", "PingFang SC", "Microsoft YaHei", sans-serif' }
+  },
+
+  // 渲染字体选择器，高亮当前选中
+  renderFontSelector() {
+    const current = Store.get('app_font', 'default');
+    document.querySelectorAll('.font-option').forEach(btn => {
+      const fontKey = btn.dataset.font;
+      btn.classList.toggle('active', fontKey === current);
+      // 用对应字体显示按钮文字，体现差异
+      const preset = this.FONT_PRESETS[fontKey];
+      if (preset) btn.style.fontFamily = preset.family;
+    });
+  },
+
+  // 切换字体
+  changeFont(fontKey) {
+    if (!this.FONT_PRESETS[fontKey]) return;
+    Store.set('app_font', fontKey);
+    this.applyFont(fontKey);
+    this.renderFontSelector();
+    showToast(`字体已切换为「${this.FONT_PRESETS[fontKey].name}」`);
+  },
+
+  // 应用字体到全局
+  applyFont(fontKey) {
+    const preset = this.FONT_PRESETS[fontKey] || this.FONT_PRESETS.default;
+    document.body.style.fontFamily = preset.family;
+    // 同时设置 :root 以覆盖所有元素
+    document.documentElement.style.setProperty('--app-font-family', preset.family);
+  },
+
+  // 恢复已保存的字体（应用启动时调用）
+  restoreFont() {
+    const saved = Store.get('app_font', 'default');
+    this.applyFont(saved);
   },
 
   // 渲染配对信息 + 双方在线/离线状态
@@ -3906,6 +4008,75 @@ const OnlineDuration = {
   _todayStr() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+};
+
+// ====== 亲密主角模块（累积在线时长展示） ======
+const RoleCard = {
+  showTotalOnlineDuration() {
+    // 移除已有弹窗
+    const existing = document.querySelector('.role-duration-popup');
+    if (existing) { existing.remove(); return; }
+
+    // 计算累积在线时长
+    const onlineData = Store.get('online_duration', {});
+    let totalTao = 0, totalYan = 0;
+    Object.values(onlineData).forEach(day => {
+      if (day && typeof day === 'object') {
+        totalTao += day.tao || 0;
+        totalYan += day.yan || 0;
+      }
+    });
+
+    const formatDuration = (seconds) => {
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      if (days > 0) return `${days}d${hours}h${mins}m`;
+      if (hours > 0) return `${hours}h${mins}m`;
+      if (mins > 0) return `${mins}m`;
+      return '0m';
+    };
+
+    const taoName = (typeof RoleName !== 'undefined' ? RoleName.get().TAO : 'TAO');
+    const yanName = (typeof RoleName !== 'undefined' ? RoleName.get().YAN : 'YAN');
+
+    // 创建弹窗
+    const popup = document.createElement('div');
+    popup.className = 'role-duration-popup';
+    popup.innerHTML = `
+      <div class="rdp-card">
+        <div class="rdp-header">
+          <span class="rdp-title">⏱️ 累积在线时长</span>
+          <button class="rdp-close" onclick="this.closest('.role-duration-popup').remove()">✕</button>
+        </div>
+        <div class="rdp-body">
+          <div class="rdp-item tao">
+            <span class="rdp-emoji">🐱</span>
+            <span class="rdp-name">${taoName}</span>
+            <span class="rdp-time">${formatDuration(totalTao)}</span>
+          </div>
+          <div class="rdp-divider"></div>
+          <div class="rdp-item yan">
+            <span class="rdp-emoji">🐶</span>
+            <span class="rdp-name">${yanName}</span>
+            <span class="rdp-time">${formatDuration(totalYan)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // 点击外部关闭
+    popup.onclick = (e) => {
+      if (e.target === popup) popup.remove();
+    };
+
+    document.body.appendChild(popup);
+
+    // 3秒后自动关闭
+    setTimeout(() => {
+      if (popup.parentNode) popup.remove();
+    }, 4000);
   }
 };
 
@@ -9225,15 +9396,20 @@ const LandmarkCheckin = {
   // 双击打卡：切换当前角色的高亮
   _toggleCheckin(key) {
     const role = (typeof App !== 'undefined' && App.currentRole) ? App.currentRole.toLowerCase() : 'tao';
+    const now = Date.now();
     const data = this._getData();
-    if (!data[key]) data[key] = { tao: false, yan: false };
+    if (!data[key]) data[key] = { tao: false, yan: false, tao_ts: 0, yan_ts: 0 };
+    // 确保有时间戳字段
+    if (data[key].tao_ts === undefined) data[key].tao_ts = 0;
+    if (data[key].yan_ts === undefined) data[key].yan_ts = 0;
     data[key][role] = !data[key][role];
+    data[key][role + '_ts'] = now;
     this._saveData(data);
     this.render();
 
-    // 云同步
+    // 云同步（延迟100ms避免并发锁冲突）
     if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
-      CloudSync.syncLandmarks();
+      setTimeout(() => CloudSync.syncLandmarks(), 100);
     }
 
     const provName = key.split('/')[0];
