@@ -174,16 +174,16 @@
 
     <!-- ====== Tab 0: 首页（角色+音乐+文案） ====== -->
     <div class="tab-page active" id="tab-0" data-tab="0">
-      <!-- 角色信息 + 在线状态合并 -->
+      <!-- 亲密主角 + 在线状态合并 -->
       <div class="card role-card">
-        <div class="card-title"><span class="icon">🎭</span> 角色信息</div>
+        <div class="card-title"><span class="icon">🎭</span> 亲密主角</div>
         <div class="role-pair-row">
           <div class="role-pair-item tao" id="pillTAO">
             <div class="role-avatar-wrap" id="avatarWrapTAO" onclick="AvatarPicker.open('TAO');">
               <img class="role-avatar-img" id="avatarImgTAO" style="display:none" />
               <span class="role-avatar-placeholder" id="avatarPlaceholderTAO">🐱</span>
             </div>
-            <span class="role-pair-name">TAO</span>
+            <span class="role-pair-name" id="roleNameTAO" ondblclick="RoleName.startEdit('TAO')">TAO</span>
             <span class="role-pair-dot off" id="homeDotTAO"></span>
           </div>
           <span class="role-pair-connector">❤</span>
@@ -192,7 +192,7 @@
               <img class="role-avatar-img" id="avatarImgYAN" style="display:none" />
               <span class="role-avatar-placeholder" id="avatarPlaceholderYAN">🐶</span>
             </div>
-            <span class="role-pair-name">YAN</span>
+            <span class="role-pair-name" id="roleNameYAN" ondblclick="RoleName.startEdit('YAN')">YAN</span>
             <span class="role-pair-dot off" id="homeDotYAN"></span>
           </div>
         </div>
@@ -730,8 +730,8 @@
       <div class="setting-label">配对信息</div>
       <div class="setting-desc" id="settingPairInfo">未配对</div>
       <div class="setting-status-list" id="settingStatusList">
-        <div class="status-item" data-role="TAO"><span class="status-emoji">🐱</span><span class="status-name">TAO</span><span class="status-dot off"></span><span class="status-text">离线</span></div>
-        <div class="status-item" data-role="YAN"><span class="status-emoji">🐶</span><span class="status-name">YAN</span><span class="status-dot off"></span><span class="status-text">离线</span></div>
+        <div class="status-item" data-role="TAO"><span class="status-emoji">🐱</span><span class="status-name" id="settingStatusNameTAO">TAO</span><span class="status-dot off"></span><span class="status-text">离线</span></div>
+        <div class="status-item" data-role="YAN"><span class="status-emoji">🐶</span><span class="status-name" id="settingStatusNameYAN">YAN</span><span class="status-dot off"></span><span class="status-text">离线</span></div>
       </div>
       <button class="setting-btn" onclick="Setting.switchLogin()">🔄 切换配对码登录</button>
       <button class="setting-btn" onclick="Setting.logout()">🚪 退出登录</button>
@@ -850,6 +850,33 @@
     </div>
   </div>
 </div>
+
+<!-- 未知配对码确认弹窗 -->
+<div class="pair-confirm-overlay" id="pairConfirmOverlay" style="display:none">
+  <div class="pair-confirm-modal">
+    <div class="pair-confirm-title" id="pairConfirmTitle">未识别的配对码</div>
+    <div class="pair-confirm-desc" id="pairConfirmDesc">该配对码未曾使用过，请确认：</div>
+    <div class="pair-confirm-btns">
+      <button class="pair-confirm-btn recheck" onclick="Pair.confirmUnknown(false)">重新检查配对码</button>
+      <button class="pair-confirm-btn create" onclick="Pair.confirmUnknown(true)">确认建立新配对</button>
+    </div>
+  </div>
+</div>
+
+<!-- 角色名称编辑弹窗 -->
+<div class="rolename-overlay" id="rolenameOverlay" style="display:none">
+  <div class="rolename-modal">
+    <div class="rolename-title" id="rolenameTitle">编辑名称</div>
+    <div class="rolename-desc">最多5个字母或文字，每天仅可修改一次</div>
+    <input type="text" class="rolename-input" id="rolenameInput" maxlength="5" autocomplete="off">
+    <div class="rolename-hint" id="rolenameHint"></div>
+    <div class="rolename-btns">
+      <button class="rolename-btn cancel" onclick="RoleName.cancelEdit()">取消</button>
+      <button class="rolename-btn confirm" onclick="RoleName.saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
 <script src="vocab-data.js"></script>
 <script src="app.js"></script>
 </body>

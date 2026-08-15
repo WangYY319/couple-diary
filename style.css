@@ -1998,6 +1998,185 @@ html, body {
   line-height: 1.4;
 }
 
+/* 配对码复制按钮 */
+.pair-copy-btn {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-left: 6px;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.7);
+  font-size: 11px;
+  color: #666;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: all 0.2s;
+}
+.pair-copy-btn:active {
+  background: rgba(0,0,0,0.06);
+  transform: scale(0.95);
+}
+
+/* 未知配对码确认弹窗 */
+.pair-confirm-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.pair-confirm-modal {
+  width: 82%;
+  max-width: 320px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px 18px;
+  text-align: center;
+  animation: scaleIn 0.25s ease;
+}
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.pair-confirm-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 8px;
+}
+.pair-confirm-desc {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.pair-confirm-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pair-confirm-btn {
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pair-confirm-btn.recheck {
+  background: #f0f0f0;
+  color: #333;
+}
+.pair-confirm-btn.recheck:active {
+  background: #e5e5e5;
+}
+.pair-confirm-btn.create {
+  background: var(--theme-primary);
+  color: #fff;
+}
+.pair-confirm-btn.create:active {
+  opacity: 0.85;
+}
+
+/* 角色名称编辑弹窗 */
+.rolename-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.rolename-modal {
+  width: 82%;
+  max-width: 300px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px 18px;
+  text-align: center;
+  animation: scaleIn 0.25s ease;
+}
+.rolename-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 6px;
+}
+.rolename-desc {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 14px;
+}
+.rolename-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid rgba(0,0,0,0.08);
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 1px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.rolename-input:focus {
+  border-color: var(--theme-primary);
+}
+.rolename-hint {
+  font-size: 11px;
+  color: #999;
+  margin-top: 6px;
+  min-height: 14px;
+}
+.rolename-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.rolename-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.rolename-btn.cancel {
+  background: #f0f0f0;
+  color: #333;
+}
+.rolename-btn.cancel:active {
+  background: #e5e5e5;
+}
+.rolename-btn.confirm {
+  background: var(--theme-primary);
+  color: #fff;
+}
+.rolename-btn.confirm:active {
+  opacity: 0.85;
+}
+
+/* 角色名称可编辑提示 */
+.role-pair-name {
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.role-pair-name:active {
+  opacity: 0.6;
+}
+
 .pair-action-btn {
   display: block;
   width: 100%;
@@ -2858,7 +3037,6 @@ html, body {
 }
 
 .role-pair-emoji { font-size: 18px; }
-.role-pair-name { letter-spacing: 0.5px; }
 
 /* 圆形头像 */
 .role-avatar-wrap {

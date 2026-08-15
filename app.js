@@ -443,6 +443,7 @@ const Cloud = {
           CloudSync.syncPomodoro();
           CloudSync.syncLandmarks();
           ReadMark.syncAll();
+          RoleName.syncFromCloud();
         }
         // 刷新IP地址（拉取对方最新IP）
         if (typeof IPAddress !== 'undefined') {
@@ -1210,6 +1211,7 @@ const App = {
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
           ReadMark.syncAll();
+          RoleName.syncFromCloud();
         }
       }
     });
@@ -1326,6 +1328,7 @@ const App = {
         CloudSync.syncBgOpacity();
         CloudSync.syncPomodoro();
         ReadMark.syncAll();
+        RoleName.syncFromCloud();
       }
       // IP地址显示已移除
       showToast('已配对成功，开始你们的日记吧 💕');
@@ -1407,6 +1410,7 @@ const App = {
     Cards.renderAll();
     Cards.updateRolePermissions();
     Background.load();
+    RoleName.init();
 
     // 进入时同步（仅当本地有数据时才拉取云端，避免拉回已清除的旧数据）
     if (Cloud.isPaired()) {
@@ -1424,6 +1428,7 @@ const App = {
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
           ReadMark.syncAll();
+          RoleName.syncFromCloud();
         }
         // IP地址显示已移除
       });
@@ -1605,6 +1610,50 @@ const Pair = {
       showToast('请输入配对码');
       return;
     }
+    // 检查是否为历史配对码
+    const history = Store.getPairHistory();
+    const known = history.some(h => h.code === code);
+    if (!known) {
+      // 未知配对码：弹出确认弹窗
+      this._pendingJoinCode = code;
+      this._pendingJoinRole = role;
+      const overlay = document.getElementById('pairConfirmOverlay');
+      const titleEl = document.getElementById('pairConfirmTitle');
+      const descEl = document.getElementById('pairConfirmDesc');
+      if (titleEl) titleEl.textContent = '未识别的配对码';
+      if (descEl) descEl.innerHTML = `配对码 <b>${code}</b> 未曾使用过，请确认：<br>① 可能为输入有误，请重新检查<br>② 或确认建立新的配对码登录`;
+      if (overlay) overlay.style.display = 'flex';
+      return;
+    }
+    await this._doJoin(code, role);
+  },
+
+  // 确认未知配对码的选择
+  async confirmUnknown(proceed) {
+    const overlay = document.getElementById('pairConfirmOverlay');
+    if (overlay) overlay.style.display = 'none';
+    if (!proceed) {
+      // 用户选择重新检查：清空输入框让用户重新输入
+      const input = document.getElementById('pairCodeInput');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      showToast('请重新输入配对码');
+      return;
+    }
+    // 用户确认建立新配对码登录
+    const code = this._pendingJoinCode;
+    const role = this._pendingJoinRole;
+    this._pendingJoinCode = null;
+    this._pendingJoinRole = null;
+    if (!code || !role) return;
+    showToast('正在建立新配对连接...');
+    await this._doJoin(code, role);
+  },
+
+  // 实际执行加入配对
+  async _doJoin(code, role) {
     const btn = document.getElementById('pairJoinBtn-' + role);
     if (btn) btn.disabled = true;
     showToast('正在验证配对码...');
@@ -3148,7 +3197,9 @@ const Setting = {
     const list = document.getElementById('settingStatusList');
     if (info) {
       if (Cloud.isPaired()) {
-        info.innerHTML = `配对码：<b>${Cloud.pairCode}</b><br>把配对码分享给对方，对方输入后即可同步数据`;
+        info.innerHTML = `配对码：<b>${Cloud.pairCode}</b>` +
+          `<button class="pair-copy-btn" onclick="Setting.copyPairCode()">📋 复制</button>` +
+          `<br><span style="font-size:11px;color:#999">把配对码分享给对方，对方输入后即可同步数据</span>`;
       } else {
         info.innerHTML = '尚未配对';
       }
@@ -3478,6 +3529,40 @@ const Setting = {
     }
     Setting.close();
     App.logout();
+  },
+
+  // 快捷复制配对码
+  copyPairCode() {
+    const code = Cloud.pairCode;
+    if (!code) {
+      showToast('暂无配对码');
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('配对码已复制：' + code);
+      }).catch(() => {
+        this._fallbackCopy(code);
+      });
+    } else {
+      this._fallbackCopy(code);
+    }
+  },
+
+  _fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showToast('配对码已复制：' + text);
+    } catch {
+      showToast('复制失败，请手动长按选择复制');
+    }
+    document.body.removeChild(ta);
   }
 };
 
@@ -3562,7 +3647,7 @@ const DetailMenu = {
   // 各tab的板块配置
   TAB_SECTIONS: {
     0: [
-      { icon: '🎭', name: '角色信息', selector: '.role-card' },
+      { icon: '🎭', name: '亲密主角', selector: '.role-card' },
       { icon: '💌', name: '甜蜜语录', selector: '.sweet-text-card' },
       { icon: '🎵', name: '音乐播放', selector: '.music-card' },
       { icon: '📊', name: '本周数透', selector: '.data-pivot-card' }
@@ -3895,6 +3980,175 @@ const AvatarPicker = {
 
   renderAll() {
     ['TAO', 'YAN'].forEach(role => this._renderRole(role));
+  }
+};
+
+// ====== 角色名称管理模块 ======
+const RoleName = {
+  _editingRole: null,
+
+  // 获取角色显示名称
+  get(role) {
+    const names = Store.get('roleNames', {});
+    return (names[role] && names[role].name) || role;
+  },
+
+  // 获取所有角色名称
+  getAll() {
+    const names = Store.get('roleNames', {});
+    return {
+      TAO: (names.TAO && names.TAO.name) || 'TAO',
+      YAN: (names.YAN && names.YAN.name) || 'YAN'
+    };
+  },
+
+  // 检查今天是否已修改过
+  canEditToday() {
+    const names = Store.get('roleNames', {});
+    if (!names.lastEditDate) return true;
+    const today = new Date().toDateString();
+    return names.lastEditDate !== today;
+  },
+
+  // 开始编辑角色名称
+  startEdit(role) {
+    if (!this.canEditToday()) {
+      showToast('每天仅可修改一次名称，明天再试吧');
+      return;
+    }
+    this._editingRole = role;
+    const overlay = document.getElementById('rolenameOverlay');
+    const titleEl = document.getElementById('rolenameTitle');
+    const input = document.getElementById('rolenameInput');
+    const hint = document.getElementById('rolenameHint');
+    if (titleEl) titleEl.textContent = `编辑 ${this.get(role)} 的名称`;
+    if (input) {
+      input.value = this.get(role);
+      input.setAttribute('maxlength', '5');
+    }
+    if (hint) {
+      hint.textContent = '';
+      hint.style.color = '#999';
+    }
+    if (overlay) overlay.style.display = 'flex';
+    setTimeout(() => { if (input) input.focus(); }, 100);
+  },
+
+  // 取消编辑
+  cancelEdit() {
+    const overlay = document.getElementById('rolenameOverlay');
+    if (overlay) overlay.style.display = 'none';
+    this._editingRole = null;
+  },
+
+  // 保存编辑
+  saveEdit() {
+    if (!this._editingRole) return;
+    const input = document.getElementById('rolenameInput');
+    const hint = document.getElementById('rolenameHint');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) {
+      if (hint) {
+        hint.textContent = '名称不能为空';
+        hint.style.color = '#e8296a';
+      }
+      return;
+    }
+    if (val.length > 5) {
+      if (hint) {
+        hint.textContent = '最多5个字母或文字';
+        hint.style.color = '#e8296a';
+      }
+      return;
+    }
+    // 保存
+    const names = Store.get('roleNames', {});
+    if (!names[this._editingRole]) names[this._editingRole] = {};
+    names[this._editingRole].name = val;
+    names[this._editingRole].updatedAt = Date.now();
+    names.lastEditDate = new Date().toDateString();
+    Store.set('roleNames', names);
+    // 应用到界面
+    this.applyAll();
+    // 同步到云端
+    CloudSync.set('roleNames', names);
+    // 关闭弹窗
+    this.cancelEdit();
+    showToast(`${this._editingRole === 'TAO' ? '🐱' : '🐶'} 名称已更新为「${val}」`);
+  },
+
+  // 应用所有角色名称到界面
+  applyAll() {
+    const names = this.getAll();
+    // 首页角色名称
+    const taoEl = document.getElementById('roleNameTAO');
+    const yanEl = document.getElementById('roleNameYAN');
+    if (taoEl) taoEl.textContent = names.TAO;
+    if (yanEl) yanEl.textContent = names.YAN;
+    // 设置面板状态名称
+    const stTao = document.getElementById('settingStatusNameTAO');
+    const stYan = document.getElementById('settingStatusNameYAN');
+    if (stTao) stTao.textContent = names.TAO;
+    if (stYan) stYan.textContent = names.YAN;
+    // 顶部导航标题
+    this._updateNavTitle(names);
+  },
+
+  // 更新导航标题
+  _updateNavTitle(names) {
+    const titleEl = document.getElementById('navTitle');
+    if (!titleEl) return;
+    // 如果正在播放动画则不更新
+    if (titleEl.dataset.bouncing === '1') return;
+    titleEl.innerHTML = `${names.TAO}<span class="heart"> ❤️ </span>${names.YAN}`;
+  },
+
+  // 获取字母逐一跳动的字母数组（用于导航标题动画）
+  getBounceLetters() {
+    const names = this.getAll();
+    const taoLetters = names.TAO.split('');
+    const yanLetters = names.YAN.split('');
+    return {
+      tao: taoLetters,
+      yan: yanLetters,
+      taoColor: '#1b7fe3',
+      yanColor: '#e8296a'
+    };
+  },
+
+  // 从云端同步角色名称
+  async syncFromCloud() {
+    if (!Cloud.pairCode) return;
+    const remote = await CloudSync.get('roleNames');
+    if (!remote) return;
+    const local = Store.get('roleNames', {});
+    let changed = false;
+    // 合并：取最新更新的版本
+    for (const role of ['TAO', 'YAN']) {
+      const r = remote[role];
+      const l = local[role];
+      if (r && (!l || (r.updatedAt || 0) > (l.updatedAt || 0))) {
+        local[role] = r;
+        changed = true;
+      }
+    }
+    // 同步 lastEditDate（取最早的限制，防止双方都改）
+    if (remote.lastEditDate && remote.lastEditDate !== local.lastEditDate) {
+      // 保留更严格的限制（即更近的日期）
+      if (!local.lastEditDate || remote.lastEditDate > local.lastEditDate) {
+        local.lastEditDate = remote.lastEditDate;
+      }
+      changed = true;
+    }
+    if (changed) {
+      Store.set('roleNames', local);
+      this.applyAll();
+    }
+  },
+
+  init() {
+    this.applyAll();
   }
 };
 
@@ -5235,11 +5489,20 @@ const LoveRain = {
     titleEl.dataset.bouncing = '1';
 
     const originalHTML = titleEl.innerHTML;
-    const letters = ['T', 'A', 'O', 'Y', 'A', 'N'];
-    titleEl.innerHTML = letters.map((ch, i) => {
-      const color = i < 3 ? '#1b7fe3' : '#e8296a';
-      return `<span class="nav-letter" style="color:${color};-webkit-text-fill-color:${color};animation-delay:${i * 0.08}s">${ch}</span>` +
-        (i === 2 ? '<span class="heart"> ❤️ </span>' : '');
+    // 使用自定义角色名称的字母
+    const bounceData = RoleName.getBounceLetters();
+    const taoLetters = bounceData.tao;
+    const yanLetters = bounceData.yan;
+    const allLetters = [...taoLetters, ...yanLetters];
+    const taoLen = taoLetters.length;
+    titleEl.innerHTML = allLetters.map((ch, i) => {
+      const color = i < taoLen ? bounceData.taoColor : bounceData.yanColor;
+      let html = `<span class="nav-letter" style="color:${color};-webkit-text-fill-color:${color};animation-delay:${i * 0.08}s">${ch}</span>`;
+      // 在TAO名称后插入心形
+      if (i === taoLen - 1) {
+        html += '<span class="heart"> ❤️ </span>';
+      }
+      return html;
     }).join('');
 
     setTimeout(() => {
