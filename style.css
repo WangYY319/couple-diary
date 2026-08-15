@@ -5598,16 +5598,39 @@ body.music-active #tab-0 .card {
   padding: 14px 16px;
 }
 
+.pomodoro-layout {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.pomodoro-left {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.pomodoro-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .pomodoro-timer-wrap {
   display: flex;
   justify-content: center;
-  padding: 12px 0 6px;
+  padding: 4px 0;
 }
 
 .pomodoro-ring {
   position: relative;
-  width: 130px;
-  height: 130px;
+  width: 100px;
+  height: 100px;
 }
 
 .pomodoro-ring-svg {
@@ -5646,7 +5669,7 @@ body.music-active #tab-0 .card {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--text-main);
   letter-spacing: 1px;
@@ -5656,8 +5679,7 @@ body.music-active #tab-0 .card {
 .pomodoro-controls {
   display: flex;
   justify-content: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 8px;
 }
 
 .pomodoro-btn {
@@ -5686,20 +5708,19 @@ body.music-active #tab-0 .card {
 
 .pomodoro-stats {
   display: flex;
-  gap: 10px;
-  padding: 10px 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
 }
 
 .pomodoro-stat {
   flex: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 4px;
-  padding: 8px 6px;
-  border-radius: 10px;
-  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12px;
 }
 
 .pomodoro-stat.tao-stat {
@@ -5721,7 +5742,7 @@ body.music-active #tab-0 .card {
 }
 
 .pomodoro-stat-count {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }

@@ -246,21 +246,6 @@
         </div>
       </div>
 
-      <!-- 数据透视 -->
-      <div class="card data-pivot-card">
-        <div class="card-title"><span class="icon">📊</span> 本周数透</div>
-        <div class="pivot-tabs">
-          <button class="pivot-tab active" data-metric="pomodoro" onclick="DataPivot.switch('pomodoro')">番茄管理</button>
-          <button class="pivot-tab" data-metric="exercise" onclick="DataPivot.switch('exercise')">运动健身</button>
-          <button class="pivot-tab" data-metric="vocab" onclick="DataPivot.switch('vocab')">英语单词</button>
-        </div>
-        <div class="pivot-chart" id="pivotChart"></div>
-        <div class="pivot-legend">
-          <span class="pivot-leg-tao">🐱 TAO</span>
-          <span class="pivot-leg-yan">🐶 YAN</span>
-        </div>
-      </div>
-
       <div class="tab-bottom-hint">宝宝，到底啦～</div>
     </div>
     <div class="tab-page" id="tab-1" data-tab="1">
@@ -469,37 +454,58 @@
     <!-- ====== Tab 3: 娱乐 ====== -->
     <div class="tab-page" id="tab-3" data-tab="3">
 
+      <!-- 数据透视 -->
+      <div class="card data-pivot-card">
+        <div class="card-title"><span class="icon">📊</span> 本周数透</div>
+        <div class="pivot-tabs">
+          <button class="pivot-tab active" data-metric="vocab" onclick="DataPivot.switch('vocab')">英语刷词</button>
+          <button class="pivot-tab" data-metric="pomodoro" onclick="DataPivot.switch('pomodoro')">番茄管理</button>
+          <button class="pivot-tab" data-metric="exercise" onclick="DataPivot.switch('exercise')">运动健身</button>
+        </div>
+        <div class="pivot-chart" id="pivotChart"></div>
+        <div class="pivot-legend">
+          <span class="pivot-leg-tao">🐱 TAO</span>
+          <span class="pivot-leg-yan">🐶 YAN</span>
+        </div>
+      </div>
+
       <!-- 番茄管理 -->
       <div class="card pomodoro-card">
         <div class="card-title"><span class="icon">🍅</span> 番茄管理</div>
-        <div class="pomodoro-timer-wrap">
-          <div class="pomodoro-ring" id="pomodoroRing">
-            <svg class="pomodoro-ring-svg" viewBox="0 0 120 120">
-              <circle class="pomodoro-ring-bg" cx="60" cy="60" r="54" />
-              <circle class="pomodoro-ring-fill" cx="60" cy="60" r="54" id="pomodoroRingFill" />
-            </svg>
-            <div class="pomodoro-time-display" id="pomodoroTimeDisplay">25:00</div>
+        <div class="pomodoro-layout">
+          <div class="pomodoro-left">
+            <div class="pomodoro-timer-wrap">
+              <div class="pomodoro-ring" id="pomodoroRing">
+                <svg class="pomodoro-ring-svg" viewBox="0 0 120 120">
+                  <circle class="pomodoro-ring-bg" cx="60" cy="60" r="54" />
+                  <circle class="pomodoro-ring-fill" cx="60" cy="60" r="54" id="pomodoroRingFill" />
+                </svg>
+                <div class="pomodoro-time-display" id="pomodoroTimeDisplay">25:00</div>
+              </div>
+            </div>
+            <div class="pomodoro-controls">
+              <button class="pomodoro-btn primary" id="pomodoroStartBtn" onclick="Pomodoro.toggle()">▶ 开始</button>
+              <button class="pomodoro-btn" id="pomodoroResetBtn" onclick="Pomodoro.reset()">↺ 重置</button>
+            </div>
+          </div>
+          <div class="pomodoro-right">
+            <div class="pomodoro-stats">
+              <div class="pomodoro-stat tao-stat">
+                <span class="pomodoro-stat-icon">🐱</span>
+                <span class="pomodoro-stat-name">TAO</span>
+                <span class="pomodoro-stat-count" id="pomodoroCountTAO">0</span>
+                <span class="pomodoro-stat-unit">个</span>
+              </div>
+              <div class="pomodoro-stat yan-stat">
+                <span class="pomodoro-stat-icon">🐶</span>
+                <span class="pomodoro-stat-name">YAN</span>
+                <span class="pomodoro-stat-count" id="pomodoroCountYAN">0</span>
+                <span class="pomodoro-stat-unit">个</span>
+              </div>
+            </div>
+            <div class="pomodoro-hint" id="pomodoroHint">专注25分钟，完成后自动统计 🍅</div>
           </div>
         </div>
-        <div class="pomodoro-controls">
-          <button class="pomodoro-btn primary" id="pomodoroStartBtn" onclick="Pomodoro.toggle()">▶ 开始</button>
-          <button class="pomodoro-btn" id="pomodoroResetBtn" onclick="Pomodoro.reset()">↺ 重置</button>
-        </div>
-        <div class="pomodoro-stats">
-          <div class="pomodoro-stat tao-stat">
-            <span class="pomodoro-stat-icon">🐱</span>
-            <span class="pomodoro-stat-name">TAO</span>
-            <span class="pomodoro-stat-count" id="pomodoroCountTAO">0</span>
-            <span class="pomodoro-stat-unit">个</span>
-          </div>
-          <div class="pomodoro-stat yan-stat">
-            <span class="pomodoro-stat-icon">🐶</span>
-            <span class="pomodoro-stat-name">YAN</span>
-            <span class="pomodoro-stat-count" id="pomodoroCountYAN">0</span>
-            <span class="pomodoro-stat-unit">个</span>
-          </div>
-        </div>
-        <div class="pomodoro-hint" id="pomodoroHint">专注25分钟，完成后自动统计 🍅</div>
       </div>
 
       <!-- 英语刷词 -->

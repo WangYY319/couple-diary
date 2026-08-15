@@ -3687,8 +3687,7 @@ const DetailMenu = {
     0: [
       { icon: '🎭', name: '亲密主角', selector: '.role-card' },
       { icon: '💌', name: '甜蜜语录', selector: '.sweet-text-card' },
-      { icon: '🎵', name: '音乐播放', selector: '.music-card' },
-      { icon: '📊', name: '本周数透', selector: '.data-pivot-card' }
+      { icon: '🎵', name: '音乐播放', selector: '.music-card' }
     ],
     1: [
       { icon: '❤️', name: '发射爱心', selector: '#card-greet' },
@@ -3704,6 +3703,7 @@ const DetailMenu = {
       { icon: '✨', name: '打卡晚安', selector: '#card-night' }
     ],
     3: [
+      { icon: '📊', name: '本周数透', selector: '.data-pivot-card' },
       { icon: '🍅', name: '番茄管理', selector: '.pomodoro-card' },
       { icon: '📚', name: '英语刷词', selector: '.vocab-card' },
       { icon: '💪', name: '运动健身', selector: '.exercise-card' },
@@ -4296,7 +4296,7 @@ const IPAddress = {
 
 // ====== 数据透视模块（本周柱状图） ======
 const DataPivot = {
-  _currentMetric: 'pomodoro', // pomodoro | exercise | vocab
+  _currentMetric: 'vocab', // vocab | pomodoro | exercise
   _weekDays: [], // 本周7天的日期字符串
 
   // 获取本周7天日期（周一到周日）
