@@ -726,8 +726,9 @@ html, body {
   width: 80px;
   height: 72px;
   position: absolute;
-  transition: opacity 0.4s, transform 0.5s;
-  opacity: 0.18;
+  top: 24px;
+  transition: opacity 0.5s, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.4s;
+  opacity: 0.15;
   user-select: none;
   pointer-events: none;
   overflow: hidden;
@@ -754,6 +755,16 @@ html, body {
   -webkit-clip-path: inset(0 0 0 50%);
 }
 
+/* 打卡后高饱和度亮起 + 向中心靠近 */
+.heart-half.left.done {
+  opacity: 1;
+  transform: translateX(-50%) translateX(-20px) scale(1.15);
+}
+.heart-half.right.done {
+  opacity: 1;
+  transform: translateX(-50%) translateX(20px) scale(1.15);
+}
+
 /* 双方都完成后两半隐藏 */
 .heart-half.left.merged,
 .heart-half.right.merged {
@@ -761,27 +772,27 @@ html, body {
   transform: translateX(-50%) scale(0.5);
 }
 
-/* 单半显示的颜色：TAO=蓝, YAN=粉 */
+/* 单半显示的颜色：TAO=蓝, YAN=粉（高饱和度） */
 .heart-half.left.done path { fill: #1b7fe3; }
 .heart-half.right.done path { fill: #e8296a; }
 
 /* 单方打卡后半颗心光环效果 */
 .heart-half.done svg {
-  filter: drop-shadow(0 0 6px rgba(27, 127, 227, 0.5));
+  filter: drop-shadow(0 0 8px rgba(27, 127, 227, 0.6));
   animation: heartGlow 2.5s ease-in-out infinite;
 }
 .heart-half.right.done svg {
-  filter: drop-shadow(0 0 6px rgba(232, 41, 106, 0.5));
+  filter: drop-shadow(0 0 8px rgba(232, 41, 106, 0.6));
 }
 
 @keyframes heartGlow {
   0%, 100% {
-    filter: drop-shadow(0 0 4px rgba(27, 127, 227, 0.4)) brightness(1);
+    filter: drop-shadow(0 0 6px rgba(27, 127, 227, 0.5)) brightness(1);
     opacity: 1;
   }
   50% {
-    filter: drop-shadow(0 0 12px rgba(27, 127, 227, 0.7)) brightness(1.15);
-    opacity: 0.92;
+    filter: drop-shadow(0 0 16px rgba(27, 127, 227, 0.8)) brightness(1.2);
+    opacity: 1;
   }
 }
 
@@ -791,18 +802,18 @@ html, body {
 
 @keyframes heartGlowRight {
   0%, 100% {
-    filter: drop-shadow(0 0 4px rgba(232, 41, 106, 0.4)) brightness(1);
+    filter: drop-shadow(0 0 6px rgba(232, 41, 106, 0.5)) brightness(1);
     opacity: 1;
   }
   50% {
-    filter: drop-shadow(0 0 12px rgba(232, 41, 106, 0.7)) brightness(1.15);
-    opacity: 0.92;
+    filter: drop-shadow(0 0 16px rgba(232, 41, 106, 0.8)) brightness(1.2);
+    opacity: 1;
   }
 }
 
 /* 单方打卡时半透明的提示色 */
-.heart-half.left.hint path { fill: rgba(27, 127, 227, 0.45); }
-.heart-half.right.hint path { fill: rgba(232, 41, 106, 0.45); }
+.heart-half.left.hint path { fill: rgba(27, 127, 227, 0.3); }
+.heart-half.right.hint path { fill: rgba(232, 41, 106, 0.3); }
 
 /* 合并后的爱心形状（CSS mask + 渐变色） */
 .heart-merged {
