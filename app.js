@@ -3336,7 +3336,6 @@ const Setting = {
     if (info) {
       if (Cloud.isPaired()) {
         info.innerHTML = `配对码：<b>${Cloud.pairCode}</b>` +
-          `<button class="pair-copy-btn" onclick="Setting.copyPairCode()">📋 复制</button>` +
           `<br><span style="font-size:11px;color:#999">把配对码分享给对方，对方输入后即可同步数据</span>`;
       } else {
         info.innerHTML = '尚未配对';

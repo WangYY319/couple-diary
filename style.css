@@ -6243,18 +6243,22 @@ body.music-active #tab-0 .card {
 .landmark-stats .ls-yan { color: #e8296a; }
 
 .landmark-sync-btn {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
   border: none;
   background: transparent;
-  font-size: 14px;
   cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  transition: all 0.2s;
-  opacity: 0.5;
-  margin-left: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.3;
+  transition: all 0.3s;
 }
-.landmark-sync-btn:hover { opacity: 1; background: rgba(0,0,0,0.05); }
-.landmark-sync-btn:active { transform: scale(0.85); }
+.landmark-sync-btn:hover { opacity: 0.6; }
+.landmark-sync-btn:active {
+  opacity: 0.8;
+  transform: rotate(180deg);
+}
 
 .landmark-grid {
   display: grid;
