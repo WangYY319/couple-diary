@@ -449,6 +449,10 @@ const Cloud = {
         if (typeof IPAddress !== 'undefined') {
           IPAddress._pullOtherIP();
         }
+        // 检测双方在线状态（触发动画 + US Online 提示）
+        if (typeof Setting !== 'undefined') {
+          Setting.refreshStatus();
+        }
       }
     }, 30000); // 30 秒
   },
@@ -3259,6 +3263,9 @@ const Setting = {
     }
   },
 
+  // 双方在线状态追踪
+  _prevBothOnline: false,
+
   async refreshStatus() {
     if (!Cloud.isPaired()) return;
     // 自己必然在线
@@ -3267,7 +3274,30 @@ const Setting = {
       const st = await Cloud.checkOnlineStatus();
       this.setStatusDot('TAO', st.tao);
       this.setStatusDot('YAN', st.yan);
+      // 检测双方同时在线
+      const bothOnline = st.tao && st.yan;
+      if (bothOnline && !this._prevBothOnline) {
+        // 从非双方在线变为双方在线：触发动画
+        this._triggerBothOnlineEffect();
+      }
+      // 更新"US Online"提示显示状态
+      const onlineEl = document.getElementById('navBothOnline');
+      if (onlineEl) {
+        if (bothOnline) {
+          onlineEl.classList.add('show');
+        } else {
+          onlineEl.classList.remove('show');
+        }
+      }
+      this._prevBothOnline = bothOnline;
     } catch (e) { /* 保持现状 */ }
+  },
+
+  // 双方在线时触发导航标题字母跳跃动画
+  _triggerBothOnlineEffect() {
+    if (typeof LoveRain !== 'undefined' && LoveRain._playBothOnlineBounce) {
+      LoveRain._playBothOnlineBounce();
+    }
   },
 
   // 从首页/设置直接切换角色
@@ -5517,6 +5547,37 @@ const LoveRain = {
       titleEl.innerHTML = originalHTML;
       titleEl.dataset.bouncing = '';
     }, 1400);
+  },
+
+  // 双方在线触发的字母跳跃（节奏舒缓，仅一遍）
+  _playBothOnlineBounce() {
+    const titleEl = document.getElementById('navTitle');
+    if (!titleEl) return;
+    if (titleEl.dataset.bouncing === '1') return;
+    titleEl.dataset.bouncing = '1';
+
+    const originalHTML = titleEl.innerHTML;
+    const bounceData = RoleName.getBounceLetters();
+    const taoLetters = bounceData.tao;
+    const yanLetters = bounceData.yan;
+    const allLetters = [...taoLetters, ...yanLetters];
+    const taoLen = taoLetters.length;
+    // 舒缓节奏：每字母间隔 0.12s，动画时长 0.8s
+    titleEl.innerHTML = allLetters.map((ch, i) => {
+      const color = i < taoLen ? bounceData.taoColor : bounceData.yanColor;
+      let html = `<span class="nav-letter nav-letter-gentle" style="color:${color};-webkit-text-fill-color:${color};animation-delay:${i * 0.12}s">${ch}</span>`;
+      if (i === taoLen - 1) {
+        html += '<span class="heart"> ❤️ </span>';
+      }
+      return html;
+    }).join('');
+
+    // 恢复时间 = 最后一个字母延迟 + 动画时长 + 余量
+    const totalDuration = (allLetters.length - 1) * 120 + 800 + 300;
+    setTimeout(() => {
+      titleEl.innerHTML = originalHTML;
+      titleEl.dataset.bouncing = '';
+    }, totalDuration);
   },
 
   start() {

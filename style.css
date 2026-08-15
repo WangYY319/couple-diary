@@ -171,12 +171,18 @@ html, body {
   z-index: 1;
 }
 
-.nav-title {
+.nav-title-wrap {
   position: absolute; left: 50%; top: 50%;
   transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.nav-title {
   font-size: 20px; font-weight: 800;
   white-space: nowrap;
-  pointer-events: auto;
   cursor: pointer;
   letter-spacing: 1px;
   background: linear-gradient(90deg, #1b7fe3, #e8296a);
@@ -189,6 +195,26 @@ html, body {
 }
 
 .nav-title .heart { font-size: 16px; }
+
+/* 双方在线提示 */
+.nav-both-online {
+  font-size: 10px;
+  font-weight: 700;
+  color: #22c55e;
+  letter-spacing: 1.5px;
+  margin-top: 1px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  pointer-events: none;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(34,197,94,0.15);
+}
+
+.nav-both-online.show {
+  opacity: 0.85;
+  transform: translateY(0);
+}
 
 .nav-left {
   display: flex;
@@ -3606,10 +3632,23 @@ html, body {
   100% { transform: translateY(0) scale(1); }
 }
 
+/* 双方在线舒缓跳跃 */
+.nav-letter-gentle {
+  animation: navLetterGentle 0.8s ease-in-out both;
+}
+
+@keyframes navLetterGentle {
+  0% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-12px) scale(1.15); }
+  50% { transform: translateY(2px) scale(0.95); }
+  75% { transform: translateY(-3px) scale(1.03); }
+  100% { transform: translateY(0) scale(1); }
+}
+
 @keyframes musicWave {
-  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
-  25% { transform: translate(-50%, -50%) translateY(-3px) scale(1.02); }
-  75% { transform: translate(-50%, -50%) translateY(2px) scale(0.98); }
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-3px) scale(1.02); }
+  75% { transform: translateY(2px) scale(0.98); }
 }
 
 /* ============================
