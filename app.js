@@ -1098,39 +1098,53 @@ const CloudSync = {
   },
 
   // 同步地标打卡数据：合并双方打卡状态
+  _landmarkSyncing: false,
   async syncLandmarks() {
     if (!Cloud.pairCode) return;
-    const localData = Store.get('landmark_checkins', {});
-    const remoteData = await this.get('landmark_checkins');
+    // 防止并发同步
+    if (this._landmarkSyncing) return;
+    this._landmarkSyncing = true;
+    try {
+      const localData = Store.get('landmark_checkins', {});
+      const remoteData = await this.get('landmark_checkins');
 
-    if (!remoteData || typeof remoteData !== 'object') {
-      if (Object.keys(localData).length > 0) {
-        await this.set('landmark_checkins', localData);
+      if (!remoteData || typeof remoteData !== 'object' || Array.isArray(remoteData)) {
+        // 云端无数据，推送本地
+        if (Object.keys(localData).length > 0) {
+          await this.set('landmark_checkins', localData);
+        }
+        this._landmarkSyncing = false;
+        return;
       }
-      return;
-    }
 
-    let changed = false;
-    // 合并：对每个地标，取双方的 OR 值（任一方打卡即为打卡）
-    const allKeys = new Set([...Object.keys(localData), ...Object.keys(remoteData)]);
-    allKeys.forEach(key => {
-      if (!localData[key]) {
-        localData[key] = { tao: false, yan: false };
-        changed = true;
-      }
-      for (const role of ['tao', 'yan']) {
-        if (remoteData[key] && remoteData[key][role] && !localData[key][role]) {
-          localData[key][role] = true;
+      let changed = false;
+      // 合并：对每个地标，取双方的 OR 值（任一方打卡即为打卡）
+      const allKeys = new Set([...Object.keys(localData), ...Object.keys(remoteData)]);
+      allKeys.forEach(key => {
+        if (!localData[key] || typeof localData[key] !== 'object') {
+          localData[key] = { tao: false, yan: false };
           changed = true;
         }
-      }
-    });
+        if (remoteData[key] && typeof remoteData[key] === 'object') {
+          for (const role of ['tao', 'yan']) {
+            if (remoteData[key][role] === true && !localData[key][role]) {
+              localData[key][role] = true;
+              changed = true;
+            }
+          }
+        }
+      });
 
-    if (changed) {
+      // 无论是否有变化，都保存并推送（确保云端和本地一致）
       Store.set('landmark_checkins', localData);
-      if (typeof LandmarkCheckin !== 'undefined') LandmarkCheckin.render();
+      if (typeof LandmarkCheckin !== 'undefined') {
+        LandmarkCheckin.render();
+      }
+      await this.set('landmark_checkins', localData);
+    } catch (e) {
+      // 静默失败，下次轮询再试
     }
-    await this.set('landmark_checkins', localData);
+    this._landmarkSyncing = false;
   }
 };
 
@@ -3639,6 +3653,10 @@ const TabNav = {
       GeoCard.init();
       Pomodoro.init();
       LandmarkCheckin.init();
+      // 切换到娱乐页时主动同步地标打卡数据
+      if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+        CloudSync.syncLandmarks();
+      }
       ReadMark.renderAll();
     }
     // 切换到记录页时刷新爱心状态
