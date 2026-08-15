@@ -6242,6 +6242,20 @@ body.music-active #tab-0 .card {
 .landmark-stats .ls-tao { color: #1b7fe3; }
 .landmark-stats .ls-yan { color: #e8296a; }
 
+.landmark-sync-btn {
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  opacity: 0.5;
+  margin-left: 4px;
+}
+.landmark-sync-btn:hover { opacity: 1; background: rgba(0,0,0,0.05); }
+.landmark-sync-btn:active { transform: scale(0.85); }
+
 .landmark-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
