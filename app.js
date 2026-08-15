@@ -5511,6 +5511,8 @@ const LoveRain = {
         clearTimeout(clickTimer);
         clickTimer = null;
         this.start();
+        // 联动播放音乐（仅一次生效）
+        this._tryPlayMusicWithRain();
       } else {
         // 单击触发字母逐一跳动
         this._playNavLetterBounce();
@@ -5654,6 +5656,39 @@ const LoveRain = {
       this.container.innerHTML = '';
       this.isActive = false;
     }, 6500);
+  },
+
+  // 双击爱心雨联动播放音乐（一次生效）
+  _musicLinked: false,
+  _tryPlayMusicWithRain() {
+    // 如果音乐已经在播放，不需要再触发
+    if (typeof MusicPlayer !== 'undefined' && MusicPlayer.isPlaying) return;
+    // 如果已经联动过，不再重复联动（需回到音乐面板关闭后才能再次联动）
+    if (this._musicLinked) return;
+    if (typeof MusicPlayer === 'undefined' || !MusicPlayer.audio || !MusicPlayer.audio.src) {
+      // 没有加载音乐，静默跳过
+      return;
+    }
+    // 标记已联动
+    this._musicLinked = true;
+    // 播放音乐
+    MusicPlayer.audio.play().then(() => {
+      MusicPlayer.isPlaying = true;
+      MusicPlayer.startNavWave();
+      MusicPlayer.startProgress();
+      MusicPlayer.updateUI();
+      showToast('🎵 爱心雨联动播放音乐');
+    }).catch(() => {
+      // 播放失败，重置标记允许下次重试
+      this._musicLinked = false;
+    });
+    // 监听音乐停止事件，重置联动标记（这样关闭后再次双击可重新联动）
+    if (!this._musicStopListenerAdded && MusicPlayer.audio) {
+      MusicPlayer.audio.addEventListener('pause', () => {
+        this._musicLinked = false;
+      }, { once: false });
+      this._musicStopListenerAdded = true;
+    }
   }
 };
 
