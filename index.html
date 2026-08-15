@@ -57,10 +57,19 @@
 <div class="entry-screen pair-screen" id="pairScreen" style="display:none">
   <div class="entry-title">TAO &amp; YAN</div>
   <div class="entry-subtitle">💕 配对后两人才可同步数据</div>
+
+  <!-- 历史配对码快捷登录 -->
+  <div class="pair-history-section" id="pairHistorySection" style="display:none">
+    <div class="pair-section-title">快捷登录</div>
+    <div class="pair-history-desc">点击之前用过的配对码快速登录</div>
+    <div class="pair-history-list" id="pairHistoryList"></div>
+  </div>
+
   <div class="pair-view" id="pairCreateView" style="display:flex">
     <div class="pair-section">
       <div class="pair-section-title">创建新配对</div>
       <div class="pair-section-desc">选择你的身份，生成配对码给对方</div>
+      <div class="pair-warn-text">⚠️ 创建新配对码将使用新账户，之前的数据不会同步到新账户</div>
       <div class="pair-role-buttons">
         <button class="pair-role-btn tao" id="pairCreateBtn-TAO" onclick="Pair.create('TAO')">
           <span class="emoji">🐱</span><span>我是 TAO</span>
@@ -724,6 +733,8 @@
         <div class="status-item" data-role="TAO"><span class="status-emoji">🐱</span><span class="status-name">TAO</span><span class="status-dot off"></span><span class="status-text">离线</span></div>
         <div class="status-item" data-role="YAN"><span class="status-emoji">🐶</span><span class="status-name">YAN</span><span class="status-dot off"></span><span class="status-text">离线</span></div>
       </div>
+      <button class="setting-btn" onclick="Setting.switchLogin()">🔄 切换配对码登录</button>
+      <button class="setting-btn" onclick="Setting.logout()">🚪 退出登录</button>
       <button class="setting-btn danger" onclick="Setting.unpair()">解除配对</button>
     </div>
     <div class="setting-group">

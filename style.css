@@ -1933,6 +1933,71 @@ html, body {
   margin: 4px 0;
 }
 
+/* 配对历史快捷登录 */
+.pair-history-section {
+  width: 92%;
+  max-width: 360px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.pair-history-desc {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.pair-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pair-history-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid rgba(0,0,0,0.04);
+}
+
+.pair-history-item:active {
+  transform: scale(0.97);
+  background: rgba(0,0,0,0.04);
+}
+
+.pair-history-item.last {
+  border-color: rgba(27,127,227,0.3);
+  background: rgba(27,127,227,0.05);
+}
+
+.pair-history-code {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #333;
+}
+
+.pair-history-meta {
+  font-size: 11px;
+  color: #999;
+}
+
+/* 创建新配对警告文字 */
+.pair-warn-text {
+  font-size: 11px;
+  color: #e8296a;
+  margin: 6px 0 8px;
+  line-height: 1.4;
+}
+
 .pair-action-btn {
   display: block;
   width: 100%;

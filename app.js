@@ -28,6 +28,21 @@ const Store = {
   },
   getAllDays() { return this.get('days', {}); },
 
+  // 配对码历史记录
+  getPairHistory() {
+    return this.get('pairHistory', []);
+  },
+  addPairHistory(code, role) {
+    const history = this.get('pairHistory', []);
+    const filtered = history.filter(h => h.code !== code);
+    filtered.unshift({ code, role, savedAt: Date.now() });
+    this.set('pairHistory', filtered.slice(0, 5));
+  },
+  getLastPairCode() {
+    const history = this.get('pairHistory', []);
+    return history.length > 0 ? history[0] : null;
+  },
+
   // 合并云端数据到本地（字段级合并，双方写的都保留）
   mergeRemoteDays(remoteDays) {
     if (!remoteDays || typeof remoteDays !== 'object') return false;
@@ -115,6 +130,10 @@ const Cloud = {
         this.pairCode = backup.pairCode;
         Store.set('pairCode', backup.pairCode);
         if (backup.role) Store.set('role', backup.role);
+        // 恢复配对历史
+        if (backup.pairHistory) {
+          Store.set('pairHistory', backup.pairHistory);
+        }
       }
     } else {
       // 确保 IndexedDB 也有备份
@@ -139,8 +158,9 @@ const Cloud = {
     try {
       const db = await this._backupDB();
       if (!db) return;
+      const pairHistory = Store.getPairHistory();
       const tx = db.transaction('backup', 'readwrite');
-      tx.objectStore('backup').put({ pairCode, role, savedAt: Date.now() }, 'pair_info');
+      tx.objectStore('backup').put({ pairCode, role, pairHistory, savedAt: Date.now() }, 'pair_info');
     } catch (e) { /* ignore */ }
   },
 
@@ -210,6 +230,7 @@ const Cloud = {
     this.pairCode = code;
     Store.set('pairCode', code);
     Store.set('role', role);
+    Store.addPairHistory(code, role);
     this._saveBackup(code, role); // 立即备份到 IndexedDB
 
     const meta = {
@@ -258,6 +279,7 @@ const Cloud = {
       this.pairCode = code;
       Store.set('pairCode', code);
       Store.set('role', role);
+      Store.addPairHistory(code, role);
       this._saveBackup(code, role); // 立即备份到 IndexedDB
       return { ok: true, code };
     } catch (e) {
@@ -1143,6 +1165,11 @@ const App = {
         this.enterApp();
       }
     } else {
+      // 未配对：尝试从 IndexedDB 恢复历史配对码
+      const backup = await Cloud._getBackup();
+      if (backup && backup.pairHistory) {
+        Store.set('pairHistory', backup.pairHistory);
+      }
       // 显示角色选择页（entryScreen 默认就显示）
       // 用户选完角色后 selectRole → showPairScreen
     }
@@ -1334,6 +1361,31 @@ const App = {
     showToast('已解除配对，打卡记录已保留');
   },
 
+  // 退出登录：清除当前会话，回到角色选择页（保留配对历史）
+  logout() {
+    Cloud.stopPolling();
+    Cloud.pairCode = null;
+    Store.remove('pairCode');
+    Store.remove('role');
+    this.currentRole = null;
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('pairScreen').style.display = 'none';
+    const entry = document.getElementById('entryScreen');
+    entry.style.display = 'flex';
+    entry.classList.remove('hidden');
+    showToast('已退出登录');
+  },
+
+  // 切换配对码登录：回到配对页（保留角色选择）
+  switchLogin() {
+    Cloud.stopPolling();
+    Cloud.pairCode = null;
+    Store.remove('pairCode');
+    document.getElementById('mainApp').style.display = 'none';
+    this.showPairScreen();
+    showToast('请输入配对码或创建新配对');
+  },
+
   // 左上角日期点击：如果在历史模式返回今天，否则跳转到日历
   onDateClick() {
     if (this.isHistory) {
@@ -1459,6 +1511,7 @@ const App = {
 // ====== 配对模块 ======
 const Pair = {
   showCreateView() {
+    this._renderHistory();
     document.getElementById('pairCreateView').style.display = 'flex';
     document.getElementById('pairJoinView').style.display = 'none';
     document.getElementById('pairSwitchView').style.display = 'none';
@@ -1468,6 +1521,12 @@ const Pair = {
     document.getElementById('pairCreateView').style.display = 'none';
     document.getElementById('pairJoinView').style.display = 'flex';
     document.getElementById('pairSwitchView').style.display = 'none';
+    // 如果有历史，预填最后一个配对码
+    const last = Store.getLastPairCode();
+    if (last) {
+      const input = document.getElementById('pairCodeInput');
+      if (input && !input.value) input.value = last.code;
+    }
   },
 
   showSwitchView() {
@@ -1477,6 +1536,40 @@ const Pair = {
     const codeEl = document.getElementById('switchPairCode');
     if (codeEl && Cloud.pairCode) {
       codeEl.textContent = Cloud.pairCode;
+    }
+  },
+
+  // 渲染历史配对码列表
+  _renderHistory() {
+    const section = document.getElementById('pairHistorySection');
+    const list = document.getElementById('pairHistoryList');
+    if (!section || !list) return;
+    const history = Store.getPairHistory();
+    if (history.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+    list.innerHTML = history.map((h, i) => {
+      const isLast = i === 0;
+      const roleIcon = h.role === 'TAO' ? '🐱' : '🐶';
+      const date = new Date(h.savedAt);
+      const dateStr = `${date.getMonth()+1}/${date.getDate()}`;
+      return `<div class="pair-history-item ${isLast ? 'last' : ''}" onclick="Pair.quickJoin('${h.code}','${h.role}')">
+        <span class="pair-history-code">${h.code}</span>
+        <span class="pair-history-meta">${roleIcon} ${h.role} · ${dateStr}${isLast ? ' · 上次登录' : ''}</span>
+      </div>`;
+    }).join('');
+  },
+
+  // 快捷登录：直接用历史配对码加入
+  async quickJoin(code, role) {
+    showToast('正在验证配对码...');
+    const r = await Cloud.joinPair(code, role);
+    if (r.ok) {
+      App.enterAfterPair(role);
+    } else {
+      showToast(r.error || '加入失败，请检查配对码');
     }
   },
 
@@ -3367,6 +3460,24 @@ const Setting = {
     }
     App.unpair();
     Setting.close();
+  },
+
+  // 切换配对码登录
+  switchLogin() {
+    if (!confirm('确定要切换配对码吗？\n\n当前配对连接将断开，你需要输入新的配对码或创建新配对')) {
+      return;
+    }
+    Setting.close();
+    App.switchLogin();
+  },
+
+  // 退出登录
+  logout() {
+    if (!confirm('确定要退出登录吗？\n\n退出后需要重新选择角色并输入配对码才能进入\n✅ 配对历史会保留，可快捷登录')) {
+      return;
+    }
+    Setting.close();
+    App.logout();
   }
 };
 
