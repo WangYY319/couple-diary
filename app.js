@@ -7211,7 +7211,7 @@ const Pomodoro = {
   _timer: null,
 
   init() {
-    this._checkWeeklyReset();
+    // 不在init中调用_checkWeeklyReset，避免切换标签页时反复重置
     this._remaining = this.DURATION;
     this._updateDisplay();
     this._renderStats();
@@ -7224,7 +7224,8 @@ const Pomodoro = {
     const monday = new Date(today);
     monday.setDate(today.getDate() - dayOfWeek + 1);
     monday.setHours(0, 0, 0, 0);
-    const weekKey = monday.getFullYear() + '-' + (monday.getMonth() + 1) + '-' + monday.getDate();
+    // 使用 YYYY-MM-DD 格式（带前导零），与历史记录key格式一致
+    const weekKey = monday.getFullYear() + '-' + String(monday.getMonth() + 1).padStart(2, '0') + '-' + String(monday.getDate()).padStart(2, '0');
     const savedWeek = Store.get('pomodoro_week_key', '');
     if (savedWeek !== weekKey) {
       // 新的一周，重置计数
@@ -7232,9 +7233,8 @@ const Pomodoro = {
       Store.set('pomodoro_week_key', weekKey);
       // 同时清理过期的历史记录（保留本周的）
       const history = Store.get('pomodoro_history', {});
-      const weekStartStr = weekKey;
       Object.keys(history).forEach(dateStr => {
-        if (dateStr < weekStartStr) delete history[dateStr];
+        if (dateStr < weekKey) delete history[dateStr];
       });
       Store.set('pomodoro_history', history);
     }
@@ -7298,28 +7298,38 @@ const Pomodoro = {
     const hint = document.getElementById('pomodoroHint');
     if (hint) hint.textContent = '完成一个番茄！休息一下吧 🎉';
 
+    // 震动反馈（短暂）
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]);
+    }
+
     // 统计：当前角色 +1（先检查是否需要每周重置）
-    const role = App.currentRole;
-    if (role) {
-      this._checkWeeklyReset();
-      const data = Store.get('pomodoro_count', { tao: 0, yan: 0 });
-      data[role.toLowerCase()] = (data[role.toLowerCase()] || 0) + 1;
-      Store.set('pomodoro_count', data);
-      this._renderStats();
+    try {
+      const role = App.currentRole;
+      if (role) {
+        this._checkWeeklyReset();
+        const data = Store.get('pomodoro_count', { tao: 0, yan: 0 });
+        const roleKey = role.toLowerCase();
+        data[roleKey] = (data[roleKey] || 0) + 1;
+        Store.set('pomodoro_count', data);
+        this._renderStats();
 
-      // 记录每日历史（用于数据透视柱状图）
-      const dateStr = todayStr();
-      const history = Store.get('pomodoro_history', {});
-      if (!history[dateStr]) history[dateStr] = { tao: 0, yan: 0 };
-      history[dateStr][role.toLowerCase()] = (history[dateStr][role.toLowerCase()] || 0) + 1;
-      Store.set('pomodoro_history', history);
+        // 记录每日历史（用于数据透视柱状图）
+        const dateStr = todayStr();
+        const history = Store.get('pomodoro_history', {});
+        if (!history[dateStr]) history[dateStr] = { tao: 0, yan: 0 };
+        history[dateStr][roleKey] = (history[dateStr][roleKey] || 0) + 1;
+        Store.set('pomodoro_history', history);
 
-      // 云同步
-      if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
-        CloudSync.syncPomodoro();
-        CloudSync.syncPomodoroHistory();
+        // 云同步
+        if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+          CloudSync.syncPomodoro();
+          CloudSync.syncPomodoroHistory();
+        }
+        showToast('🍅 完成一个番茄！专注力 +1');
       }
-      showToast('🍅 完成一个番茄！专注力 +1');
+    } catch (e) {
+      // 出错也不影响用户体验
     }
 
     // 提示音
