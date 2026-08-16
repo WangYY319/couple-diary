@@ -443,7 +443,9 @@ const Cloud = {
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
+          CloudSync.syncPomodoroHistory();
           CloudSync.syncLandmarks();
+          CloudSync.syncThemeColor();
           ReadMark.syncAll();
           RoleName.syncFromCloud();
         }
@@ -1121,6 +1123,120 @@ const CloudSync = {
     await this.set('pomodoro_count', localData);
   },
 
+  // 同步番茄历史数据（用于数据透视柱状图）：合并双方每日数据
+  async syncPomodoroHistory() {
+    if (!Cloud.pairCode) return;
+    const localData = Store.get('pomodoro_history', {});
+    const remoteData = await this.get('pomodoro_history');
+
+    if (!remoteData || typeof remoteData !== 'object') {
+      // 云端没有，推送本地
+      if (Object.keys(localData).length > 0) {
+        await this.set('pomodoro_history', localData);
+      }
+      return;
+    }
+
+    // 合并：每个日期每个角色取最大值
+    let changed = false;
+    const allDates = new Set([...Object.keys(localData), ...Object.keys(remoteData)]);
+    allDates.forEach(dateStr => {
+      const local = localData[dateStr] || { tao: 0, yan: 0 };
+      const remote = remoteData[dateStr] || { tao: 0, yan: 0 };
+      const merged = {
+        tao: Math.max(local.tao || 0, remote.tao || 0),
+        yan: Math.max(local.yan || 0, remote.yan || 0)
+      };
+      if (merged.tao !== local.tao || merged.yan !== local.yan) {
+        localData[dateStr] = merged;
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      Store.set('pomodoro_history', localData);
+      // 如果数据透视页面打开着，刷新图表
+      if (typeof HistoryView !== 'undefined' && HistoryView._renderChart) {
+        HistoryView._renderChart();
+      }
+    }
+    // 推送合并后的数据
+    await this.set('pomodoro_history', localData);
+  },
+
+  // 同步主题颜色：基于时间戳合并
+  async syncThemeColor() {
+    if (!Cloud.pairCode) return;
+    const localTheme = Store.get('customTheme', null);
+    const localTs = Store.get('customThemeTs', 0);
+    const remoteData = await this.get('customTheme');
+
+    if (!remoteData || typeof remoteData !== 'object') {
+      // 云端没有，推送本地
+      if (localTheme) {
+        await this.set('customTheme', { theme: localTheme, ts: localTs, idx: Store.get('customThemeIdx', null) });
+      }
+      return;
+    }
+
+    const remoteTheme = remoteData.theme; // 可能是 null（表示恢复默认）
+    const remoteTs = remoteData.ts || 0;
+    const remoteIdx = remoteData.idx;
+
+    // 比较时间戳，取最新的
+    if (remoteTs > localTs) {
+      if (remoteTheme === null) {
+        // 对方恢复了默认主题
+        Store.remove('customTheme');
+        Store.remove('customThemeIdx');
+        Store.set('customThemeTs', remoteTs);
+        // 清除内联样式，恢复 CSS 默认
+        const root = document.documentElement;
+        root.style.removeProperty('--theme-primary');
+        root.style.removeProperty('--theme-accent');
+        root.style.removeProperty('--theme-light');
+        root.style.removeProperty('--theme-bg');
+        root.style.removeProperty('--theme-rgb');
+        // 重新应用角色默认主题
+        if (typeof App !== 'undefined') {
+          const theme = App.currentRole === 'TAO' ? 'blue' : 'pink';
+          App.applyTheme(theme);
+        }
+        // 更新调色盘高亮（无高亮）
+        document.querySelectorAll('.theme-color-chip').forEach(c => c.classList.remove('active'));
+        // 更新颜色选择器为默认值
+        const picker = document.getElementById('themeColorPicker');
+        if (picker && typeof App !== 'undefined') {
+          picker.value = App.currentRole === 'TAO' ? '#1b7fe3' : '#e8296a';
+        }
+      } else {
+        // 远端有自定义主题，应用
+        Store.set('customTheme', remoteTheme);
+        Store.set('customThemeTs', remoteTs);
+        if (remoteIdx !== null && remoteIdx !== undefined) {
+          Store.set('customThemeIdx', remoteIdx);
+        } else {
+          Store.remove('customThemeIdx');
+        }
+        // 应用到界面
+        if (typeof Setting !== 'undefined') {
+          Setting._applyThemeVars(remoteTheme);
+          // 更新调色盘高亮
+          document.querySelectorAll('.theme-color-chip').forEach(c => c.classList.remove('active'));
+          if (remoteIdx !== null && remoteIdx !== undefined) {
+            document.querySelector(`.theme-color-chip[data-idx="${remoteIdx}"]`)?.classList.add('active');
+          }
+          // 更新颜色选择器
+          const picker = document.getElementById('themeColorPicker');
+          if (picker && remoteTheme.primary) picker.value = remoteTheme.primary;
+        }
+      }
+    } else if (localTs > remoteTs) {
+      // 本地更新，推送本地
+      await this.set('customTheme', { theme: localTheme, ts: localTs, idx: Store.get('customThemeIdx', null) });
+    }
+  },
+
   // 同步地标打卡数据：直接使用fetch，绕过CloudSync封装
   async syncLandmarks() {
     if (!Cloud.pairCode) return;
@@ -1265,6 +1381,7 @@ const App = {
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && Cloud.isPaired() && !App.isHistory) {
         Cloud.syncAll();
+        Cloud.syncQuizVocab();
         Cloud.syncPhotos();
         Cloud.syncVoices();
         if (typeof CloudSync !== 'undefined') {
@@ -1274,6 +1391,9 @@ const App = {
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
+          CloudSync.syncPomodoroHistory();
+          CloudSync.syncLandmarks();
+          CloudSync.syncThemeColor();
           ReadMark.syncAll();
           RoleName.syncFromCloud();
         }
@@ -1391,7 +1511,9 @@ const App = {
         CloudSync.syncExerciseTime();
         CloudSync.syncBgOpacity();
         CloudSync.syncPomodoro();
+        CloudSync.syncPomodoroHistory();
         CloudSync.syncLandmarks();
+        CloudSync.syncThemeColor();
         ReadMark.syncAll();
         RoleName.syncFromCloud();
       }
@@ -1504,7 +1626,9 @@ const App = {
           CloudSync.syncExerciseTime();
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
+          CloudSync.syncPomodoroHistory();
           CloudSync.syncLandmarks();
+          CloudSync.syncThemeColor();
           ReadMark.syncAll();
           RoleName.syncFromCloud();
         }
@@ -3551,6 +3675,12 @@ const Setting = {
     this._applyThemeVars(preset);
     Store.set('customTheme', preset);
     Store.set('customThemeIdx', idx);
+    // 记录时间戳并同步到云端
+    const ts = Date.now();
+    Store.set('customThemeTs', ts);
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.set('customTheme', { theme: preset, ts: ts, idx: idx });
+    }
     // 更新调色盘高亮
     document.querySelectorAll('.theme-color-chip').forEach(c => c.classList.remove('active'));
     document.querySelector(`.theme-color-chip[data-idx="${idx}"]`)?.classList.add('active');
@@ -3592,6 +3722,12 @@ const Setting = {
     };
     this._applyThemeVars(preset);
     Store.set('customTheme', preset);
+    // 记录时间戳并同步到云端
+    const ts = Date.now();
+    Store.set('customThemeTs', ts);
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.set('customTheme', { theme: preset, ts: ts, idx: null });
+    }
     // 取消预设高亮
     document.querySelectorAll('.theme-color-chip').forEach(c => c.classList.remove('active'));
   },
@@ -3613,6 +3749,13 @@ const Setting = {
   resetTheme() {
     Store.remove('customTheme');
     Store.remove('customThemeIdx');
+    Store.remove('customThemeTs');
+    // 同步重置到云端（用空主题表示恢复默认）
+    const ts = Date.now();
+    Store.set('customThemeTs', ts);
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.set('customTheme', { theme: null, ts: ts, idx: null });
+    }
     const root = document.documentElement;
     // 清除内联样式，恢复 CSS 默认
     root.style.removeProperty('--theme-primary');
