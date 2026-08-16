@@ -113,6 +113,9 @@ function genPairCode() {
   return s;
 }
 
+// 默认配对码：双方进入网站时自动使用此码同步数据
+const DEFAULT_PAIR_CODE = 'U2A6KA';
+
 // ====== 云同步模块 ======
 const Cloud = {
   BASE: 'https://mantledb.sh/v2',
@@ -233,6 +236,35 @@ const Cloud = {
     Store.set('role', role);
     Store.addPairHistory(code, role);
     this._saveBackup(code, role); // 立即备份到 IndexedDB
+
+    const meta = {
+      creator: role,
+      createdAt: new Date().toISOString(),
+      members: [role]
+    };
+    try {
+      const r = await fetch(this._url('meta'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(meta)
+      });
+      if (!r.ok) throw new Error('create failed');
+      return { ok: true, code };
+    } catch (e) {
+      this.pairCode = null;
+      Store.remove('pairCode');
+      Store.remove('role');
+      return { ok: false, error: e.message };
+    }
+  },
+
+  // 使用指定配对码创建配对（用于默认配对码 U2A6KA）
+  async createPairWithCode(code, role) {
+    this.pairCode = code;
+    Store.set('pairCode', code);
+    Store.set('role', role);
+    Store.addPairHistory(code, role);
+    this._saveBackup(code, role);
 
     const meta = {
       creator: role,
@@ -671,9 +703,9 @@ const Cloud = {
   // MantleDB 免费版限制：100 条/命名空间，64KB/条
   // CHUNK_SIZE 设为 65000（含 JSON 包装后恰好 < 64KB）
   CHUNK_SIZE: 65000,
-  MAX_RETRIES: 2, // 每块失败重试次数
+  MAX_RETRIES: 3, // 每块失败重试次数（共 4 次尝试）
 
-  // 带重试的 POST 请求
+  // 带重试的 POST 请求（指数退避 + 抖动）
   async _retryPOST(url, body, retries) {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -685,10 +717,20 @@ const Cloud = {
         if (r.ok) return true; // 成功
         // 413 = payload 太大，不重试直接失败
         if (r.status === 413) return false;
+        // 429 = 限流，等待更长时间后重试
+        if (r.status === 429) {
+          if (attempt < retries) {
+            await new Promise(res => setTimeout(res, 2000 * (attempt + 1)));
+          }
+          continue;
+        }
         // 其他错误（500 等）重试
       } catch (e) { /* 网络错误，重试 */ }
       if (attempt < retries) {
-        await new Promise(r => setTimeout(r, 500 * (attempt + 1))); // 递增延迟
+        // 指数退避：500ms, 1000ms, 2000ms + 随机抖动
+        const base = 500 * Math.pow(2, attempt);
+        const jitter = Math.floor(Math.random() * 200);
+        await new Promise(r => setTimeout(r, base + jitter));
       }
     }
     return false;
@@ -717,7 +759,7 @@ const Cloud = {
     return new Blob(byteArrays, { type: mime || 'application/octet-stream' });
   },
 
-  // 上传文件（分块）到云端
+  // 上传文件（分块）到云端（带整体重试 + 进度提示）
   async uploadFile(blob, path, onProgress) {
     if (!this.pairCode) return null;
     const b64 = await this._blobToBase64(blob);
@@ -727,6 +769,9 @@ const Cloud = {
     for (let i = 0; i < b64.length; i += this.CHUNK_SIZE) {
       chunks.push(b64.slice(i, i + this.CHUNK_SIZE));
     }
+
+    // 多分块文件显示上传进度
+    const showProgress = chunks.length > 3 && typeof showToast === 'function';
 
     // 存储元数据
     const meta = JSON.stringify({
@@ -738,15 +783,35 @@ const Cloud = {
     const metaOk = await this._retryPOST(this._url(`${path}/meta`), meta, this.MAX_RETRIES);
     if (!metaOk) return null;
 
-    // 分块上传（带重试）
-    for (let i = 0; i < chunks.length; i++) {
-      const chunkBody = JSON.stringify({ data: chunks[i] });
-      const ok = await this._retryPOST(this._url(`${path}/chunk_${i}`), chunkBody, this.MAX_RETRIES);
-      if (!ok) return null; // 某块失败则整体失败
-      if (onProgress) onProgress(Math.round((i + 1) / chunks.length * 100));
+    // 分块上传（最多整体重试 2 轮）
+    for (let round = 0; round < 2; round++) {
+      let failed = false;
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkBody = JSON.stringify({ data: chunks[i] });
+        const ok = await this._retryPOST(this._url(`${path}/chunk_${i}`), chunkBody, this.MAX_RETRIES);
+        if (!ok) {
+          failed = true;
+          console.warn(`[Cloud] uploadFile: ${path}/chunk_${i} 上传失败（第${round + 1}轮）`);
+          break;
+        }
+        if (onProgress) onProgress(Math.round((i + 1) / chunks.length * 100));
+        if (showProgress && i > 0 && i % 5 === 0) {
+          showToast(`上传中 ${Math.round((i + 1) / chunks.length * 100)}%...`, 1000);
+        }
+      }
+      if (!failed) {
+        if (showProgress) showToast('上传完成 ✅', 1500);
+        return path;
+      }
+      // 第一轮失败后等待 1 秒再整体重试
+      if (round === 0) {
+        console.warn(`[Cloud] uploadFile: ${path} 第一轮上传有失败块，1 秒后整体重试`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
     }
-
-    return path;
+    // 两轮都失败
+    if (typeof showToast === 'function') showToast('照片同步失败，将在下次自动重试', 3000);
+    return null;
   },
 
   // 下载文件（分块）从云端（带重试）
@@ -867,15 +932,28 @@ const Cloud = {
       }
     }
 
-    // 上传本地有但云端没有的照片
+    // 上传本地有但云端没有的照片（带失败追踪）
+    const failedUploads = Store.get('photo_upload_failed', []);
+    let uploadFailed = false;
     for (const id of localIds) {
       if (!remoteIds.includes(id)) {
         const photo = Photos.photos.find(p => p.id === id);
         if (photo) {
-          await this.uploadFile(photo.blob, `photos/${id}`);
+          const result = await this.uploadFile(photo.blob, `photos/${id}`);
+          if (result) {
+            // 上传成功，从失败列表中移除
+            const idx = failedUploads.indexOf(id);
+            if (idx >= 0) failedUploads.splice(idx, 1);
+          } else {
+            // 上传失败，加入失败列表等待下次重试
+            if (!failedUploads.includes(id)) failedUploads.push(id);
+            uploadFailed = true;
+          }
         }
       }
     }
+    // 保存失败列表
+    Store.set('photo_upload_failed', failedUploads);
 
     // 更新云端照片列表
     await this.pushPhotoList();
@@ -883,6 +961,9 @@ const Cloud = {
     if (newPhotos) {
       Photos.render();
       showToast('对方上传了新照片 📸');
+    }
+    if (uploadFailed && !newPhotos) {
+      showToast(`${failedUploads.length} 张照片待同步，下次自动重试`, 3000);
     }
   },
 
@@ -1534,11 +1615,11 @@ const App = {
           this.enterApp();
         }, 400);
       } else {
-        // 未配对：跳到配对页
+        // 未配对：自动使用默认配对码 U2A6KA 加入
         document.getElementById('entryScreen').classList.add('hidden');
         setTimeout(() => {
           document.getElementById('entryScreen').style.display = 'none';
-          this.showPairScreen();
+          Pair.autoJoin(role);
         }, 400);
       }
     });
@@ -1845,6 +1926,32 @@ const App = {
 
 // ====== 配对模块 ======
 const Pair = {
+  // 自动使用默认配对码 U2A6KA 加入
+  // 第一个进入的人创建配对，第二个进入的人直接加入
+  async autoJoin(role) {
+    showToast('正在连接配对码 U2A6KA...');
+    // 先尝试加入已有配对
+    const joinResult = await Cloud.joinPair(DEFAULT_PAIR_CODE, role);
+    if (joinResult.ok) {
+      App.enterAfterPair(role);
+      return;
+    }
+    // 加入失败说明配对码尚不存在，创建它
+    showToast('正在创建默认配对...');
+    const createResult = await Cloud.createPairWithCode(DEFAULT_PAIR_CODE, role);
+    if (createResult.ok) {
+      App.enterAfterPair(role);
+      return;
+    }
+    // 网络错误等：回退到手动配对页
+    showToast('自动配对失败，请手动配对');
+    const pairScreen = document.getElementById('pairScreen');
+    if (pairScreen) {
+      pairScreen.style.display = 'flex';
+      Pair.showCreateView();
+    }
+  },
+
   showCreateView() {
     this._renderHistory();
     document.getElementById('pairCreateView').style.display = 'flex';
