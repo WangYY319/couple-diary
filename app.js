@@ -300,7 +300,16 @@ const Cloud = {
     if (!this.pairCode) { console.warn('[SYNC] pushDay: no pairCode'); return; }
     try {
       // 1. 先拉取云端数据并合并（防止覆盖对方的打卡）
-      const remote = await this.pullDay(dateStr);
+      let remote = await this.pullDay(dateStr);
+      // 如果单日数据不存在，从 days_all 备份获取
+      if (!remote) {
+        console.log('[SYNC] pushDay: single day not found, checking days_all');
+        const allDays = await this.pullAllDays();
+        if (allDays && typeof allDays === 'object' && allDays[dateStr]) {
+          remote = allDays[dateStr];
+          console.log('[SYNC] pushDay: found in days_all:', JSON.stringify(remote.greet));
+        }
+      }
       if (remote && typeof remote === 'object') {
         console.log('[SYNC] pushDay: pulled remote for', dateStr, JSON.stringify(remote.greet));
         Store.mergeRemoteDays({ [dateStr]: remote });
@@ -363,22 +372,19 @@ const Cloud = {
     this.isSyncing = true;
 
     try {
-      // 1. 先拉取云端全部日记备份（防止本地数据丢失后无法恢复）
+      // 1. 先拉取云端全部日记备份，始终合并（防止本地数据不完整）
       const allRemoteDays = await this.pullAllDays();
+      let anyChanged = false;
       if (allRemoteDays && typeof allRemoteDays === 'object') {
-        const remoteDates = Object.keys(allRemoteDays);
-        const localDates = Object.keys(Store.getAllDays());
-        // 如果云端有本地没有的日期，说明本地数据可能丢失，需要恢复
-        const missingDates = remoteDates.filter(ds => !localDates.includes(ds));
-        if (missingDates.length > 0 || remoteDates.length > localDates.length) {
-          const changed = Store.mergeRemoteDays(allRemoteDays);
-          if (changed) {
-            if (typeof Cards !== 'undefined') {
-              Cards.renderAll();
-              Cards.updateRolePermissions();
-            }
-            if (typeof Calendar !== 'undefined') Calendar.render();
+        // 始终合并 days_all 数据（不仅是在缺少日期时）
+        const changed = Store.mergeRemoteDays(allRemoteDays);
+        if (changed) {
+          anyChanged = true;
+          if (typeof Cards !== 'undefined') {
+            Cards.renderAll();
+            Cards.updateRolePermissions();
           }
+          if (typeof Calendar !== 'undefined') Calendar.render();
         }
       }
 
@@ -509,8 +515,25 @@ const Cloud = {
     try {
       const ds = todayStr();
       console.log('[SYNC] syncToday: pulling for', ds);
-      const remote = await this.pullDay(ds);
-      console.log('[SYNC] syncToday: remote =', remote ? JSON.stringify(remote.greet) : 'null');
+      let remote = await this.pullDay(ds);
+      console.log('[SYNC] syncToday: pullDay remote =', remote ? JSON.stringify(remote.greet) : 'null');
+      
+      // 如果单日数据不存在(404)，从 days_all 备份中获取
+      if (!remote) {
+        console.log('[SYNC] syncToday: single day not found, falling back to days_all');
+        const allDays = await this.pullAllDays();
+        if (allDays && typeof allDays === 'object' && allDays[ds]) {
+          remote = allDays[ds];
+          console.log('[SYNC] syncToday: got from days_all:', JSON.stringify(remote.greet));
+          // 同时把单日数据写回云端（修复缺失的单日数据）
+          await fetch(this._url(`days/${ds}`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(remote)
+          });
+        }
+      }
+      
       if (remote && typeof remote === 'object') {
         const localSingle = { [ds]: remote };
         const changed = Store.mergeRemoteDays(localSingle);
@@ -1939,8 +1962,8 @@ const Pair = {
       const overlay = document.getElementById('pairConfirmOverlay');
       const titleEl = document.getElementById('pairConfirmTitle');
       const descEl = document.getElementById('pairConfirmDesc');
-      if (titleEl) titleEl.textContent = '未识别的配对码';
-      if (descEl) descEl.innerHTML = `配对码 <b>${code}</b> 未曾使用过，请确认：<br>① 可能为输入有误，请重新检查<br>② 或确认建立新的配对码登录`;
+      if (titleEl) titleEl.textContent = '配对码未被本地记录';
+      if (descEl) descEl.innerHTML = `配对码 <b>${code}</b> 未在本设备记录过（可能是清除了缓存导致）。<br>如果这是你之前用过的配对码，请点击「确认加入」恢复数据。<br>如果输入有误，请点击「重新检查」。`;
       if (overlay) overlay.style.display = 'flex';
       return;
     }
