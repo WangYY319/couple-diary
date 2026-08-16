@@ -69,6 +69,7 @@ const Store = {
 
       // 检测是否变化
       if (JSON.stringify(merged) !== JSON.stringify(l)) {
+        console.log('[SYNC] mergeRemoteDays: changed for', ds, '| local greet:', JSON.stringify(l.greet), '| merged greet:', JSON.stringify(merged.greet));
         local[ds] = merged;
         changed = true;
       }
@@ -296,16 +297,18 @@ const Cloud = {
 
   // 推送当天数据到云端（先拉取合并，防止覆盖对方的打卡）
   async pushDay(dateStr) {
-    if (!this.pairCode) return;
+    if (!this.pairCode) { console.warn('[SYNC] pushDay: no pairCode'); return; }
     try {
       // 1. 先拉取云端数据并合并（防止覆盖对方的打卡）
       const remote = await this.pullDay(dateStr);
       if (remote && typeof remote === 'object') {
+        console.log('[SYNC] pushDay: pulled remote for', dateStr, JSON.stringify(remote.greet));
         Store.mergeRemoteDays({ [dateStr]: remote });
       }
       // 2. 获取合并后的数据并推送
       const merged = Store.getDay(dateStr);
-      if (!merged) return;
+      if (!merged) { console.warn('[SYNC] pushDay: no merged data'); return; }
+      console.log('[SYNC] pushDay: pushing merged for', dateStr, JSON.stringify(merged.greet));
       await fetch(this._url(`days/${dateStr}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -314,17 +317,19 @@ const Cloud = {
       // 同时更新云端全部日记备份
       this.pushAllDays();
       this.lastSyncAt = Date.now();
-    } catch (e) { /* 静默失败，下次重试 */ }
+    } catch (e) { console.error('[SYNC] pushDay error:', e); }
   },
 
   // 拉取云端当天数据
   async pullDay(dateStr) {
-    if (!this.pairCode) return null;
+    if (!this.pairCode) { console.warn('[SYNC] pullDay: no pairCode'); return null; }
     try {
       const r = await fetch(this._url(`days/${dateStr}`));
-      if (!r.ok) return null;
-      return await r.json();
-    } catch (e) { return null; }
+      if (!r.ok) { console.warn('[SYNC] pullDay: not ok for', dateStr, r.status); return null; }
+      const data = await r.json();
+      console.log('[SYNC] pullDay: got data for', dateStr, data ? JSON.stringify(data.greet) : 'null');
+      return data;
+    } catch (e) { console.error('[SYNC] pullDay error:', e); return null; }
   },
 
   // 推送全部日记数据到云端（作为整体备份，防止本地清空后丢失）
@@ -503,7 +508,9 @@ const Cloud = {
     this.isSyncing = true;
     try {
       const ds = todayStr();
+      console.log('[SYNC] syncToday: pulling for', ds);
       const remote = await this.pullDay(ds);
+      console.log('[SYNC] syncToday: remote =', remote ? JSON.stringify(remote.greet) : 'null');
       if (remote && typeof remote === 'object') {
         const localSingle = { [ds]: remote };
         const changed = Store.mergeRemoteDays(localSingle);
@@ -1769,6 +1776,59 @@ const App = {
 
   getCurrentDate() {
     return this.isHistory ? this.viewDate : todayStr();
+  },
+
+  // 手动强制同步（用户点击🔄按钮时调用）
+  async forceSync() {
+    if (!Cloud.isPaired()) {
+      showToast('未配对，无法同步');
+      return;
+    }
+    const btn = document.getElementById('syncStatusBtn');
+    if (btn) btn.textContent = '⏳';
+    showToast('正在同步...');
+    console.log('[FORCE-SYNC] Starting force sync');
+
+    try {
+      // 全量同步
+      await Cloud.syncAll();
+      // 同步所有模块
+      Cloud.syncQuizVocab();
+      Cloud.syncPhotos();
+      Cloud.syncVoices();
+      if (typeof CloudSync !== 'undefined') {
+        CloudSync.syncOnlineDuration();
+        CloudSync.syncLetters();
+        CloudSync.syncAvatars();
+        CloudSync.syncExerciseTime();
+        CloudSync.syncBgOpacity();
+        CloudSync.syncPomodoro();
+        CloudSync.syncPomodoroHistory();
+        CloudSync.syncLandmarks();
+        CloudSync.syncThemeColor();
+        ReadMark.syncAll();
+        RoleName.syncFromCloud();
+      }
+
+      // 刷新所有 UI
+      Cards.renderAll();
+      Cards.updateRolePermissions();
+      Calendar.render();
+      this.updateNav();
+      if (typeof HistoryView !== 'undefined') HistoryView.render();
+
+      console.log('[FORCE-SYNC] Force sync complete');
+      console.log('[FORCE-SYNC] Today data:', JSON.stringify(Store.getDay(todayStr())));
+
+      if (btn) btn.textContent = '✅';
+      showToast('同步完成 ✨');
+      setTimeout(() => { if (btn) btn.textContent = '🔄'; }, 2000);
+    } catch (e) {
+      console.error('[FORCE-SYNC] Error:', e);
+      if (btn) btn.textContent = '❌';
+      showToast('同步失败：' + e.message);
+      setTimeout(() => { if (btn) btn.textContent = '🔄'; }, 3000);
+    }
   }
 };
 
@@ -2537,23 +2597,29 @@ const Cards = {
     // 3. 拉取云端数据并合并（获取对方的打卡），然后推送
     if (Cloud.pairCode) {
       try {
+        console.log('[CHECKIN] doCheckin: pulling cloud for', dateStr, 'role:', role);
         const remote = await Cloud.pullDay(dateStr);
         if (remote && typeof remote === 'object') {
+          console.log('[CHECKIN] doCheckin: remote greet:', JSON.stringify(remote.greet));
           const changed = Store.mergeRemoteDays({ [dateStr]: remote });
           if (changed) {
+            console.log('[CHECKIN] doCheckin: merged, re-rendering');
             this.renderAll();
             Calendar.render();
             App.updateNav();
           }
+        } else {
+          console.log('[CHECKIN] doCheckin: no remote data');
         }
         // 推送合并后的数据
         await Cloud.pushDay(dateStr);
-      } catch (e) { /* 静默失败 */ }
+      } catch (e) { console.error('[CHECKIN] doCheckin sync error:', e); }
     }
 
     // 4. 检查"双方都打卡"的效果（使用合并后的数据）
     if (cardType === 'greet') {
       const updatedData = Store.getDay(dateStr);
+      console.log('[CHECKIN] doCheckin final check: greet =', JSON.stringify(updatedData?.greet));
       if (updatedData && updatedData.greet && updatedData.greet.tao && updatedData.greet.yan && !updatedData.greet.count) {
         const allDays = Store.getAllDays();
         let count = 0;
@@ -2565,6 +2631,9 @@ const Cards = {
         Cloud.pushDay(dateStr);
         this.renderGreet();
         showToast('💕 打卡完成！两人合成了完整爱心');
+      } else if (updatedData && updatedData.greet && updatedData.greet.tao && updatedData.greet.yan && updatedData.greet.count) {
+        // Already counted, just render
+        this.renderGreet();
       } else {
         showToast(`${App.currentRole} 已打卡，等待另一半 ✨`);
       }
