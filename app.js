@@ -393,7 +393,6 @@ const Cloud = {
       const dates = new Set(Object.keys(localDays));
       dates.add(todayStr());
 
-      let anyChanged = false;
       for (const ds of dates) {
         const remote = await this.pullDay(ds);
         if (remote && typeof remote === 'object') {
