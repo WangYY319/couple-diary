@@ -1607,6 +1607,30 @@ html, body {
   cursor: pointer;
 }
 
+/* === 版本日志 === */
+.version-log { display: flex; flex-direction: column; gap: 6px; }
+.version-log-item {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.03);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.version-log-item.latest {
+  background: rgba(52,168,83,0.08);
+  border-left: 3px solid #34a853;
+}
+.version-tag {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 12px;
+  color: #999;
+  margin-right: 6px;
+}
+.version-tag.latest { color: #34a853; }
+.version-date { color: #bbb; font-size: 10px; }
+.version-change { color: #666; margin-top: 2px; }
+
 /* === 设置弹窗：主题调色盘 === */
 .theme-palette {
   display: grid;
@@ -4544,8 +4568,18 @@ body.music-active #tab-0 .card {
 .quiz-stats-row {
   display: flex;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 8px;
 }
+
+.quiz-sync-hint {
+  font-size: 12px;
+  margin-bottom: 12px;
+  min-height: 18px;
+}
+.quiz-sync-hint:empty { display: none; }
+.quiz-hint-done { color: #34a853; font-weight: 600; }
+.quiz-hint-wait { color: #f39c12; }
+.quiz-hint-other { color: #1b7fe3; }
 
 .quiz-stat {
   flex: 1;
@@ -6320,27 +6354,26 @@ body.music-active #tab-0 .card {
   box-shadow: 0 0 5px rgba(232,41,106,0.5);
 }
 
-/* TAO 打卡 → 左侧边框高亮 */
+/* TAO 标注 → 左侧边框高亮 */
 .landmark-bubble.tao-on {
   border-left: 3px solid #1b7fe3;
   border-left-color: #1b7fe3;
   background: rgba(27,127,227,0.08);
 }
 
-/* YAN 打卡 → 右侧边框高亮 */
+/* YAN 标注 → 右侧边框高亮 */
 .landmark-bubble.yan-on {
   border-right: 3px solid #e8296a;
   border-right-color: #e8296a;
   background: rgba(232,41,106,0.08);
 }
 
-/* 双方都打卡 → 全亮 */
-.landmark-bubble.tao-on.yan-on {
-  border: 2px solid;
-  border-left: 3px solid #1b7fe3;
-  border-right: 3px solid #e8296a;
-  background: linear-gradient(90deg, rgba(27,127,227,0.12), rgba(232,41,106,0.12));
-  color: #333;
+/* 双方都标注 → 绿色高亮 */
+.landmark-bubble.both-on {
+  border: 2px solid #34a853 !important;
+  background: rgba(52,168,83,0.15) !important;
+  color: #1b6b2e;
+  font-weight: 700;
 }
 
 /* 城市展开区域 */
@@ -6389,12 +6422,18 @@ body.music-active #tab-0 .card {
   background: rgba(232,41,106,0.08);
 }
 
-.landmark-city.tao-on.yan-on {
-  border: 2px solid;
-  border-left: 3px solid #1b7fe3;
-  border-right: 3px solid #e8296a;
-  background: linear-gradient(90deg, rgba(27,127,227,0.12), rgba(232,41,106,0.12));
-  color: #333;
+.landmark-city.both-on {
+  border: 2px solid #34a853 !important;
+  background: rgba(52,168,83,0.15) !important;
+  color: #1b6b2e;
+  font-weight: 700;
+}
+
+/* 统计中双方标注计数 */
+.ls-both {
+  color: #34a853;
+  font-weight: 600;
+  margin-left: 4px;
 }
 
 /* === 动画 === */

@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="img/favicon.svg">
   <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
   <title>TAO&YAN 相处日记</title>
-  <link rel="stylesheet" href="style.css?v=98">
+  <link rel="stylesheet" href="style.css?v=99">
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -401,6 +401,7 @@
             <span class="quiz-stat-count" id="quizCountYAN">0/5</span>
           </div>
         </div>
+        <div class="quiz-sync-hint" id="quizSyncHint"></div>
         <div class="quiz-content" id="quizContent">
           <div class="quiz-placeholder" id="quizPlaceholder">点击下方按钮开始今日问答 💕</div>
           <div class="quiz-question-area" id="quizQuestionArea" style="display:none">
@@ -639,7 +640,7 @@
       <!-- 地标打卡 -->
       <div class="card landmark-card">
         <div class="card-title"><span class="icon">📍</span> 地标打卡 <span class="landmark-stats" id="landmarkStats"></span></div>
-        <div class="landmark-hint">单击展开省市 · 双击打卡标记</div>
+        <div class="landmark-hint">单击展开省市 · 双击标注颜色 · 双方都标注变绿色</div>
         <div class="landmark-grid" id="landmarkGrid"></div>
         <button class="landmark-sync-btn" onclick="CloudSync.syncLandmarks(); showToast('正在同步...');">🔄</button>
       </div>
@@ -784,6 +785,10 @@
       <div class="setting-desc">导出照片、信件、打卡记录、娱乐内容</div>
       <button class="setting-btn primary" onclick="ExportPanel.open()">📦 打开导出面板</button>
     </div>
+    <div class="setting-group">
+      <div class="setting-label">版本日志</div>
+      <div class="version-log" id="versionLog"></div>
+    </div>
     <button class="setting-cancel" onclick="Setting.close()">关闭</button>
   </div>
 </div>
@@ -898,7 +903,7 @@
   </div>
 </div>
 
-<script src="vocab-data.js?v=98"></script>
-<script src="app.js?v=98"></script>
+<script src="vocab-data.js?v=99"></script>
+<script src="app.js?v=99"></script>
 </body>
 </html>

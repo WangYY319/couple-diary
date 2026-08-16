@@ -932,28 +932,36 @@ const Cloud = {
       }
     }
 
-    // 上传本地有但云端没有的照片（带失败追踪）
+    // 上传本地有但云端没有的照片（带失败追踪 + 最大重试限制）
     const failedUploads = Store.get('photo_upload_failed', []);
+    const MAX_SYNC_RETRIES = 10;
     let uploadFailed = false;
+    const stillFailed = [];
     for (const id of localIds) {
       if (!remoteIds.includes(id)) {
         const photo = Photos.photos.find(p => p.id === id);
         if (photo) {
           const result = await this.uploadFile(photo.blob, `photos/${id}`);
           if (result) {
-            // 上传成功，从失败列表中移除
-            const idx = failedUploads.indexOf(id);
-            if (idx >= 0) failedUploads.splice(idx, 1);
+            // 上传成功
           } else {
-            // 上传失败，加入失败列表等待下次重试
-            if (!failedUploads.includes(id)) failedUploads.push(id);
-            uploadFailed = true;
+            // 记录重试次数
+            const retryCount = Store.get(`photo_retry_${id}`, 0) + 1;
+            Store.set(`photo_retry_${id}`, retryCount);
+            if (retryCount < MAX_SYNC_RETRIES) {
+              stillFailed.push(id);
+              uploadFailed = true;
+            } else {
+              // 超过最大重试，放弃
+              showToast(`照片 ${id.slice(-6)} 多次同步失败，请检查网络后重新上传`, 4000);
+              Store.remove(`photo_retry_${id}`);
+            }
           }
         }
       }
     }
-    // 保存失败列表
-    Store.set('photo_upload_failed', failedUploads);
+    // 更新失败列表（只保留未超限的）
+    Store.set('photo_upload_failed', stillFailed);
 
     // 更新云端照片列表
     await this.pushPhotoList();
@@ -963,7 +971,7 @@ const Cloud = {
       showToast('对方上传了新照片 📸');
     }
     if (uploadFailed && !newPhotos) {
-      showToast(`${failedUploads.length} 张照片待同步，下次自动重试`, 3000);
+      showToast(`${stillFailed.length} 张照片待同步，下次自动重试 (${stillFailed.length}张)`, 3000);
     }
   },
 
@@ -1389,20 +1397,20 @@ const CloudSync = {
     }
   },
 
-  // 同步地标打卡数据：直接使用fetch，绕过CloudSync封装
+  // 同步地标标注数据（简化版）
   async syncLandmarks() {
     if (!Cloud.pairCode) return;
     try {
-      const url = Cloud._url('custom/landmark_checkins');
-      const localData = Store.get('landmark_checkins', {});
+      const url = Cloud._url('custom/landmark_marks');
+      const localData = typeof LandmarkCheckin !== 'undefined'
+        ? LandmarkCheckin.getLocalData()
+        : Store.get('landmark_marks', {});
 
       // 读取云端数据
       let remoteData = null;
       try {
         const r = await fetch(url);
-        if (r.ok) {
-          remoteData = await r.json();
-        }
+        if (r.ok) remoteData = await r.json();
       } catch (e) { /* ignore */ }
 
       if (!remoteData || typeof remoteData !== 'object' || Array.isArray(remoteData)) {
@@ -1419,43 +1427,27 @@ const CloudSync = {
         return;
       }
 
-      // 基于时间戳的合并：每个角色的状态取时间戳最新的值
-      const allKeys = new Set([...Object.keys(localData), ...Object.keys(remoteData)]);
-      allKeys.forEach(key => {
-        if (!localData[key] || typeof localData[key] !== 'object') {
-          localData[key] = { tao: false, yan: false, tao_ts: 0, yan_ts: 0 };
-        }
-        if (localData[key].tao_ts === undefined) localData[key].tao_ts = 0;
-        if (localData[key].yan_ts === undefined) localData[key].yan_ts = 0;
-
-        if (remoteData[key] && typeof remoteData[key] === 'object') {
-          const remoteTsTao = remoteData[key].tao_ts || 0;
-          const remoteTsYan = remoteData[key].yan_ts || 0;
-
-          if (remoteTsTao > localData[key].tao_ts) {
-            localData[key].tao = !!remoteData[key].tao;
-            localData[key].tao_ts = remoteTsTao;
-          }
-          if (remoteTsYan > localData[key].yan_ts) {
-            localData[key].yan = !!remoteData[key].yan;
-            localData[key].yan_ts = remoteTsYan;
-          }
-        }
-      });
-
-      // 保存到本地并重新渲染
-      Store.set('landmark_checkins', localData);
+      // 合并远端数据到本地
+      let changed = false;
       if (typeof LandmarkCheckin !== 'undefined') {
-        LandmarkCheckin.render();
+        changed = LandmarkCheckin.mergeRemote(remoteData);
       }
-      // 推送到云端
+
+      // 推送合并后的数据到云端
+      const merged = typeof LandmarkCheckin !== 'undefined'
+        ? LandmarkCheckin.getLocalData()
+        : localData;
       try {
         await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(localData)
+          body: JSON.stringify(merged)
         });
       } catch (e) { /* ignore */ }
+
+      if (changed && typeof showToast === 'function') {
+        showToast('地标标注已同步 ✅', 1500);
+      }
     } catch (e) {
       // 静默失败
     }
@@ -3689,7 +3681,28 @@ const Setting = {
       this.renderThemePalette();
       // 渲染字体选择
       this.renderFontSelector();
+      // 渲染版本日志
+      this.renderVersionLog();
     });
+  },
+
+  VERSION_LOG: [
+    { v: 'v99', date: '2026-08-16', changes: '照片自适应压缩+失败检测/问答情侣题库+完成提示同步/地标标注重构+绿色双方标/版本日志' },
+    { v: 'v98', date: '2026-08-16', changes: '配对码U2A6KA默认化/版本号统一/照片上传可靠性增强' },
+    { v: 'v95', date: '2026-08-15', changes: 'SW缓存策略修复/地标打卡初始版/随机问答初始版' },
+  ],
+
+  renderVersionLog() {
+    const el = document.getElementById('versionLog');
+    if (!el) return;
+    el.innerHTML = this.VERSION_LOG.map((log, i) => {
+      const isLatest = i === 0;
+      return `<div class="version-log-item${isLatest ? ' latest' : ''}">
+        <span class="version-tag${isLatest ? ' latest' : ''}">${log.v}</span>
+        <span class="version-date">${log.date}</span>
+        <div class="version-change">${log.changes}</div>
+      </div>`;
+    }).join('');
   },
 
   // 字体定义
@@ -5972,15 +5985,20 @@ const Photos = {
     const files = input.files;
     if (!files || files.length === 0) return;
     let success = 0;
+    let failed = 0;
     const newPhotos = [];
     for (const file of files) {
-      if (!file.type.startsWith('image/')) continue;
-      if (file.size > 10 * 1024 * 1024) {
-        showToast(`${file.name} 超过10MB，已跳过`);
+      if (!file.type.startsWith('image/')) {
+        showToast(`${file.name} 非图片，已跳过`);
         continue;
       }
       try {
         const blob = await this._compressImage(file);
+        if (!blob || blob.size === 0) {
+          showToast(`${file.name} 压缩失败，已跳过`);
+          failed++;
+          continue;
+        }
         const id = uid();
         await this._put(id, blob);
         this.photos.push({ id, blob });
@@ -5988,44 +6006,72 @@ const Photos = {
         success++;
       } catch (e) {
         console.error('Photo upload error', e);
+        showToast(`${file.name} 上传失败: ${e.message || '未知错误'}`);
+        failed++;
       }
     }
     input.value = '';
     if (success > 0) {
-      showToast(`已上传 ${success} 张照片 📸 正在同步给对方...`);
+      const msg = failed > 0
+        ? `已上传 ${success} 张，${failed} 张失败`
+        : `已上传 ${success} 张照片 📸 正在同步...`;
+      showToast(msg);
       this.render();
-      // 云同步新照片
       if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
         for (const p of newPhotos) {
-          Cloud.uploadFile(p.blob, `photos/${p.id}`).then(() => {
-            Cloud.pushPhotoList();
+          Cloud.uploadFile(p.blob, `photos/${p.id}`).then((result) => {
+            if (result) {
+              Cloud.pushPhotoList();
+            } else {
+              Store.set('photo_upload_failed',
+                [...Store.get('photo_upload_failed', []), p.id]);
+              showToast(`照片 ${p.id.slice(-6)} 同步失败，将在下次自动重试`, 3000);
+            }
           });
         }
       }
+    } else if (failed > 0) {
+      showToast(`${failed} 张照片上传失败，请重试`);
     }
   },
 
   async _compressImage(file) {
-    return new Promise((resolve, reject) => {
+    const MAX_BYTES = 400 * 1024; // 目标压缩后 < 400KB
+    const steps = [
+      { maxDim: 800, quality: 0.85 },
+      { maxDim: 800, quality: 0.65 },
+      { maxDim: 600, quality: 0.5 },
+      { maxDim: 480, quality: 0.4 },
+    ];
+    for (let s = 0; s < steps.length; s++) {
+      const { maxDim, quality } = steps[s];
+      const blob = await this._resizeToBlob(file, maxDim, quality);
+      if (!blob) continue;
+      if (blob.size <= MAX_BYTES || s === steps.length - 1) return blob;
+    }
+    // 兜底
+    return this._resizeToBlob(file, 480, 0.3);
+  },
+
+  _resizeToBlob(file, maxDim, quality) {
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          const maxW = 800;
-          const maxH = 800;
           let w = img.width, h = img.height;
-          if (w > maxW) { h = h * maxW / w; w = maxW; }
-          if (h > maxH) { w = w * maxH / h; h = maxH; }
+          if (w > maxDim) { h = h * maxDim / w; w = maxDim; }
+          if (h > maxDim) { w = w * maxDim / h; h = maxDim; }
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
-          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
         };
-        img.onerror = reject;
+        img.onerror = () => resolve(null);
         img.src = e.target.result;
       };
-      reader.onerror = reject;
+      reader.onerror = () => resolve(null);
       reader.readAsDataURL(file);
     });
   },
@@ -6605,58 +6651,58 @@ const HistoryHint = {
 
 // ====== 随机问答模块 ======
 const RandomQA = {
-  // 二选一题库：简单无脑的爱好类问题
+  // 二选一题库：适合情侣关系的兴趣爱好和处理感情
   QUESTION_BANK: [
-    { q: '周末更喜欢做什么？', a: ['宅在家追剧', '出门逛街玩'] },
-    { q: '最喜欢的颜色系？', a: ['暖色调（红橙黄）', '冷色调（蓝绿紫）'] },
-    { q: '更喜欢哪个季节？', a: ['春夏', '秋冬'] },
-    { q: '早餐你更爱？', a: ['中式（包子油条）', '西式（面包牛奶）'] },
-    { q: '更喜欢什么宠物？', a: ['猫', '狗'] },
-    { q: '理想旅行目的地？', a: ['海边沙滩', '山林自然'] },
-    { q: '更喜欢什么饮品？', a: ['咖啡', '奶茶'] },
-    { q: '电影类型偏好？', a: ['动作科幻', '爱情文艺'] },
-    { q: '音乐风格偏好？', a: ['流行摇滚', '民谣古典'] },
-    { q: '更喜欢什么天气？', a: ['晴天', '雨天'] },
-    { q: '运动方式偏好？', a: ['跑步游泳', '瑜伽健身'] },
-    { q: '零食偏好？', a: ['甜食（巧克力蛋糕）', '咸食（薯片坚果）'] },
-    { q: '理想的约会方式？', a: ['看电影吃美食', '户外探险旅行'] },
-    { q: '睡眠习惯？', a: ['早睡早起', '晚睡晚起'] },
-    { q: '手机偏好？', a: ['苹果', '安卓'] },
-    { q: '阅读偏好？', a: ['小说文学', '科普历史'] },
-    { q: '穿衣风格？', a: ['休闲舒适', '时尚精致'] },
-    { q: '最喜欢的花？', a: ['玫瑰', '向日葵'] },
-    { q: '更喜欢的交通工具？', a: ['飞机', '高铁'] },
-    { q: '水果偏好？', a: ['西瓜葡萄', '苹果橙子'] },
-    { q: '游戏偏好？', a: ['手游', '电脑主机'] },
-    { q: '家居风格？', a: ['简约现代', '温馨复古'] },
-    { q: '度假方式？', a: ['海岛度假', '城市探索'] },
-    { q: '最喜欢的甜点？', a: ['冰淇淋', '蛋糕'] },
-    { q: '晚餐偏好？', a: ['火锅烧烤', '炒菜米饭'] },
-    { q: '理想居住地？', a: ['大城市', '小城镇'] },
-    { q: '社交偏好？', a: ['热闹聚会', '安静独处'] },
-    { q: '最喜欢的节日？', a: ['春节', '圣诞节'] },
-    { q: '动物偏好？', a: ['海洋动物', '陆地动物'] },
-    { q: '更喜欢的运动？', a: ['篮球足球', '羽毛球乒乓球'] },
-    { q: '早餐偏好？', a: ['甜口豆浆', '咸口豆浆'] },
-    { q: '夜生活偏好？', a: ['酒吧夜店', '散步聊天'] },
-    { q: '理想房间色调？', a: ['浅色明亮', '深色温馨'] },
-    { q: '更喜欢的味道？', a: ['辣味', '酸甜味'] },
-    { q: '出行方式？', a: ['自驾', '公共交通'] },
-    { q: '最喜欢的冰淇淋口味？', a: ['巧克力', '草莓'] },
-    { q: '编程语言偏好？（如果学过）', a: ['Python', 'JavaScript'] },
-    { q: '更喜欢的菜系？', a: ['川菜湘菜', '粤菜江浙'] },
-    { q: '理想退休生活？', a: ['种花养草', '环游世界'] },
-    { q: '最喜欢的书籍类型？', a: ['言情小说', '悬疑推理'] },
-    { q: '更喜欢的音乐播放方式？', a: ['耳机独享', '外放共享'] },
-    { q: '周末起床时间？', a: ['8点前', '10点后'] },
-    { q: '更喜欢的拍照方式？', a: ['自拍', '风景照'] },
-    { q: '最喜欢的面条？', a: ['汤面', '拌面'] },
-    { q: '更喜欢的气候？', a: ['湿润多雨', '干燥少雨'] },
-    { q: '理想婚礼形式？', a: ['隆重酒店婚礼', '简约旅行婚礼'] },
-    { q: '更喜欢的水果口感？', a: ['脆甜', '软糯'] },
-    { q: '更喜欢的甜品温度？', a: ['热的', '冰的'] },
-    { q: '日常穿搭颜色？', a: ['黑白灰', '彩色鲜艳'] },
-    { q: '更喜欢的生日庆祝方式？', a: ['热闹派对', '二人世界'] },
+    { q: '吵架后你更倾向于？', a: ['冷静后主动沟通', '立刻把话说清楚'] },
+    { q: '纪念日你更希望？', a: ['收到精心准备的礼物', '一起体验新事物'] },
+    { q: '你觉得爱情中更重要的是？', a: ['互相理解包容', '共同成长进步'] },
+    { q: '理想的二人周末？', a: ['一起做饭看电影', '出门探索新地方'] },
+    { q: '对方难过时你会？', a: ['安静陪伴在身边', '想办法逗对方开心'] },
+    { q: '你更在意对方的？', a: ['说的话和承诺', '实际行动和付出'] },
+    { q: '约会迟到时你的反应？', a: ['担心对方出了什么事', '有点不高兴但理解'] },
+    { q: '你表达爱的方式？', a: ['说出口的甜言蜜语', '默默为对方做事'] },
+    { q: '吵架时谁先低头？', a: ['谁错了谁先道歉', '不管对错我先哄'] },
+    { q: '你更喜欢的相处模式？', a: ['形影不离天天黏一起', '各有空间但心在一起'] },
+    { q: '收到什么会让你更感动？', a: ['手写的信或卡片', '对方记得你随口说过的话'] },
+    { q: '你觉得浪漫是？', a: ['偶尔的惊喜和仪式感', '日常的细心和陪伴'] },
+    { q: '一起旅行时你负责？', a: ['做攻略订酒店', '负责吃喝玩乐'] },
+    { q: '对方生气时你怎么办？', a: ['先道歉再慢慢解释', '给对方空间等气消'] },
+    { q: '你更希望对方记住？', a: ['你的生日和纪念日', '你不喜欢吃的东西'] },
+    { q: '深夜聊天的内容？', a: ['聊聊未来和梦想', '分享今天有趣的事'] },
+    { q: '你觉得最甜的事？', a: ['突然被抱住', '被夸奖和肯定'] },
+    { q: '冷战时你更想？', a: ['对方主动来找你', '找个台阶赶紧和好'] },
+    { q: '你更看重对方哪点？', a: ['温柔体贴的性格', '积极上进的态度'] },
+    { q: '一起养宠物你选？', a: ['猫（安静独立）', '狗（热情粘人）'] },
+    { q: '你觉得最好的道歉？', a: ['真诚地说对不起', '用一个拥抱代替'] },
+    { q: '你更喜欢的约会？', a: ['高级餐厅烛光晚餐', '路边摊散步聊天'] },
+    { q: '对方加班很晚你会？', a: ['等对方一起睡', '先睡但留一盏灯'] },
+    { q: '你理想的家？', a: ['温馨有烟火气', '简约干净有格调'] },
+    { q: '分手的话题你会？', a: ['绝口不提保护感情', '坦诚讨论共同面对'] },
+    { q: '你觉得安全感来自？', a: ['对方主动报备和分享', '彼此信任不需要证明'] },
+    { q: '一起看剧时？', a: ['一起追同一部', '各看各的但坐一起'] },
+    { q: '你更想要的生日？', a: ['精心策划的惊喜派对', '只有两个人的简单庆祝'] },
+    { q: '对方做错事你的态度？', a: ['好好说但会指出问题', '小事就算了不计较'] },
+    { q: '你觉得异地恋？', a: ['距离不是问题心在一起', '需要更多沟通和信任'] },
+    { q: '一起攒钱的目标？', a: ['旅行基金去想去的地方', '攒着买房安家'] },
+    { q: '你更吃哪一套？', a: ['霸道总裁式的宠溺', '温柔细腻的体贴'] },
+    { q: '吵架后的和好方式？', a: ['一起吃顿好的', '一个拥抱一个吻'] },
+    { q: '你觉得最好的情话？', a: ['有你在我就不怕', '和你在一起很开心'] },
+    { q: '对方生病时你会？', a: ['寸步不离地照顾', '买好药叮嘱按时吃'] },
+    { q: '你更喜欢的早安？', a: ['一条暖心的消息', '身边人的一句早安'] },
+    { q: '共同做家务时？', a: ['一人做一半公平分配', '谁有空谁做不计较'] },
+    { q: '你更在意的仪式感？', a: ['每个纪念日都认真过', '日常的小惊喜更重要'] },
+    { q: '你觉得最好的陪伴？', a: ['放下手机认真听对方说话', '什么都不说只是靠着'] },
+    { q: '一起运动你选？', a: ['跑步骑车户外', '瑜伽跳舞室内'] },
+    { q: '对方的哪个瞬间最打动你？', a: ['认真做事的侧脸', '突然看向你的微笑'] },
+    { q: '你理想的老后生活？', a: ['一起住到乡下种花养草', '到处旅行看世界'] },
+    { q: '你觉得最重要的约定？', a: ['吵架不过夜', '不轻易说分手'] },
+    { q: '对方送你不喜欢的东西？', a: ['开心收下并感谢', '委婉说出真实想法'] },
+    { q: '你更喜欢对方怎么叫你？', a: ['专属的小名或昵称', '直接叫名字'] },
+    { q: '一起拍照时？', a: ['摆好姿势认真拍', '抓拍自然瞬间'] },
+    { q: '你觉得最暖的瞬间？', a: ['天冷了把你的手放进他口袋', '你说了什么他都认真听'] },
+    { q: '关于未来的计划？', a: ['一起规划共同的目标', '走一步看一步顺其自然'] },
+    { q: '你更希望对方在你低落时？', a: ['什么都不问就抱住你', '耐心问你怎么了'] },
+    { q: '你觉得爱情长久的关键？', a: ['不断发现对方新的优点', '接受对方的缺点和不足'] },
   ],
 
   _questions: [],
@@ -6716,30 +6762,55 @@ const RandomQA = {
 
     const myRole = App.currentRole;
     const myAnswers = this._getAnswers(myRole);
+    const otherRole = myRole === 'TAO' ? 'YAN' : 'TAO';
+    const otherAnswers = this._getAnswers(otherRole);
     const startBtn = document.getElementById('quizStartBtn');
     const viewBtn = document.getElementById('quizViewBtn');
+    const hintEl = document.getElementById('quizSyncHint');
+    const placeholder = document.getElementById('quizPlaceholder');
+    const qArea = document.getElementById('quizQuestionArea');
+    const rArea = document.getElementById('quizResultArea');
 
-    if (myAnswers.length >= 5) {
-      // 已完成
+    const iDone = myAnswers.length >= 5;
+    const otherDone = otherAnswers.length >= 5;
+
+    if (iDone) {
+      // 我已完成
       if (startBtn) startBtn.style.display = 'none';
-      const otherRole = myRole === 'TAO' ? 'YAN' : 'TAO';
-      const otherAnswers = this._getAnswers(otherRole);
-      if (viewBtn) {
-        viewBtn.style.display = otherAnswers.length > 0 ? '' : 'none';
+      if (qArea) qArea.style.display = 'none';
+      if (rArea) rArea.style.display = '';
+
+      if (otherDone) {
+        // 双方都完成 → 可查看对方答案
+        if (viewBtn) {
+          viewBtn.style.display = '';
+          viewBtn.textContent = '👁 查看对方选择';
+        }
+        if (hintEl) hintEl.innerHTML = '<span class="quiz-hint-done">✅ 双方都已完成今日问答，点击查看对方选择</span>';
+      } else {
+        // 我已完成，对方未完成
+        if (viewBtn) viewBtn.style.display = 'none';
+        if (hintEl) hintEl.innerHTML = `<span class="quiz-hint-wait">⏳ 你已完成今日问答，等待 ${otherRole} 完成后可互相查看答案</span>`;
       }
       this._showResults(myAnswers);
     } else {
+      // 我未完成
+      if (viewBtn) viewBtn.style.display = 'none';
+      if (rArea) rArea.style.display = 'none';
+
+      if (otherDone) {
+        // 对方已完成，我还没做
+        if (hintEl) hintEl.innerHTML = `<span class="quiz-hint-other">💬 ${otherRole} 已完成今日问答，做完后可查看对方答案</span>`;
+      } else {
+        if (hintEl) hintEl.innerHTML = '';
+      }
+
       if (startBtn) {
         startBtn.style.display = '';
         startBtn.textContent = myAnswers.length > 0 ? '继续问答' : '开始问答';
       }
-      if (viewBtn) viewBtn.style.display = 'none';
-      const placeholder = document.getElementById('quizPlaceholder');
-      const qArea = document.getElementById('quizQuestionArea');
-      const rArea = document.getElementById('quizResultArea');
       if (placeholder) placeholder.style.display = myAnswers.length > 0 ? 'none' : '';
       if (qArea) qArea.style.display = myAnswers.length > 0 ? '' : 'none';
-      if (rArea) rArea.style.display = 'none';
     }
   },
 
@@ -6808,6 +6879,10 @@ const RandomQA = {
     document.getElementById('quizQuestionArea').style.display = 'none';
     document.getElementById('quizStartBtn').style.display = 'none';
     showToast('🎉 今日问答完成！');
+    // 立即推送，让对方看到你已完成
+    if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+      Cloud.pushQuizVocab();
+    }
     this.render();
   },
 
@@ -6833,8 +6908,13 @@ const RandomQA = {
     const myAnswers = this._getAnswers(myRole);
     const otherAnswers = this._getAnswers(otherRole);
 
-    if (otherAnswers.length === 0) {
-      showToast(`${otherRole} 还未完成今日问答`);
+    // 必须双方都完成全部5题才能查看
+    if (myAnswers.length < 5) {
+      showToast('请先完成你的今日问答');
+      return;
+    }
+    if (otherAnswers.length < 5) {
+      showToast(`${otherRole} 还未完成今日问答，完成后可互相查看`);
       return;
     }
 
@@ -9703,9 +9783,8 @@ const ExportPanel = {
   }
 };
 
-// ====== 地标打卡模块 ======
+// ====== 地标打卡模块（新版 - 简化同步） ======
 const LandmarkCheckin = {
-  // 中国34个省级行政区及主要城市
   PROVINCES: [
     { name: '北京', cities: ['东城区','西城区','朝阳区','海淀区','丰台区','石景山区','通州区','顺义区','昌平区','大兴区','房山区','门头沟区','平谷区','密云区','怀柔区','延庆区'] },
     { name: '上海', cities: ['黄浦区','徐汇区','长宁区','静安区','普陀区','虹口区','杨浦区','浦东新区','闵行区','宝山区','嘉定区','金山区','松江区','青浦区','奉贤区','崇明区'] },
@@ -9743,41 +9822,39 @@ const LandmarkCheckin = {
     { name: '澳门', cities: ['花地玛堂区','圣安多尼堂区','大堂区','望德堂区','风顺堂区','嘉模堂区','圣方济各堂区','路氹'] }
   ],
 
+  MUNICIPALITIES: ['北京', '上海', '天津', '重庆'],
   _expandedProvince: null,
+  _STORE_KEY: 'landmark_marks',
 
   init() {
     this.render();
   },
 
-  // 获取打卡数据
   _getData() {
-    return Store.get('landmark_checkins', {});
+    return Store.get(this._STORE_KEY, {});
   },
 
   _saveData(data) {
-    Store.set('landmark_checkins', data);
+    Store.set(this._STORE_KEY, data);
   },
 
-  // 渲染打卡统计
   _renderStats(data) {
     const el = document.getElementById('landmarkStats');
     if (!el) return;
-    let taoCount = 0, yanCount = 0;
-    Object.values(data).forEach(state => {
-      if (state.tao) taoCount++;
-      if (state.yan) yanCount++;
+    let taoCount = 0, yanCount = 0, bothCount = 0;
+    Object.values(data).forEach(s => {
+      if (s.tao) taoCount++;
+      if (s.yan) yanCount++;
+      if (s.tao && s.yan) bothCount++;
     });
-    el.innerHTML = `<span class="ls-tao">🐱 ${taoCount}</span><span class="ls-yan">🐶 ${yanCount}</span>`;
+    el.innerHTML = `<span class="ls-tao">🐱 ${taoCount}</span><span class="ls-yan">🐶 ${yanCount}</span><span class="ls-both">💚 ${bothCount}</span>`;
   },
 
-  // 渲染省份网格
   render() {
     const grid = document.getElementById('landmarkGrid');
     if (!grid) return;
     const data = this._getData();
     grid.innerHTML = '';
-
-    // 更新统计数量
     this._renderStats(data);
 
     this.PROVINCES.forEach((prov, idx) => {
@@ -9785,17 +9862,18 @@ const LandmarkCheckin = {
       const state = data[key] || {};
       const bubble = document.createElement('div');
       bubble.className = 'landmark-bubble';
-      if (state.tao) bubble.classList.add('tao-on');
-      if (state.yan) bubble.classList.add('yan-on');
+      if (state.tao && state.yan) {
+        bubble.classList.add('both-on');
+      } else if (state.tao) {
+        bubble.classList.add('tao-on');
+      } else if (state.yan) {
+        bubble.classList.add('yan-on');
+      }
       bubble.textContent = prov.name;
       bubble.dataset.key = key;
-      bubble.dataset.idx = idx;
-
-      // 单击展开 / 双击打卡
-      this._bindBubbleEvents(bubble, key, idx, false);
+      this._bindEvents(bubble, key, idx, false);
       grid.appendChild(bubble);
 
-      // 如果该省已展开，渲染城市
       if (this._expandedProvince === idx) {
         const cityWrap = document.createElement('div');
         cityWrap.className = 'landmark-cities';
@@ -9804,11 +9882,16 @@ const LandmarkCheckin = {
           const cityState = data[cityKey] || {};
           const cityEl = document.createElement('div');
           cityEl.className = 'landmark-city';
-          if (cityState.tao) cityEl.classList.add('tao-on');
-          if (cityState.yan) cityEl.classList.add('yan-on');
+          if (cityState.tao && cityState.yan) {
+            cityEl.classList.add('both-on');
+          } else if (cityState.tao) {
+            cityEl.classList.add('tao-on');
+          } else if (cityState.yan) {
+            cityEl.classList.add('yan-on');
+          }
           cityEl.textContent = cityName;
           cityEl.dataset.key = cityKey;
-          this._bindBubbleEvents(cityEl, cityKey, null, true);
+          this._bindEvents(cityEl, cityKey, null, true);
           cityWrap.appendChild(cityEl);
         });
         grid.appendChild(cityWrap);
@@ -9816,65 +9899,88 @@ const LandmarkCheckin = {
     });
   },
 
-  // 直辖市列表（不展开城市，仅支持打卡）
-  MUNICIPALITIES: ['北京', '上海', '天津', '重庆'],
-
-  // 绑定单击/双击事件（区分展开和打卡）
-  _bindBubbleEvents(el, key, provIdx, isCity) {
+  _bindEvents(el, key, provIdx, isCity) {
     let clickTimer = null;
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       if (clickTimer) {
-        // 双击 → 打卡
         clearTimeout(clickTimer);
         clickTimer = null;
-        this._toggleCheckin(key);
+        this._toggleMark(key);
       } else {
         clickTimer = setTimeout(() => {
           clickTimer = null;
-          // 单击 → 展开（仅省级，且非直辖市）
           if (!isCity && provIdx !== null) {
             const provName = this.PROVINCES[provIdx].name;
-            if (this.MUNICIPALITIES.includes(provName)) return; // 直辖市不展开
-            this._toggleExpand(provIdx);
+            if (!this.MUNICIPALITIES.includes(provName)) {
+              this._toggleExpand(provIdx);
+            }
           }
-        }, 280);
+        }, 250);
       }
     });
   },
 
-  // 展开/折叠省份城市
   _toggleExpand(provIdx) {
-    if (this._expandedProvince === provIdx) {
-      this._expandedProvince = null;
-    } else {
-      this._expandedProvince = provIdx;
-    }
+    this._expandedProvince = this._expandedProvince === provIdx ? null : provIdx;
     this.render();
   },
 
-  // 双击打卡：切换当前角色的高亮
-  _toggleCheckin(key) {
+  _toggleMark(key) {
     const role = (typeof App !== 'undefined' && App.currentRole) ? App.currentRole.toLowerCase() : 'tao';
-    const now = Date.now();
     const data = this._getData();
-    if (!data[key]) data[key] = { tao: false, yan: false, tao_ts: 0, yan_ts: 0 };
-    // 确保有时间戳字段
-    if (data[key].tao_ts === undefined) data[key].tao_ts = 0;
-    if (data[key].yan_ts === undefined) data[key].yan_ts = 0;
+    if (!data[key]) data[key] = { tao: false, yan: false };
     data[key][role] = !data[key][role];
-    data[key][role + '_ts'] = now;
+    data[key][role + '_ts'] = Date.now();
     this._saveData(data);
     this.render();
 
-    // 云同步（延迟100ms避免并发锁冲突）
+    // 立即云同步
     if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
-      setTimeout(() => CloudSync.syncLandmarks(), 100);
+      CloudSync.syncLandmarks();
     }
 
-    const provName = key.split('/')[0];
-    const cityName = key.split('/')[1];
-    const label = cityName ? `${provName} · ${cityName}` : provName;
-    showToast(`${label} ${data[key][role] ? '✓ 已打卡' : '✗ 取消打卡'}`);
+    const label = key.includes('/') ? key.replace('/', ' · ') : key;
+    const marked = data[key][role];
+    const both = data[key].tao && data[key].yan;
+    if (both) {
+      showToast(`${label} 💚 双方都已标注`);
+    } else {
+      showToast(`${label} ${marked ? '✓ 已标注' : '✗ 取消标注'}`);
+    }
+  },
+
+  // 供 CloudSync 调用：合并远端数据
+  mergeRemote(remoteData) {
+    if (!remoteData || typeof remoteData !== 'object') return false;
+    const local = this._getData();
+    let changed = false;
+    const allKeys = new Set([...Object.keys(local), ...Object.keys(remoteData)]);
+    allKeys.forEach(key => {
+      if (!local[key]) local[key] = { tao: false, yan: false };
+      const r = remoteData[key];
+      if (!r) return;
+      // 按时间戳取最新值
+      if ((r.tao_ts || 0) > (local[key].tao_ts || 0)) {
+        local[key].tao = !!r.tao;
+        local[key].tao_ts = r.tao_ts || 0;
+        changed = true;
+      }
+      if ((r.yan_ts || 0) > (local[key].yan_ts || 0)) {
+        local[key].yan = !!r.yan;
+        local[key].yan_ts = r.yan_ts || 0;
+        changed = true;
+      }
+    });
+    if (changed) {
+      this._saveData(local);
+      this.render();
+    }
+    return changed;
+  },
+
+  // 供 CloudSync 调用：获取本地数据
+  getLocalData() {
+    return this._getData();
   }
 };
