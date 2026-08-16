@@ -431,6 +431,8 @@ const Cloud = {
       if (!App.isHistory) {
         this.heartbeat();
         this.syncToday();
+        // 单独同步问答和刷词数据（不依赖 syncToday 的 isSyncing 状态）
+        this.syncQuizVocab();
         this.syncPhotos();
         this.syncVoices();
         // 同步在线时长、信件、头像、运动时间、背景透明度
@@ -464,7 +466,11 @@ const Cloud = {
   // 仅同步今天（轮询用）
   async syncToday() {
     if (!this.pairCode) return;
-    if (this.isSyncing) return;
+    if (this.isSyncing) {
+      // 即使正在同步today，也要同步quiz/vocab（不受isSyncing影响）
+      this.syncQuizVocab();
+      return;
+    }
     this.isSyncing = true;
     try {
       const ds = todayStr();
@@ -489,11 +495,13 @@ const Cloud = {
           showToast('对方有新的打卡了 ✨');
         }
       }
-
-      // 同步问答和刷词数据（不锁定 isSyncing）
-      this.syncQuizVocab();
     } catch (e) { /* ignore */ }
     this.isSyncing = false;
+
+    // 同步问答和刷词数据（在try/catch之外，确保始终执行）
+    try {
+      await this.syncQuizVocab();
+    } catch (e) { /* ignore */ }
   },
 
   // 同步问答和刷词数据到云端
@@ -533,19 +541,26 @@ const Cloud = {
     const ds = todayStr();
 
     // 推送自己的数据
-    await this.pushQuizVocab();
+    try {
+      await this.pushQuizVocab();
+    } catch (e) { /* ignore */ }
 
     // 拉取对方的数据
-    const remote = await this.pullQuizVocab();
+    let remote;
+    try {
+      remote = await this.pullQuizVocab();
+    } catch (e) { return; }
     if (!remote) return;
 
     const otherRole = App.currentRole === 'TAO' ? 'YAN' : 'TAO';
     let changed = false;
 
-    // 更新问答统计
+    // 更新问答统计 - 比较内容而非仅长度
     const remoteQuizAnswers = remote.quizAnswers || [];
     const localQuizAnswers = Store.get(`quiz_a_${ds}_${otherRole}`, []);
-    if (remoteQuizAnswers.length !== localQuizAnswers.length) {
+    const remoteStr = JSON.stringify(remoteQuizAnswers);
+    const localStr = JSON.stringify(localQuizAnswers);
+    if (remoteStr !== localStr) {
       Store.set(`quiz_a_${ds}_${otherRole}`, remoteQuizAnswers);
       changed = true;
     }
@@ -561,6 +576,15 @@ const Cloud = {
     if (remoteVocabCount !== localVocabCount) {
       Store.set(`vocab_count_${ds}_${otherRole}`, remoteVocabCount);
       changed = true;
+    }
+
+    // 同步刷词进度
+    if (remote.vocabProg !== undefined) {
+      const localVocabProg = Store.get(`vocab_prog_${ds}_${otherRole}`, null);
+      if (JSON.stringify(remote.vocabProg) !== JSON.stringify(localVocabProg)) {
+        Store.set(`vocab_prog_${ds}_${otherRole}`, remote.vocabProg);
+        changed = true;
+      }
     }
 
     if (changed) {
@@ -1373,6 +1397,11 @@ const App = {
       }
       // IP地址显示已移除
       showToast('已配对成功，开始你们的日记吧 💕');
+    }).catch(() => {
+      // 即使 syncAll 失败，也要启动轮询确保后续同步
+      Cloud.startPolling();
+      Cloud.syncQuizVocab();
+      showToast('已配对成功，开始你们的日记吧 💕');
     });
   },
 
@@ -1466,6 +1495,8 @@ const App = {
         // 即时同步照片、语音、信件、在线时长
         Cloud.syncPhotos();
         Cloud.syncVoices();
+        // 同步问答和刷词数据
+        Cloud.syncQuizVocab();
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncOnlineDuration();
           CloudSync.syncLetters();
@@ -1478,6 +1509,10 @@ const App = {
           RoleName.syncFromCloud();
         }
         // IP地址显示已移除
+      }).catch(() => {
+        // 即使 syncAll 失败，也要启动轮询确保后续同步
+        Cloud.startPolling();
+        Cloud.syncQuizVocab();
       });
     }
   },
