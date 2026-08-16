@@ -318,13 +318,17 @@ const Cloud = {
       const merged = Store.getDay(dateStr);
       if (!merged) { console.warn('[SYNC] pushDay: no merged data'); return; }
       console.log('[SYNC] pushDay: pushing merged for', dateStr, JSON.stringify(merged.greet));
-      await fetch(this._url(`days/${dateStr}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(merged)
-      });
-      // 同时更新云端全部日记备份
-      this.pushAllDays();
+      // 尝试推送单日数据（可能因API限制失败，不影响整体流程）
+      try {
+        const resp = await fetch(this._url(`days/${dateStr}`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(merged)
+        });
+        if (!resp.ok) console.warn('[SYNC] pushDay: single day POST failed, falling back to days_all');
+      } catch (e) { console.warn('[SYNC] pushDay: single day POST error:', e); }
+      // 始终更新云端全部日记备份（这是可靠的数据同步方式）
+      await this.pushAllDays();
       this.lastSyncAt = Date.now();
     } catch (e) { console.error('[SYNC] pushDay error:', e); }
   },
@@ -406,22 +410,14 @@ const Cloud = {
           const localSingle = { [ds]: remote };
           const changed = Store.mergeRemoteDays(localSingle);
           if (changed) anyChanged = true;
-          // 推送合并后的数据回云端（让对方也能拿到）
-          const merged = Store.getDay(ds);
-          if (merged) {
-            await fetch(this._url(`days/${ds}`), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(merged)
-            });
-          }
+          // 推送合并后的数据回云端（通过 days_all，不依赖单日条目）
         } else if (Store.getDay(ds)) {
-          // 云端没有，推送本地
+          // 云端单日没有，但本地有，通过 pushDay 推送（会更新 days_all）
           await this.pushDay(ds);
         }
       }
 
-      // 3. 推送全部日记备份到云端（更新备份）
+      // 3. 推送全部日记备份到云端（更新备份）- 这是最可靠的同步方式
       await this.pushAllDays();
 
       this.lastSyncAt = Date.now();
@@ -437,15 +433,8 @@ const Cloud = {
             if (d.greet && d.greet.tao && d.greet.yan) count++;
           }
           Store.updateDay(todayDs, (day) => { day.greet.count = count; });
-          // 推送包含 count 的数据
-          const updatedMerged = Store.getDay(todayDs);
-          if (updatedMerged) {
-            await fetch(this._url(`days/${todayDs}`), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updatedMerged)
-            });
-          }
+          // 通过 days_all 推送包含 count 的数据（不依赖单日条目）
+          await this.pushAllDays();
         }
         // 触发 UI 刷新
         if (typeof Cards !== 'undefined') {
@@ -2567,6 +2556,7 @@ const Cards = {
       if (data.greet[role]) {
         // 已打卡，触发小心心冒出效果但不取消
         this.spawnHearts(clickX, clickY);
+        showToast('你已经打卡过了');
         return;
       }
       if (data.greet.tao && data.greet.yan) return;
@@ -2574,20 +2564,9 @@ const Cards = {
     // 晚安随时可打卡，只需检查是否双方都已完成
     if (cardType === 'night' && data.night.tao && data.night.yan) return;
 
-    const now = Date.now();
-    const key = cardType;
-    const lastClick = this.clickStates[key] || 0;
-
-    if (now - lastClick < 350) {
-      this.doCheckin(cardType, role);
-      this.spawnHearts(clickX, clickY);
-      this.clickStates[key] = 0;
-    } else {
-      const cardEl = document.getElementById('card-' + cardType);
-      cardEl.classList.add('highlight');
-      setTimeout(() => cardEl.classList.remove('highlight'), 800);
-      this.clickStates[key] = now;
-    }
+    // 单击即可打卡（去掉双击要求）
+    this.doCheckin(cardType, role);
+    this.spawnHearts(clickX, clickY);
   },
 
   async doCheckin(cardType, role) {
