@@ -294,16 +294,22 @@ const Cloud = {
     if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
   },
 
-  // 推送当天数据到云端
+  // 推送当天数据到云端（先拉取合并，防止覆盖对方的打卡）
   async pushDay(dateStr) {
     if (!this.pairCode) return;
-    const data = Store.getDay(dateStr);
-    if (!data) return;
     try {
+      // 1. 先拉取云端数据并合并（防止覆盖对方的打卡）
+      const remote = await this.pullDay(dateStr);
+      if (remote && typeof remote === 'object') {
+        Store.mergeRemoteDays({ [dateStr]: remote });
+      }
+      // 2. 获取合并后的数据并推送
+      const merged = Store.getDay(dateStr);
+      if (!merged) return;
       await fetch(this._url(`days/${dateStr}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(merged)
       });
       // 同时更新云端全部日记备份
       this.pushAllDays();
@@ -410,6 +416,27 @@ const Cloud = {
 
       this.lastSyncAt = Date.now();
       if (anyChanged) {
+        // 检查今天是否双方都打卡了，如果是则计算连续天数
+        const todayDs = todayStr();
+        const todayData = Store.getDay(todayDs);
+        if (todayData && todayData.greet && todayData.greet.tao && todayData.greet.yan && !todayData.greet.count) {
+          const allDays = Store.getAllDays();
+          let count = 0;
+          for (const dayDs of Object.keys(allDays).sort()) {
+            const d = allDays[dayDs];
+            if (d.greet && d.greet.tao && d.greet.yan) count++;
+          }
+          Store.updateDay(todayDs, (day) => { day.greet.count = count; });
+          // 推送包含 count 的数据
+          const updatedMerged = Store.getDay(todayDs);
+          if (updatedMerged) {
+            await fetch(this._url(`days/${todayDs}`), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updatedMerged)
+            });
+          }
+        }
         // 触发 UI 刷新
         if (typeof Cards !== 'undefined') {
           Cards.renderAll();
@@ -490,11 +517,37 @@ const Cloud = {
               body: JSON.stringify(merged)
             });
           }
-          Cards.renderAll();
-          Cards.updateRolePermissions();
-          Calendar.render();
-          App.updateNav();
-          showToast('对方有新的打卡了 ✨');
+
+          // 检查是否双方都打卡了，如果是则计算连续天数并触发效果
+          if (merged && merged.greet && merged.greet.tao && merged.greet.yan && !merged.greet.count) {
+            const allDays = Store.getAllDays();
+            let count = 0;
+            for (const dayDs of Object.keys(allDays).sort()) {
+              const d = allDays[dayDs];
+              if (d.greet && d.greet.tao && d.greet.yan) count++;
+            }
+            Store.updateDay(ds, (day) => { day.greet.count = count; });
+            // 推送包含 count 的数据
+            const updatedMerged = Store.getDay(ds);
+            if (updatedMerged) {
+              await fetch(this._url(`days/${ds}`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedMerged)
+              });
+            }
+            Cards.renderAll();
+            Cards.updateRolePermissions();
+            Calendar.render();
+            App.updateNav();
+            showToast('💕 打卡完成！两人合成了完整爱心');
+          } else {
+            Cards.renderAll();
+            Cards.updateRolePermissions();
+            Calendar.render();
+            App.updateNav();
+            showToast('对方有新的打卡了 ✨');
+          }
         }
       }
     } catch (e) { /* ignore */ }
@@ -2455,9 +2508,10 @@ const Cards = {
     }
   },
 
-  doCheckin(cardType, role) {
+  async doCheckin(cardType, role) {
     const dateStr = App.getCurrentDate();
 
+    // 1. 立即在本地打卡
     Store.updateDay(dateStr, (day) => {
       if (cardType === 'greet') {
         if (day.greet[role]) {
@@ -2474,12 +2528,33 @@ const Cards = {
       }
     });
 
-    // 推送到云端
-    Cloud.pushDay(dateStr);
+    // 2. 立即渲染（即时反馈，显示自己的打卡）
+    this.renderAll();
+    Calendar.render();
+    App.updateNav();
+    HistoryView.render();
 
+    // 3. 拉取云端数据并合并（获取对方的打卡），然后推送
+    if (Cloud.pairCode) {
+      try {
+        const remote = await Cloud.pullDay(dateStr);
+        if (remote && typeof remote === 'object') {
+          const changed = Store.mergeRemoteDays({ [dateStr]: remote });
+          if (changed) {
+            this.renderAll();
+            Calendar.render();
+            App.updateNav();
+          }
+        }
+        // 推送合并后的数据
+        await Cloud.pushDay(dateStr);
+      } catch (e) { /* 静默失败 */ }
+    }
+
+    // 4. 检查"双方都打卡"的效果（使用合并后的数据）
     if (cardType === 'greet') {
       const updatedData = Store.getDay(dateStr);
-      if (updatedData.greet.tao && updatedData.greet.yan && !updatedData.greet.count) {
+      if (updatedData && updatedData.greet && updatedData.greet.tao && updatedData.greet.yan && !updatedData.greet.count) {
         const allDays = Store.getAllDays();
         let count = 0;
         for (const ds of Object.keys(allDays).sort()) {
@@ -2488,23 +2563,19 @@ const Cards = {
         }
         Store.updateDay(dateStr, (day) => { day.greet.count = count; });
         Cloud.pushDay(dateStr);
+        this.renderGreet();
         showToast('💕 打卡完成！两人合成了完整爱心');
       } else {
         showToast(`${App.currentRole} 已打卡，等待另一半 ✨`);
       }
     } else if (cardType === 'night') {
       const updatedData = Store.getDay(dateStr);
-      if (updatedData.night.tao && updatedData.night.yan) {
+      if (updatedData && updatedData.night && updatedData.night.tao && updatedData.night.yan) {
         showToast('🌙 两人都已晚安，好梦 💕');
       } else {
         showToast(`${App.currentRole} 已晚安，等待另一半 🌙`);
       }
     }
-
-    this.renderAll();
-    Calendar.render();
-    App.updateNav();
-    HistoryView.render();
   },
 
   // 小心心冒出动画
