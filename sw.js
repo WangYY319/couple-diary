@@ -1,5 +1,5 @@
 /* TAO & YAN 相处日记 - Service Worker */
-const CACHE_NAME = 'couple-pwa-v86';
+const CACHE_NAME = 'couple-pwa-v95';
 const URLS_TO_CACHE = [
   './',
   './index.html',
@@ -24,7 +24,6 @@ self.addEventListener('activate', (event) => {
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
       .then(() => {
-        // 通知所有客户端强制刷新
         return self.clients.matchAll().then(clients => {
           clients.forEach(client => client.postMessage({ type: 'FORCE_RELOAD' }));
         });
@@ -35,7 +34,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  // 对 HTML 文件使用"网络优先"策略（确保及时更新）
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(
       fetch(event.request).then((response) => {
@@ -47,7 +45,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // CSS/JS 使用"网络优先"策略（确保始终加载最新代码）
   if (event.request.destination === 'style' || event.request.destination === 'script') {
     event.respondWith(
       fetch(event.request).then((response) => {
@@ -61,7 +58,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 其他资源用"缓存优先"策略
   event.respondWith(
     caches.match(event.request).then((cached) => {
       return cached || fetch(event.request).then((response) => {
