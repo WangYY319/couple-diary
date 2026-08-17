@@ -183,12 +183,15 @@ const Cloud = {
 
   isPaired() { return !!this.pairCode; },
 
-  _ns() {
-    return this.pairCode ? `couple-pwa-${this.pairCode.toLowerCase()}` : null;
+  _ns(type) {
+    if (!this.pairCode) return null;
+    const base = `couple-pwa-${this.pairCode.toLowerCase()}`;
+    // 拆分命名空间：照片/语音/问答/背景图各自独立，避免100条配额耗尽
+    return type ? `${base}-${type}` : base;
   },
 
-  _url(path) {
-    return `${this.BASE}/${this._ns()}/${path}`;
+  _url(path, type) {
+    return `${this.BASE}/${this._ns(type)}/${path}`;
   },
 
   // 心跳：写入自己最后在线时间
@@ -407,6 +410,9 @@ const Cloud = {
     if (this.isSyncing) return;
     this.isSyncing = true;
 
+    // 一次性清理旧命名空间数据（释放base命名空间配额）
+    await this.cleanupOldNamespace();
+
     try {
       // 1. 先拉取云端全部日记备份，始终合并（防止本地数据不完整）
       const allRemoteDays = await this.pullAllDays();
@@ -481,6 +487,61 @@ const Cloud = {
     this.isSyncing = false;
   },
 
+  // 一次性清理旧命名空间数据（v108：将照片/语音/问答迁移到独立命名空间后，删除旧数据释放配额）
+  async cleanupOldNamespace() {
+    if (Store.get('ns_cleanup_v108', false)) return;
+    if (!this.pairCode) return;
+    console.log('[Cloud] 开始清理旧命名空间数据...');
+
+    // 1. 清理旧照片数据（base命名空间中的 photos_list + photos/{id}/*）
+    try {
+      const r = await fetch(this._url('photos_list'));
+      if (r.ok) {
+        const oldIds = await r.json();
+        if (Array.isArray(oldIds)) {
+          for (const id of oldIds) {
+            await this.deleteFile(`photos/${id}`); // 无 type = 旧 base 命名空间
+          }
+          console.log(`[Cloud] 清理旧照片 ${oldIds.length} 张`);
+        }
+        await fetch(this._url('photos_list'), { method: 'DELETE' }).catch(() => {});
+      }
+    } catch (e) { /* ignore */ }
+
+    // 2. 清理旧语音数据
+    try {
+      const r = await fetch(this._url('voices_list'));
+      if (r.ok) {
+        const oldVoices = await r.json();
+        if (Array.isArray(oldVoices)) {
+          for (const item of oldVoices) {
+            const id = typeof item === 'string' ? item : item.id;
+            if (id) await this.deleteFile(`voices/${id}`);
+          }
+          console.log(`[Cloud] 清理旧语音 ${oldVoices.length} 条`);
+        }
+        await fetch(this._url('voices_list'), { method: 'DELETE' }).catch(() => {});
+      }
+    } catch (e) { /* ignore */ }
+
+    // 3. 清理旧Q&A数据（extra/{ds}/{role}）
+    const today = todayStr();
+    for (const ds of [today]) {
+      try {
+        await fetch(this._url(`extra/${ds}/TAO`), { method: 'DELETE' }).catch(() => {});
+        await fetch(this._url(`extra/${ds}/YAN`), { method: 'DELETE' }).catch(() => {});
+      } catch (e) { /* ignore */ }
+    }
+
+    // 4. 清理旧背景图数据
+    try {
+      await this.deleteFile('background/file');
+    } catch (e) { /* ignore */ }
+
+    Store.set('ns_cleanup_v108', true);
+    console.log('[Cloud] 旧命名空间清理完成');
+  },
+
   // 启动轮询
   startPolling() {
     if (this.pollTimer) clearInterval(this.pollTimer);
@@ -506,6 +567,7 @@ const Cloud = {
           CloudSync.syncPomodoroHistory();
           CloudSync.syncLandmarks();
           CloudSync.syncThemeColor();
+          CloudSync.syncSweetSubmitted();
           ReadMark.syncAll();
           RoleName.syncFromCloud();
         }
@@ -627,13 +689,12 @@ const Cloud = {
     const iqaQVer = typeof IntimateQA !== 'undefined' ? IntimateQA.QUESTION_VERSION : '';
     const iqaNote = Store.get(`iqa_note_${ds}_${role}`, '');
 
-    try {
-      await fetch(this._url(`extra/${ds}/${role}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, quizNote, iqaAnswers, iqaQuestions, iqaQVer, iqaNote, ts: Date.now() })
-      });
-    } catch (e) { /* ignore */ }
+    const body = JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, quizNote, iqaAnswers, iqaQuestions, iqaQVer, iqaNote, ts: Date.now() });
+    // 使用独立命名空间 + 带重试的 POST，避免配额耗尽导致同步失败
+    const ok = await this._retryPOST(this._url(`extra/${ds}/${role}`, 'qa'), body, this.MAX_RETRIES);
+    if (!ok) {
+      console.warn('[Cloud] pushQuizVocab: 问答数据同步失败');
+    }
   },
 
   // 拉取对方的问答和刷词数据
@@ -642,8 +703,11 @@ const Cloud = {
     const ds = todayStr();
     const otherRole = App.currentRole === 'TAO' ? 'YAN' : 'TAO';
     try {
-      const r = await fetch(this._url(`extra/${ds}/${otherRole}`));
-      if (!r.ok) return null;
+      const r = await fetch(this._url(`extra/${ds}/${otherRole}`, 'qa'));
+      if (!r.ok) {
+        if (r.status !== 404) console.warn(`[Cloud] pullQuizVocab: HTTP ${r.status}`);
+        return null;
+      }
       return await r.json();
     } catch (e) { return null; }
   },
@@ -810,6 +874,7 @@ const Cloud = {
 
   // ====== 文件分块同步（图片、音乐等二进制文件） ======
   // MantleDB 免费版限制：100 条/命名空间，64KB/条
+  // v108起：照片(-photos)、语音(-voices)、问答(-qa)、背景图(-bg) 各自独立命名空间
   // CHUNK_SIZE 设为 65000（含 JSON 包装后恰好 < 64KB）
   CHUNK_SIZE: 65000,
   MAX_RETRIES: 3, // 每块失败重试次数（共 4 次尝试）
@@ -869,7 +934,7 @@ const Cloud = {
   },
 
   // 上传文件（分块）到云端（带整体重试 + 进度提示）
-  async uploadFile(blob, path, onProgress) {
+  async uploadFile(blob, path, onProgress, nsType) {
     if (!this.pairCode) return null;
     const b64 = await this._blobToBase64(blob);
     if (!b64) return null;
@@ -889,7 +954,7 @@ const Cloud = {
       size: blob.size,
       uploadedAt: Date.now()
     });
-    const metaOk = await this._retryPOST(this._url(`${path}/meta`), meta, this.MAX_RETRIES);
+    const metaOk = await this._retryPOST(this._url(`${path}/meta`, nsType), meta, this.MAX_RETRIES);
     if (!metaOk) return null;
 
     // 分块上传（最多整体重试 2 轮）
@@ -897,7 +962,7 @@ const Cloud = {
       let failed = false;
       for (let i = 0; i < chunks.length; i++) {
         const chunkBody = JSON.stringify({ data: chunks[i] });
-        const ok = await this._retryPOST(this._url(`${path}/chunk_${i}`), chunkBody, this.MAX_RETRIES);
+        const ok = await this._retryPOST(this._url(`${path}/chunk_${i}`, nsType), chunkBody, this.MAX_RETRIES);
         if (!ok) {
           failed = true;
           console.warn(`[Cloud] uploadFile: ${path}/chunk_${i} 上传失败（第${round + 1}轮）`);
@@ -924,13 +989,13 @@ const Cloud = {
   },
 
   // 下载文件（分块）从云端（带重试）
-  async downloadFile(path) {
+  async downloadFile(path, nsType) {
     if (!this.pairCode) return null;
 
     // 读取元数据
     let meta;
     try {
-      const r = await fetch(this._url(`${path}/meta`));
+      const r = await fetch(this._url(`${path}/meta`, nsType));
       if (!r.ok) {
         console.warn(`[Cloud] downloadFile: ${path}/meta HTTP ${r.status}`);
         return null;
@@ -954,7 +1019,7 @@ const Cloud = {
       let chunkData = null;
       for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
         try {
-          const r = await fetch(this._url(`${path}/chunk_${i}`));
+          const r = await fetch(this._url(`${path}/chunk_${i}`, nsType));
           if (r.ok) {
             const chunk = await r.json();
             if (chunk && chunk.data) {
@@ -979,20 +1044,20 @@ const Cloud = {
   },
 
   // 删除云端文件
-  async deleteFile(path) {
+  async deleteFile(path, nsType) {
     if (!this.pairCode) return;
     try {
       // 读取元数据获取块数
-      const r = await fetch(this._url(`${path}/meta`));
+      const r = await fetch(this._url(`${path}/meta`, nsType));
       if (r.ok) {
         const meta = await r.json();
         if (meta && meta.totalChunks) {
           for (let i = 0; i < meta.totalChunks; i++) {
-            fetch(this._url(`${path}/chunk_${i}`), { method: 'DELETE' }).catch(() => {});
+            fetch(this._url(`${path}/chunk_${i}`, nsType), { method: 'DELETE' }).catch(() => {});
           }
         }
       }
-      fetch(this._url(`${path}/meta`), { method: 'DELETE' }).catch(() => {});
+      fetch(this._url(`${path}/meta`, nsType), { method: 'DELETE' }).catch(() => {});
     } catch (e) { /* ignore */ }
   },
 
@@ -1004,7 +1069,7 @@ const Cloud = {
     const photoIds = Photos.photos.map(p => p.id);
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       try {
-        const r = await fetch(this._url('photos_list'), {
+        const r = await fetch(this._url('photos_list', 'photos'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(photoIds)
@@ -1025,7 +1090,7 @@ const Cloud = {
     // 获取云端照片列表
     let remoteIds;
     try {
-      const r = await fetch(this._url('photos_list'));
+      const r = await fetch(this._url('photos_list', 'photos'));
       if (!r.ok) return;
       remoteIds = await r.json();
     } catch (e) { return; }
@@ -1038,7 +1103,7 @@ const Cloud = {
     // 下载本地没有的照片
     for (const id of remoteIds) {
       if (!localIds.includes(id)) {
-        const blob = await this.downloadFile(`photos/${id}`);
+        const blob = await this.downloadFile(`photos/${id}`, 'photos');
         if (blob) {
           Photos.photos.push({ id, blob });
           // 保存到本地 IndexedDB
@@ -1069,7 +1134,7 @@ const Cloud = {
               await Photos._put(id, compressed);
             }
           }
-          const result = await this.uploadFile(photo.blob, `photos/${id}`);
+          const result = await this.uploadFile(photo.blob, `photos/${id}`, null, 'photos');
           if (result) {
             uploadSuccessCount++;
             Store.remove(`photo_retry_${id}`);
@@ -1079,7 +1144,7 @@ const Cloud = {
             if (retryCount === 0) {
               // 尝试压缩已有照片释放空间
               await Photos.compressExistingPhotos();
-              const retryResult = await this.uploadFile(photo.blob, `photos/${id}`);
+              const retryResult = await this.uploadFile(photo.blob, `photos/${id}`, null, 'photos');
               if (retryResult) {
                 uploadSuccessCount++;
                 Store.remove(`photo_retry_${id}`);
@@ -1123,7 +1188,7 @@ const Cloud = {
   async pushBackground(blob) {
     if (!this.pairCode) return;
     try {
-      await this.uploadFile(blob, 'background/file');
+      await this.uploadFile(blob, 'background/file', null, 'bg');
       Store.set('cloudBgAt', Date.now());
     } catch (e) { /* ignore */ }
   },
@@ -1133,7 +1198,7 @@ const Cloud = {
     try {
       const localAt = Store.get('cloudBgAt', 0);
       // 下载背景图
-      const blob = await this.downloadFile('background/file');
+      const blob = await this.downloadFile('background/file', 'bg');
       if (!blob) return null;
       Store.set('cloudBgAt', Date.now());
       return blob;
@@ -1153,7 +1218,7 @@ const Cloud = {
       readBy: v.readBy || {}
     }));
     try {
-      await fetch(this._url('voices_list'), {
+      await fetch(this._url('voices_list', 'voices'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(voiceMeta)
@@ -1168,7 +1233,7 @@ const Cloud = {
     // 获取云端录音列表
     let remoteVoices;
     try {
-      const r = await fetch(this._url('voices_list'));
+      const r = await fetch(this._url('voices_list', 'voices'));
       if (!r.ok) return;
       remoteVoices = await r.json();
     } catch (e) { return; }
@@ -1181,7 +1246,7 @@ const Cloud = {
     // 下载本地没有的录音
     for (const meta of remoteVoices) {
       if (!localIds.includes(meta.id)) {
-        const blob = await this.downloadFile(`voices/${meta.id}`);
+        const blob = await this.downloadFile(`voices/${meta.id}`, 'voices');
         if (blob) {
           VoiceRecord.voices.push({
             id: meta.id,
@@ -1214,7 +1279,7 @@ const Cloud = {
     // 上传本地有但云端没有的录音
     for (const v of VoiceRecord.voices) {
       if (!remoteVoices.find(r => r.id === v.id)) {
-        await this.uploadFile(v.blob, `voices/${v.id}`);
+        await this.uploadFile(v.blob, `voices/${v.id}`, null, 'voices');
       }
     }
 
@@ -1629,6 +1694,24 @@ const CloudSync = {
     } catch (e) {
       // 静默失败
     }
+  },
+
+  // 同步甜蜜语录投递
+  async syncSweetSubmitted() {
+    if (!Cloud.pairCode) return;
+    try {
+      const remote = await this.get('sweet_submitted');
+      if (Array.isArray(remote) && remote.length > 0) {
+        if (typeof SweetText !== 'undefined') {
+          const beforeLen = SweetText._getCustom().length;
+          SweetText._syncSubmitted(remote);
+          const afterLen = SweetText._getCustom().length;
+          if (afterLen > beforeLen) {
+            SweetText.refresh();
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 };
 
@@ -3250,6 +3333,32 @@ const Share = {
         dayText += `  📚 英语刷词：TAO ${vocabTAO}词 / YAN ${vocabYAN}词\n`;
         dayHasData = true;
       }
+      // 随机问答
+      const quizQ = Store.get(`quiz_q_${ds}`, null);
+      if (quizQ && Array.isArray(quizQ) && quizQ.length > 0) {
+        const quizTAO = Store.get(`quiz_a_${ds}_TAO`, []);
+        const quizYAN = Store.get(`quiz_a_${ds}_YAN`, []);
+        dayText += `  🎲 随机问答：\n`;
+        quizQ.forEach((q, i) => {
+          const tChoice = (quizTAO[i] !== undefined && q.a) ? q.a[quizTAO[i]] : '未答';
+          const yChoice = (quizYAN[i] !== undefined && q.a) ? q.a[quizYAN[i]] : '未答';
+          dayText += `    Q${i+1}: ${q.q} TAO:${tChoice} YAN:${yChoice}\n`;
+        });
+        dayHasData = true;
+      }
+      // 亲密问答
+      const iqaQ = Store.get(`iqa_q_${ds}`, null);
+      if (iqaQ && Array.isArray(iqaQ) && iqaQ.length > 0) {
+        const iqaTAO = Store.get(`iqa_a_${ds}_TAO`, []);
+        const iqaYAN = Store.get(`iqa_a_${ds}_YAN`, []);
+        dayText += `  💖 亲密问答：\n`;
+        iqaQ.forEach((q, i) => {
+          const tChoice = (iqaTAO[i] !== undefined && q.a) ? q.a[iqaTAO[i]] : '未答';
+          const yChoice = (iqaYAN[i] !== undefined && q.a) ? q.a[iqaYAN[i]] : '未答';
+          dayText += `    Q${i+1}: ${q.q} TAO:${tChoice} YAN:${yChoice}\n`;
+        });
+        dayHasData = true;
+      }
 
       if (dayHasData) {
         exportText += dayText + '\n';
@@ -3866,7 +3975,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
-    { v: 'v107', date: '2026-08-17', changes: '撤销题库上限设定/恢复无限制投递/移除题库已满弹窗' },
+    { v: 'v108', date: '2026-08-17', changes: '核心修复: 云端命名空间拆分(照片/语音/问答/背景图各自独立100条配额)/问答同步修复(独立命名空间+重试机制+错误日志)/旧命名空间一次性清理/甜蜜语录双击投稿+投递者标识+云同步/打卡导出加入随机问答和亲密问答内容' },
     { v: 'v105', date: '2026-08-17', changes: '新增亲密问答板块(情侣关系题库50题)/两个问答板块支持双击标题投递自定义题目/投递题目隔天随机出现/题库云同步' },
     { v: 'v104', date: '2026-08-17', changes: '随机问答留白优化/双方完成后新增备注功能(50字双击编辑+云同步)' },
     { v: 'v103', date: '2026-08-17', changes: '取消头像修改功能改为角色信息卡片(名字+出生日期+年龄)/信息卡片字体优化/角色出生日期云同步' },
@@ -5783,7 +5892,7 @@ const VoiceRecord = {
     showToast(`录音已保存 (${this.seconds}秒) 🎤 正在同步给对方...`);
     // 云同步录音给对方
     if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
-      Cloud.uploadFile(blob, `voices/${id}`).then(() => {
+      Cloud.uploadFile(blob, `voices/${id}`, null, 'voices').then(() => {
         Cloud.pushVoiceList();
       });
     }
@@ -5858,9 +5967,9 @@ const VoiceRecord = {
           const p = this.photos.find(p => p.id === id);
           if (!p) continue;
           // 删除旧的云端分块（可能有多块旧数据）
-          await Cloud.deleteFile(`photos/${id}`).catch(() => {});
+          await Cloud.deleteFile(`photos/${id}`, 'photos').catch(() => {});
           // 上传压缩后的新照片
-          const ok = await Cloud.uploadFile(p.blob, `photos/${id}`);
+          const ok = await Cloud.uploadFile(p.blob, `photos/${id}`, null, 'photos');
           if (!ok) {
             console.warn(`[Photos] 照片 ${id} 压缩后重新上传失败`);
           }
@@ -5877,7 +5986,7 @@ const VoiceRecord = {
     if (typeof Cloud === 'undefined' || !Cloud.pairCode) return;
     let remoteIds;
     try {
-      const r = await fetch(Cloud._url('photos_list'));
+      const r = await fetch(Cloud._url('photos_list', 'photos'));
       if (!r.ok) return;
       remoteIds = await r.json();
     } catch (e) { return; }
@@ -5888,7 +5997,7 @@ const VoiceRecord = {
     // 云端有但本地没有的照片 → 删除其云端分块
     for (const id of remoteIds) {
       if (!localIds.includes(id)) {
-        await Cloud.deleteFile(`photos/${id}`).catch(() => {});
+        await Cloud.deleteFile(`photos/${id}`, 'photos').catch(() => {});
         cleaned++;
       }
     }
@@ -5896,7 +6005,7 @@ const VoiceRecord = {
     const validIds = localIds.filter(id => remoteIds.includes(id));
     if (JSON.stringify(validIds) !== JSON.stringify(remoteIds)) {
       try {
-        await fetch(Cloud._url('photos_list'), {
+        await fetch(Cloud._url('photos_list', 'photos'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(validIds)
@@ -6156,11 +6265,22 @@ const SweetText = {
 
   lastIndex: -1,
 
+  // 获取已投递的自定义语录
+  _getCustom() { return Store.get('sweet_submitted', []); },
+
+  // 合并内置语录和自定义语录
+  _getAll() {
+    const custom = this._getCustom();
+    // 内置语录为字符串，自定义语录为 {text, by, ts} 对象
+    return [...this.phrases, ...custom.map(c => ({ text: c.text, by: c.by }))];
+  },
+
   init() {
     const saved = Store.get('sweetIndex', -1);
     this.lastIndex = saved;
-    if (saved >= 0 && saved < this.phrases.length) {
-      this.display(this.phrases[saved]);
+    const all = this._getAll();
+    if (saved >= 0 && saved < all.length) {
+      this.display(all[saved]);
     }
   },
 
@@ -6169,20 +6289,104 @@ const SweetText = {
     if (!el) return;
     el.classList.add('fading');
     setTimeout(() => {
+      const all = this._getAll();
       let idx;
       do {
-        idx = Math.floor(Math.random() * this.phrases.length);
-      } while (idx === this.lastIndex && this.phrases.length > 1);
+        idx = Math.floor(Math.random() * all.length);
+      } while (idx === this.lastIndex && all.length > 1);
       this.lastIndex = idx;
       Store.set('sweetIndex', idx);
-      this.display(this.phrases[idx]);
+      this.display(all[idx]);
       el.classList.remove('fading');
     }, 300);
   },
 
-  display(text) {
+  display(item) {
     const el = document.getElementById('sweetText');
-    if (el) el.textContent = text;
+    if (!el) return;
+    if (typeof item === 'string') {
+      el.innerHTML = item;
+    } else if (item && item.text) {
+      // 自定义语录显示投递者
+      el.innerHTML = `${item.text}<span class="sweet-by">${item.by}投递</span>`;
+    }
+  },
+
+  // 双击标题投递新语录
+  openSubmit() {
+    SweetSubmit.open();
+  },
+
+  // 保存投递的语录
+  _saveSubmitted(text) {
+    const list = this._getCustom();
+    list.push({ text, by: App.currentRole, ts: Date.now() });
+    Store.set('sweet_submitted', list);
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.set('sweet_submitted', list);
+    }
+    showToast('甜蜜语录投递成功！✅', 2000);
+  },
+
+  // 同步远端投递语录
+  _syncSubmitted(remoteList) {
+    if (!Array.isArray(remoteList)) return;
+    const local = this._getCustom();
+    let changed = false;
+    for (const item of remoteList) {
+      if (item && item.text && !local.find(x => x.text === item.text)) {
+        local.push(item);
+        changed = true;
+      }
+    }
+    if (changed) {
+      Store.set('sweet_submitted', local);
+    }
+  }
+};
+
+// ====== 甜蜜语录投递弹窗 ======
+const SweetSubmit = {
+  open() {
+    const existing = document.getElementById('sweetSubmitOverlay');
+    if (existing) existing.remove();
+    const html = `<div id="sweetSubmitOverlay" class="quiz-partner-overlay" onclick="SweetSubmit.close()">
+      <div class="quiz-partner-card" onclick="event.stopPropagation()">
+        <div class="quiz-partner-header">
+          <span>💌 投递甜蜜语录</span>
+          <button class="quiz-partner-close" onclick="SweetSubmit.close()">✕</button>
+        </div>
+        <div class="quiz-partner-body">
+          <div style="margin-bottom:12px;">
+            <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">语录内容</label>
+            <input id="sweetSubmitText" type="text" maxlength="30" placeholder="输入甜蜜语录（最多30字）"
+              style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;" autocomplete="off" />
+          </div>
+          <button onclick="SweetSubmit._submit()"
+            style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--theme-primary);color:#fff;font-size:14px;cursor:pointer;">投递语录</button>
+          <p style="text-align:center;font-size:11px;color:#aaa;margin-top:10px;">投递的语录会随机出现在甜蜜语录中</p>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    setTimeout(() => {
+      const input = document.getElementById('sweetSubmitText');
+      if (input) input.focus();
+    }, 100);
+  },
+
+  _submit() {
+    const input = document.getElementById('sweetSubmitText');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) { showToast('请输入语录内容'); return; }
+    SweetText._saveSubmitted(text);
+    this.close();
+  },
+
+  close() {
+    const el = document.getElementById('sweetSubmitOverlay');
+    if (el) el.remove();
   }
 };
 
@@ -6293,14 +6497,14 @@ const Photos = {
       this.render();
       if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
         for (const p of newPhotos) {
-          Cloud.uploadFile(p.blob, `photos/${p.id}`).then(async (result) => {
+          Cloud.uploadFile(p.blob, `photos/${p.id}`, null, 'photos').then(async (result) => {
             if (result) {
               await Cloud.pushPhotoList();
               showToast('照片同步成功 ✅', 1500);
             } else {
               // 首次同步失败 → 压缩已有照片释放配额后重试
               await Photos.compressExistingPhotos().catch(() => {});
-              const retry = await Cloud.uploadFile(p.blob, `photos/${p.id}`);
+              const retry = await Cloud.uploadFile(p.blob, `photos/${p.id}`, null, 'photos');
               if (retry) {
                 await Cloud.pushPhotoList();
                 showToast('照片同步成功 ✅（已压缩优化）', 2000);
@@ -6319,9 +6523,8 @@ const Photos = {
   },
 
   async _compressImage(file) {
-    // 目标 < 30KB：MantleDB 每命名空间限 100 条记录，所有数据共享同一命名空间
-    // 30KB → base64 ≈ 40KB → 仅需 1 个分块 + 1 条 meta = 2 条记录/照片
-    // 旧方案 100KB → 4 条记录/照片，20 张就撑满命名空间
+    // 目标 < 30KB：MantleDB 每命名空间限 100 条记录（v108起照片使用独立命名空间）
+    // 30KB → base64 ≈ 40KB → 仅需 1 个分块 + 1 条 meta = 2 条记录/照片 → 可存50张
     const MAX_BYTES = 30 * 1024;
     const steps = [
       { maxDim: 640, quality: 0.6 },
@@ -6452,7 +6655,7 @@ const Photos = {
         showToast('已删除照片');
         // 云同步删除
         if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
-          Cloud.deleteFile(`photos/${id}`).then(() => Cloud.pushPhotoList());
+          Cloud.deleteFile(`photos/${id}`, 'photos').then(() => Cloud.pushPhotoList());
         }
       };
     } catch (e) {
@@ -10515,6 +10718,32 @@ const ExportPanel = {
       const vocabYAN = Store.get(`vocab_count_${ds}_YAN`, 0);
       if (vocabTAO > 0 || vocabYAN > 0) {
         dayText += `  📚 英语刷词：TAO ${vocabTAO}词 / YAN ${vocabYAN}词\n`;
+        dayHasData = true;
+      }
+      // 随机问答
+      const quizQ = Store.get(`quiz_q_${ds}`, null);
+      if (quizQ && Array.isArray(quizQ) && quizQ.length > 0) {
+        const quizTAO = Store.get(`quiz_a_${ds}_TAO`, []);
+        const quizYAN = Store.get(`quiz_a_${ds}_YAN`, []);
+        dayText += `  🎲 随机问答：\n`;
+        quizQ.forEach((q, i) => {
+          const tChoice = (quizTAO[i] !== undefined && q.a) ? q.a[quizTAO[i]] : '未答';
+          const yChoice = (quizYAN[i] !== undefined && q.a) ? q.a[quizYAN[i]] : '未答';
+          dayText += `    Q${i+1}: ${q.q} TAO:${tChoice} YAN:${yChoice}\n`;
+        });
+        dayHasData = true;
+      }
+      // 亲密问答
+      const iqaQ = Store.get(`iqa_q_${ds}`, null);
+      if (iqaQ && Array.isArray(iqaQ) && iqaQ.length > 0) {
+        const iqaTAO = Store.get(`iqa_a_${ds}_TAO`, []);
+        const iqaYAN = Store.get(`iqa_a_${ds}_YAN`, []);
+        dayText += `  💖 亲密问答：\n`;
+        iqaQ.forEach((q, i) => {
+          const tChoice = (iqaTAO[i] !== undefined && q.a) ? q.a[iqaTAO[i]] : '未答';
+          const yChoice = (iqaYAN[i] !== undefined && q.a) ? q.a[iqaYAN[i]] : '未答';
+          dayText += `    Q${i+1}: ${q.q} TAO:${tChoice} YAN:${yChoice}\n`;
+        });
         dayHasData = true;
       }
       if (dayHasData) {

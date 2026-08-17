@@ -3963,6 +3963,18 @@ body.music-active #tab-0 .card {
 
 .sweet-text-display.fading { opacity: 0; }
 
+.sweet-by {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--theme-primary);
+  background: rgba(232, 41, 106, 0.1);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
 /* ============================
    首页（Tab 0）所有卡片统一毛玻璃效果
    ============================ */
