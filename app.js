@@ -499,6 +499,7 @@ const Cloud = {
           CloudSync.syncLetters();
           CloudSync.syncAvatars();
           CloudSync.syncExerciseTime();
+          CloudSync.syncRoleProfile();
           CloudSync.syncBgOpacity();
           CloudSync.syncPomodoro();
           CloudSync.syncPomodoroHistory();
@@ -1248,6 +1249,41 @@ const CloudSync = {
         await this.set('avatar_' + role, localAvatar);
       }
     }
+  },
+
+  // 同步角色名字
+  async syncRoleName() {
+    if (!Cloud.pairCode) return;
+    for (const role of ['TAO', 'YAN']) {
+      const localName = Store.get('roleName_' + role, role);
+      const key = 'roleName_' + role;
+      const remoteName = await this.get(key);
+      if (remoteName && remoteName !== localName && typeof RoleName !== 'undefined' && RoleName.applyRemote) {
+        RoleName.applyRemote(role, remoteName);
+      } else {
+        await this.set(key, localName);
+      }
+    }
+  },
+
+  // 同步角色出生日期
+  async syncRoleProfile() {
+    if (!Cloud.pairCode) return;
+    const localData = {
+      TAO: Store.get('roleProfile_TAO', { birth: '' }),
+      YAN: Store.get('roleProfile_YAN', { birth: '' })
+    };
+    const remoteData = await this.get('role_profiles');
+    if (remoteData && typeof remoteData === 'object') {
+      // 合并：按角色取最新
+      for (const role of ['TAO', 'YAN']) {
+        if (remoteData[role] && remoteData[role].birth && !localData[role].birth) {
+          localData[role] = remoteData[role];
+          Store.set('roleProfile_' + role, localData[role]);
+        }
+      }
+    }
+    await this.set('role_profiles', localData);
   },
 
   // 同步运动时间：合并双方数据
@@ -3738,6 +3774,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v103', date: '2026-08-17', changes: '取消头像修改功能改为角色信息卡片(名字+出生日期+年龄)/信息卡片字体优化/角色出生日期云同步' },
     { v: 'v102', date: '2026-08-17', changes: '版本日志仅显示最新3条+展开收起/运动健身卡片去掉分钟文字+字体缩小/同步轮询自动拉取对方数据' },
     { v: 'v101', date: '2026-08-17', changes: '照片同步根因修复: 压缩目标降至30KB(2条/照片)/已有照片自动压缩/云端孤立数据清理/配额管理重试' },
     { v: 'v100', date: '2026-08-17', changes: '问答同步修复: 题库版本校验强制刷新旧缓存/题目强制同步(先推送为准)/答案同步后重新加载题目' },
@@ -4629,134 +4666,113 @@ const RoleCard = {
 // 确保全局可访问（onclick 属性需要）
 window.RoleCard = RoleCard;
 
-// ====== 头像选择器模块 ======
-const AvatarPicker = {
+// ====== 角色信息卡片模块（替代头像选择器） ======
+const RoleProfile = {
   _currentRole: null,
-  _tempDataUrl: null,
-  _tempZoom: 100,
-  _tempPos: 50,
   _EMOJI: { TAO: '🐱', YAN: '🐶' },
 
   open(role) {
     this._currentRole = role;
-    this._tempDataUrl = null;
-    this._tempZoom = 100;
-    this._tempPos = 50;
-    document.getElementById('avatarPickerTitle').textContent = '设置' + role + '头像';
-    document.getElementById('avatarPickerEmoji').textContent = this._EMOJI[role] || '🐱';
-    const existing = Store.get('avatar_' + role, null);
-    const img = document.getElementById('avatarPickerImg');
-    const emoji = document.getElementById('avatarPickerEmoji');
-    if (existing && existing.dataUrl) {
-      this._tempDataUrl = existing.dataUrl;
-      this._tempZoom = existing.zoom || 100;
-      this._tempPos = existing.pos || 50;
-      img.src = existing.dataUrl;
+    const overlay = document.getElementById('roleProfileOverlay');
+    if (!overlay) return;
+    // 头像展示
+    const img = document.getElementById('roleProfileAvatarImg');
+    const emoji = document.getElementById('roleProfileAvatarEmoji');
+    const avatarData = Store.get('avatar_' + role, null);
+    if (avatarData && avatarData.dataUrl) {
+      img.src = avatarData.dataUrl;
       img.style.display = 'block';
       emoji.style.display = 'none';
     } else {
       img.style.display = 'none';
+      emoji.textContent = this._EMOJI[role] || '🐱';
       emoji.style.display = 'block';
     }
-    document.getElementById('avatarPickerZoom').value = this._tempZoom;
-    document.getElementById('avatarPickerPos').value = this._tempPos;
-    this._applyPreview();
-    document.getElementById('avatarPickerOverlay').style.display = 'flex';
+    // 名字
+    const name = Store.get('roleName_' + role, role);
+    document.getElementById('roleProfileName').textContent = name;
+    document.getElementById('roleProfileNameInput').value = name;
+    // 出生日期
+    const profile = Store.get('roleProfile_' + role, {});
+    const birthInput = document.getElementById('roleProfileBirthInput');
+    birthInput.value = profile.birth || '';
+    this._updateAge(profile.birth);
+    // 监听出生日期变化实时更新年龄
+    birthInput.oninput = () => this._updateAge(birthInput.value);
+    // 显示弹窗
+    overlay.style.display = 'flex';
+    overlay.onclick = () => this.close();
   },
 
   close() {
-    document.getElementById('avatarPickerOverlay').style.display = 'none';
+    const overlay = document.getElementById('roleProfileOverlay');
+    if (overlay) overlay.style.display = 'none';
     this._currentRole = null;
-    this._tempDataUrl = null;
   },
 
-  onFile(input) {
-    const file = input.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      this._tempDataUrl = e.target.result;
-      const img = document.getElementById('avatarPickerImg');
-      img.src = this._tempDataUrl;
-      img.style.display = 'block';
-      document.getElementById('avatarPickerEmoji').style.display = 'none';
-      this._applyPreview();
-    };
-    reader.readAsDataURL(file);
-    input.value = '';
-  },
-
-  updateZoom(val) {
-    this._tempZoom = parseInt(val);
-    this._applyPreview();
-  },
-
-  updatePos(val) {
-    this._tempPos = parseInt(val);
-    this._applyPreview();
-  },
-
-  _applyPreview() {
-    const img = document.getElementById('avatarPickerImg');
-    if (!this._tempDataUrl) return;
-    const scale = this._tempZoom / 100;
-    const posX = this._tempPos;
-    img.style.transform = `scale(${scale})`;
-    img.style.transformOrigin = `${posX}% 50%`;
-  },
-
-  remove() {
-    this._tempDataUrl = null;
-    const img = document.getElementById('avatarPickerImg');
-    img.style.display = 'none';
-    img.src = '';
-    document.getElementById('avatarPickerEmoji').style.display = 'block';
+  _updateAge(birth) {
+    const el = document.getElementById('roleProfileAge');
+    if (!el) return;
+    if (!birth) { el.textContent = '—'; return; }
+    const birthDate = new Date(birth);
+    if (isNaN(birthDate.getTime())) { el.textContent = '—'; return; }
+    const now = new Date();
+    let age = now.getFullYear() - birthDate.getFullYear();
+    const m = now.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) age--;
+    el.textContent = age >= 0 ? age + ' 岁' : '—';
   },
 
   save() {
     if (!this._currentRole) return;
-    if (this._tempDataUrl) {
-      Store.set('avatar_' + this._currentRole, {
-        dataUrl: this._tempDataUrl,
-        zoom: this._tempZoom,
-        pos: this._tempPos,
-        updated: Date.now()
-      });
-    } else {
-      Store.remove('avatar_' + this._currentRole);
+    const role = this._currentRole;
+    // 保存名字
+    const newName = document.getElementById('roleProfileNameInput').value.trim();
+    if (newName) {
+      Store.set('roleName_' + role, newName);
+      const nameEl = document.getElementById('roleName' + role);
+      if (nameEl) nameEl.textContent = newName;
     }
-    this._renderRole(this._currentRole);
-    this.close();
-    Toast.show('头像已更新');
-    // 同步到云端，让对方也能看到
+    // 保存出生日期
+    const birth = document.getElementById('roleProfileBirthInput').value;
+    Store.set('roleProfile_' + role, { birth: birth || '' });
+    // 同步到云端
     if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
-      CloudSync.syncAvatars();
+      CloudSync.syncRoleName();
+      CloudSync.syncRoleProfile();
     }
-  },
-
-  _renderRole(role) {
-    const data = Store.get('avatar_' + role, null);
-    const img = document.getElementById('avatarImg' + role);
-    const placeholder = document.getElementById('avatarPlaceholder' + role);
-    if (data && data.dataUrl) {
-      img.src = data.dataUrl;
-      const scale = (data.zoom || 100) / 100;
-      const posX = data.pos || 50;
-      img.style.transform = `scale(${scale})`;
-      img.style.transformOrigin = `${posX}% 50%`;
-      img.style.display = 'block';
-      placeholder.style.display = 'none';
-    } else {
-      img.style.display = 'none';
-      img.src = '';
-      placeholder.textContent = this._EMOJI[role] || '🐱';
-      placeholder.style.display = 'block';
-    }
-  },
-
-  renderAll() {
-    ['TAO', 'YAN'].forEach(role => this._renderRole(role));
+    this.close();
+    showToast('信息已保存 ✅', 1500);
   }
+};
+
+// 向后兼容：AvatarPicker 引用指向 RoleProfile
+const AvatarPicker = {
+  open(role) { RoleProfile.open(role); },
+  close() { RoleProfile.close(); },
+  renderAll() {
+    // 保留头像渲染功能（已上传的头像仍显示）
+    ['TAO', 'YAN'].forEach(role => {
+      const data = Store.get('avatar_' + role, null);
+      const img = document.getElementById('avatarImg' + role);
+      const placeholder = document.getElementById('avatarPlaceholder' + role);
+      if (data && data.dataUrl) {
+        img.src = data.dataUrl;
+        const scale = (data.zoom || 100) / 100;
+        const posX = data.pos || 50;
+        img.style.transform = `scale(${scale})`;
+        img.style.transformOrigin = `${posX}% 50%`;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+      } else {
+        img.style.display = 'none';
+        img.src = '';
+        placeholder.textContent = RoleProfile._EMOJI[role] || '🐱';
+        placeholder.style.display = 'block';
+      }
+    });
+  },
+  _renderRole(role) { this.renderAll(); }
 };
 
 // ====== 角色名称管理模块 ======

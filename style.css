@@ -3243,8 +3243,8 @@ html, body {
   line-height: 1;
 }
 
-/* 头像选择器弹窗 */
-.avatar-picker-overlay {
+/* 角色信息卡片弹窗 */
+.role-profile-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -3256,91 +3256,117 @@ html, body {
   justify-content: center;
 }
 
-.avatar-picker-modal {
-  background: rgba(255, 255, 255, 0.85);
+.role-profile-modal {
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-radius: 20px;
-  padding: 24px;
-  width: 300px;
+  padding: 20px 24px 16px;
+  width: 280px;
   max-width: 90vw;
-  text-align: center;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 
-.avatar-picker-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: var(--text-main);
-}
-
-.avatar-picker-preview {
+.role-profile-header {
   display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
-.avatar-picker-circle {
-  width: 100px;
-  height: 100px;
+.role-profile-avatar {
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 3px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   background: rgba(255, 255, 255, 0.3);
 }
 
-.avatar-picker-circle img {
+.role-profile-avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.avatar-picker-circle span {
-  font-size: 40px;
+.role-profile-avatar-placeholder {
+  font-size: 28px;
+  line-height: 1;
 }
 
-.avatar-picker-zoom,
-.avatar-picker-pos {
-  width: 100%;
-  margin: 4px 0 2px;
-  accent-color: var(--theme-primary);
-}
-
-.avatar-picker-zoom-label,
-.avatar-picker-pos-label {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-}
-
-.avatar-picker-btns {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.avatar-picker-btn {
-  padding: 10px;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s;
-  background: rgba(0, 0, 0, 0.05);
+.role-profile-name {
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text-main);
 }
 
-.avatar-picker-btn:active { transform: scale(0.96); }
-.avatar-picker-btn.primary { background: var(--theme-primary); color: #fff; }
-.avatar-picker-btn.confirm { background: #22c55e; color: #fff; }
-.avatar-picker-btn.cancel { background: rgba(0, 0, 0, 0.05); color: var(--text-muted); }
+.role-profile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.role-profile-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.role-profile-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 48px;
+}
+
+.role-profile-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-main);
+  outline: none;
+  padding: 2px 0;
+}
+
+.role-profile-input::placeholder { color: #ccc; }
+
+.role-profile-age {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--theme-accent);
+}
+
+.role-profile-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.role-profile-btn {
+  flex: 1;
+  padding: 9px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.role-profile-btn:active { transform: scale(0.96); }
+.role-profile-btn.confirm { background: var(--theme-primary); color: #fff; }
+.role-profile-btn.cancel { background: rgba(0, 0, 0, 0.05); color: var(--text-muted); }
 
 .role-pair-dot {
   width: 7px;

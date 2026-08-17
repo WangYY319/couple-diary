@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="img/favicon.svg">
   <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
   <title>TAO&YAN 相处日记</title>
-  <link rel="stylesheet" href="style.css?v=102">
+  <link rel="stylesheet" href="style.css?v=103">
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -182,7 +182,7 @@
         <div class="card-title" onclick="RoleCard.showTotalOnlineDuration()" style="cursor:pointer"><span class="icon">🎭</span> 亲密主角</div>
         <div class="role-pair-row">
           <div class="role-pair-item tao" id="pillTAO">
-            <div class="role-avatar-wrap" id="avatarWrapTAO" onclick="AvatarPicker.open('TAO');">
+            <div class="role-avatar-wrap" id="avatarWrapTAO" onclick="RoleProfile.open('TAO')">
               <img class="role-avatar-img" id="avatarImgTAO" style="display:none" />
               <span class="role-avatar-placeholder" id="avatarPlaceholderTAO">🐱</span>
             </div>
@@ -191,7 +191,7 @@
           </div>
           <span class="role-pair-connector">❤</span>
           <div class="role-pair-item yan" id="pillYAN">
-            <div class="role-avatar-wrap" id="avatarWrapYAN" onclick="AvatarPicker.open('YAN');">
+            <div class="role-avatar-wrap" id="avatarWrapYAN" onclick="RoleProfile.open('YAN')">
               <img class="role-avatar-img" id="avatarImgYAN" style="display:none" />
               <span class="role-avatar-placeholder" id="avatarPlaceholderYAN">🐶</span>
             </div>
@@ -853,26 +853,33 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- 头像选择器 -->
-<div class="avatar-picker-overlay" id="avatarPickerOverlay" style="display:none">
-  <div class="avatar-picker-modal">
-    <div class="avatar-picker-title" id="avatarPickerTitle">设置头像</div>
-    <div class="avatar-picker-preview">
-      <div class="avatar-picker-circle" id="avatarPickerCircle">
-        <img id="avatarPickerImg" style="display:none" />
-        <span id="avatarPickerEmoji">🐱</span>
+<!-- 角色信息卡片 -->
+<div class="role-profile-overlay" id="roleProfileOverlay" style="display:none">
+  <div class="role-profile-modal" id="roleProfileModal" onclick="event.stopPropagation()">
+    <div class="role-profile-header" id="roleProfileHeader">
+      <div class="role-profile-avatar" id="roleProfileAvatarWrap">
+        <img class="role-profile-avatar-img" id="roleProfileAvatarImg" style="display:none" />
+        <span class="role-profile-avatar-placeholder" id="roleProfileAvatarEmoji">🐱</span>
+      </div>
+      <div class="role-profile-name" id="roleProfileName">TAO</div>
+    </div>
+    <div class="role-profile-body">
+      <div class="role-profile-field">
+        <label class="role-profile-label">名字</label>
+        <input type="text" class="role-profile-input" id="roleProfileNameInput" placeholder="输入名字" maxlength="12" autocomplete="off" />
+      </div>
+      <div class="role-profile-field">
+        <label class="role-profile-label">出生日期</label>
+        <input type="date" class="role-profile-input" id="roleProfileBirthInput" />
+      </div>
+      <div class="role-profile-field">
+        <label class="role-profile-label">年龄</label>
+        <div class="role-profile-age" id="roleProfileAge">—</div>
       </div>
     </div>
-    <input type="range" class="avatar-picker-zoom" id="avatarPickerZoom" min="50" max="200" value="100" oninput="AvatarPicker.updateZoom(this.value)" />
-    <div class="avatar-picker-zoom-label">缩放 / 调节显示范围</div>
-    <input type="range" class="avatar-picker-pos" id="avatarPickerPos" min="0" max="100" value="50" oninput="AvatarPicker.updatePos(this.value)" />
-    <div class="avatar-picker-pos-label">位置偏移</div>
-    <div class="avatar-picker-btns">
-      <input type="file" id="avatarPickerFile" accept="image/*" hidden onchange="AvatarPicker.onFile(this)" />
-      <button class="avatar-picker-btn primary" onclick="document.getElementById('avatarPickerFile').click()">📷 选择照片</button>
-      <button class="avatar-picker-btn" onclick="AvatarPicker.remove()">删除头像</button>
-      <button class="avatar-picker-btn confirm" onclick="AvatarPicker.save()">确认</button>
-      <button class="avatar-picker-btn cancel" onclick="AvatarPicker.close()">取消</button>
+    <div class="role-profile-btns">
+      <button class="role-profile-btn cancel" onclick="RoleProfile.close()">取消</button>
+      <button class="role-profile-btn confirm" onclick="RoleProfile.save()">保存</button>
     </div>
   </div>
 </div>
@@ -903,7 +910,7 @@
   </div>
 </div>
 
-<script src="vocab-data.js?v=102"></script>
-<script src="app.js?v=102"></script>
+<script src="vocab-data.js?v=103"></script>
+<script src="app.js?v=103"></script>
 </body>
 </html>
