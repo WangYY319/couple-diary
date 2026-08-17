@@ -3738,6 +3738,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v102', date: '2026-08-17', changes: '版本日志仅显示最新3条+展开收起/运动健身卡片去掉分钟文字+字体缩小/同步轮询自动拉取对方数据' },
     { v: 'v101', date: '2026-08-17', changes: '照片同步根因修复: 压缩目标降至30KB(2条/照片)/已有照片自动压缩/云端孤立数据清理/配额管理重试' },
     { v: 'v100', date: '2026-08-17', changes: '问答同步修复: 题库版本校验强制刷新旧缓存/题目强制同步(先推送为准)/答案同步后重新加载题目' },
     { v: 'v99', date: '2026-08-16', changes: '照片自适应压缩+失败检测/问答情侣题库+完成提示同步/地标标注重构+绿色双方标/版本日志' },
@@ -3748,7 +3749,10 @@ const Setting = {
   renderVersionLog() {
     const el = document.getElementById('versionLog');
     if (!el) return;
-    el.innerHTML = this.VERSION_LOG.map((log, i) => {
+    const MAX_VISIBLE = 3;
+    const total = this.VERSION_LOG.length;
+    const visibleCount = Math.min(MAX_VISIBLE, total);
+    let html = this.VERSION_LOG.slice(0, visibleCount).map((log, i) => {
       const isLatest = i === 0;
       return `<div class="version-log-item${isLatest ? ' latest' : ''}">
         <span class="version-tag${isLatest ? ' latest' : ''}">${log.v}</span>
@@ -3756,6 +3760,35 @@ const Setting = {
         <div class="version-change">${log.changes}</div>
       </div>`;
     }).join('');
+    // 如果超过3条，添加展开/收起按钮
+    if (total > MAX_VISIBLE) {
+      const hiddenCount = total - MAX_VISIBLE;
+      html += `<div class="version-log-toggle" id="versionLogToggle" onclick="Setting._toggleVersionLog()">展开更多（${hiddenCount} 条）</div>`;
+      html += `<div class="version-log-hidden" id="versionLogHidden" style="display:none">`;
+      html += this.VERSION_LOG.slice(MAX_VISIBLE).map((log) => {
+        return `<div class="version-log-item">
+          <span class="version-tag">${log.v}</span>
+          <span class="version-date">${log.date}</span>
+          <div class="version-change">${log.changes}</div>
+        </div>`;
+      }).join('');
+      html += `</div>`;
+    }
+    el.innerHTML = html;
+  },
+
+  _toggleVersionLog() {
+    const hidden = document.getElementById('versionLogHidden');
+    const toggle = document.getElementById('versionLogToggle');
+    if (!hidden || !toggle) return;
+    if (hidden.style.display === 'none') {
+      hidden.style.display = 'flex';
+      toggle.textContent = '收起';
+    } else {
+      hidden.style.display = 'none';
+      const hiddenCount = this.VERSION_LOG.length - 3;
+      toggle.textContent = `展开更多（${hiddenCount} 条）`;
+    }
   },
 
   // 字体定义
@@ -5157,7 +5190,7 @@ const ExerciseTime = {
       if (!el || !timeEl) return;
       const minutes = this.getDay(today, role);
       if (minutes != null) {
-        timeEl.textContent = minutes + ' 分钟';
+        timeEl.textContent = minutes;
         el.classList.add('locked');
       } else {
         timeEl.textContent = '—';
@@ -5192,7 +5225,7 @@ const ExerciseTime = {
         <div class="exercise-modal-title">${emoji} ${role} 运动时间</div>
         <input type="number" class="exercise-modal-input" id="exerciseModalInput"
                placeholder="输入分钟数" min="0" max="600" autocomplete="off" />
-        <div class="exercise-modal-unit">分钟</div>
+        <div class="exercise-modal-unit">min</div>
         <div class="exercise-modal-buttons">
           <button class="exercise-modal-btn cancel" onclick="ExerciseTime._closeModal()">取消</button>
           <button class="exercise-modal-btn confirm" onclick="ExerciseTime._confirm('${role}')">确认</button>
@@ -5225,7 +5258,7 @@ const ExerciseTime = {
     const today = this._todayStr();
     const ok = this.setDay(today, role, val);
     if (ok) {
-      showToast(`${role} 运动时间已记录：${val} 分钟 💪`);
+      showToast(`${role} 运动时间已记录：${val} 💪`, 2000);
     } else {
       showToast('已填写，不可更改 🔒');
     }

@@ -1630,6 +1630,18 @@ html, body {
 .version-tag.latest { color: #34a853; }
 .version-date { color: #bbb; font-size: 10px; }
 .version-change { color: #666; margin-top: 2px; }
+.version-log-toggle {
+  text-align: center;
+  font-size: 11px;
+  color: var(--theme-accent);
+  padding: 4px 0;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.version-log-toggle:active { background: rgba(0,0,0,0.05); }
+.version-log-hidden { gap: 6px; }
 
 /* === 设置弹窗：主题调色盘 === */
 .theme-palette {
@@ -4976,8 +4988,8 @@ body.music-active #tab-0 .card {
 
 .exercise-time {
   margin-left: auto;
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--theme-accent);
 }
