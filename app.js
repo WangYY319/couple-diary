@@ -620,12 +620,13 @@ const Cloud = {
     const quizQVer = typeof RandomQA !== 'undefined' ? RandomQA.QUESTION_VERSION : '';
     const vocabCount = Store.get(`vocab_count_${ds}_${role}`, 0);
     const vocabProg = Store.get(`vocab_prog_${ds}_${role}`, null);
+    const quizNote = Store.get(`quiz_note_${ds}_${role}`, '');
 
     try {
       await fetch(this._url(`extra/${ds}/${role}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, ts: Date.now() })
+        body: JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, quizNote, ts: Date.now() })
       });
     } catch (e) { /* ignore */ }
   },
@@ -705,6 +706,14 @@ const Cloud = {
         Store.set(`vocab_prog_${ds}_${otherRole}`, remote.vocabProg);
         changed = true;
       }
+    }
+
+    // 同步问答备注
+    const remoteNote = remote.quizNote || '';
+    const localNote = Store.get(`quiz_note_${ds}_${otherRole}`, '');
+    if (remoteNote !== localNote) {
+      Store.set(`quiz_note_${ds}_${otherRole}`, remoteNote);
+      changed = true;
     }
 
     if (changed) {
@@ -3774,6 +3783,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v104', date: '2026-08-17', changes: '随机问答留白优化/双方完成后新增备注功能(50字双击编辑+云同步)' },
     { v: 'v103', date: '2026-08-17', changes: '取消头像修改功能改为角色信息卡片(名字+出生日期+年龄)/信息卡片字体优化/角色出生日期云同步' },
     { v: 'v102', date: '2026-08-17', changes: '版本日志仅显示最新3条+展开收起/运动健身卡片去掉分钟文字+字体缩小/同步轮询自动拉取对方数据' },
     { v: 'v101', date: '2026-08-17', changes: '照片同步根因修复: 压缩目标降至30KB(2条/照片)/已有照片自动压缩/云端孤立数据清理/配额管理重试' },
@@ -7014,16 +7024,24 @@ const RandomQA = {
           viewBtn.textContent = '👁 查看对方选择';
         }
         if (hintEl) hintEl.innerHTML = '<span class="quiz-hint-done">✅ 双方都已完成今日问答，点击查看对方选择</span>';
+        // 显示备注区域
+        this._renderNote();
       } else {
         // 我已完成，对方未完成
         if (viewBtn) viewBtn.style.display = 'none';
         if (hintEl) hintEl.innerHTML = `<span class="quiz-hint-wait">⏳ 你已完成今日问答，等待 ${otherRole} 完成后可互相查看答案</span>`;
+        // 隐藏备注区域
+        const noteArea = document.getElementById('quizNoteArea');
+        if (noteArea) noteArea.style.display = 'none';
       }
       this._showResults(myAnswers);
     } else {
       // 我未完成
       if (viewBtn) viewBtn.style.display = 'none';
       if (rArea) rArea.style.display = 'none';
+      // 隐藏备注区域
+      const noteArea = document.getElementById('quizNoteArea');
+      if (noteArea) noteArea.style.display = 'none';
 
       if (otherDone) {
         // 对方已完成，我还没做
@@ -7173,6 +7191,75 @@ const RandomQA = {
 
     html += `</div></div></div>`;
     document.body.insertAdjacentHTML('beforeend', html);
+  },
+
+  // ====== 备注功能 ======
+  _getNote() {
+    const dateStr = todayStr();
+    // 合并双方备注：TAO 和 YAN 各自的备注
+    const taoNote = Store.get(`quiz_note_${dateStr}_TAO`, '');
+    const yanNote = Store.get(`quiz_note_${dateStr}_YAN`, '');
+    return { TAO: taoNote, YAN: yanNote };
+  },
+
+  _renderNote() {
+    const noteArea = document.getElementById('quizNoteArea');
+    if (!noteArea) return;
+    noteArea.style.display = '';
+    const notes = this._getNote();
+    const myRole = App.currentRole;
+    const otherRole = myRole === 'TAO' ? 'YAN' : 'TAO';
+    const display = document.getElementById('quizNoteDisplay');
+    const input = document.getElementById('quizNoteInput');
+    if (input) input.style.display = 'none';
+    if (!display) return;
+    // 显示双方备注
+    let html = '';
+    if (notes[myRole]) {
+      html += `<div class="quiz-note-line ${myRole.toLowerCase()}">${myRole === 'TAO' ? '🐱' : '🐶'} ${this._escapeHtml(notes[myRole])}</div>`;
+    }
+    if (notes[otherRole]) {
+      html += `<div class="quiz-note-line ${otherRole.toLowerCase()}">${otherRole === 'TAO' ? '🐱' : '🐶'} ${this._escapeHtml(notes[otherRole])}</div>`;
+    }
+    if (!html) html = '';
+    display.innerHTML = html;
+  },
+
+  _escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  },
+
+  _editNote() {
+    const myRole = App.currentRole;
+    const dateStr = todayStr();
+    const existing = Store.get(`quiz_note_${dateStr}_${myRole}`, '');
+    const display = document.getElementById('quizNoteDisplay');
+    const input = document.getElementById('quizNoteInput');
+    if (!display || !input) return;
+    display.style.display = 'none';
+    input.style.display = '';
+    input.value = existing;
+    input.focus();
+  },
+
+  _saveNote() {
+    const myRole = App.currentRole;
+    const dateStr = todayStr();
+    const input = document.getElementById('quizNoteInput');
+    const display = document.getElementById('quizNoteDisplay');
+    if (!input) return;
+    const val = input.value.trim().slice(0, 50);
+    Store.set(`quiz_note_${dateStr}_${myRole}`, val);
+    input.style.display = 'none';
+    if (display) display.style.display = '';
+    // 云同步
+    if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+      Cloud.pushQuizVocab();
+    }
+    this._renderNote();
+    if (val) showToast('备注已保存', 1200);
   }
 };
 

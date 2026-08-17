@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="img/favicon.svg">
   <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
   <title>TAO&YAN 相处日记</title>
-  <link rel="stylesheet" href="style.css?v=103">
+  <link rel="stylesheet" href="style.css?v=104">
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -416,6 +416,11 @@
         </div>
         <button class="quiz-start-btn" id="quizStartBtn" onclick="RandomQA.start()">开始问答</button>
         <button class="quiz-view-btn" id="quizViewBtn" style="display:none" onclick="RandomQA.viewPartner()">查看对方选择</button>
+        <div class="quiz-note-area" id="quizNoteArea" style="display:none">
+          <div class="quiz-note-label">备注</div>
+          <div class="quiz-note-display" id="quizNoteDisplay" ondblclick="RandomQA._editNote()"></div>
+          <input type="text" class="quiz-note-input" id="quizNoteInput" maxlength="50" placeholder="写一句今日小记..." style="display:none" onblur="RandomQA._saveNote()" onkeydown="if(event.key==='Enter')this.blur()" />
+        </div>
       </div>
 
       <!-- 语音留言（从首页移入） -->
@@ -910,7 +915,7 @@
   </div>
 </div>
 
-<script src="vocab-data.js?v=103"></script>
-<script src="app.js?v=103"></script>
+<script src="vocab-data.js?v=104"></script>
+<script src="app.js?v=104"></script>
 </body>
 </html>
