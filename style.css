@@ -4974,6 +4974,36 @@ body.music-active #tab-0 .card {
 .qa-submit-btn.confirm { background: var(--theme-primary); color: #fff; }
 .qa-submit-btn.cancel { background: rgba(0, 0, 0, 0.05); color: var(--text-muted); }
 
+/* 题库已满弹窗 */
+.qa-bankfull-icon {
+  text-align: center;
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.qa-bankfull-title {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.qa-bankfull-desc {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.qa-bankfull-question {
+  text-align: center;
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
 /* 问答对比弹窗 */
 .quiz-partner-overlay {
   position: fixed;

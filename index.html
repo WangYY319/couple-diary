@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="img/favicon.svg">
   <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
   <title>TAO&YAN 相处日记</title>
-  <link rel="stylesheet" href="style.css?v=105">
+  <link rel="stylesheet" href="style.css?v=106">
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -480,6 +480,20 @@
           <div class="qa-submit-btns">
             <button class="qa-submit-btn cancel" onclick="QASubmit.close()">取消</button>
             <button class="qa-submit-btn confirm" onclick="QASubmit._submit()">投递</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 题库已满提示弹窗 -->
+      <div class="qa-submit-overlay" id="qaBankFullOverlay" style="display:none">
+        <div class="qa-submit-modal" onclick="event.stopPropagation()">
+          <div class="qa-bankfull-icon">📦</div>
+          <div class="qa-bankfull-title">题库已满（150题）</div>
+          <div class="qa-bankfull-desc"><span id="qaBankFullTitle">随机问答</span> 的题库已达到上限</div>
+          <div class="qa-bankfull-question">是否清空已投递的题目，以新题目重新开始？</div>
+          <div class="qa-submit-btns">
+            <button class="qa-submit-btn cancel" id="qaBankFullCancel">取消</button>
+            <button class="qa-submit-btn confirm" id="qaBankFullConfirm">确认更新</button>
           </div>
         </div>
       </div>
@@ -976,7 +990,7 @@
   </div>
 </div>
 
-<script src="vocab-data.js?v=105"></script>
-<script src="app.js?v=105"></script>
+<script src="vocab-data.js?v=106"></script>
+<script src="app.js?v=106"></script>
 </body>
 </html>

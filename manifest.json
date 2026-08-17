@@ -2,7 +2,7 @@
   "name": "TAO & YAN 相处日记",
   "short_name": "相处日记",
   "description": "TAO 和 YAN 的共同打卡日记 · 双人一起完成",
-  "start_url": "./?v=105&source=pwa",
+  "start_url": "./?v=106&source=pwa",
   "display": "minimal-ui",
   "orientation": "portrait",
   "background_color": "#f0f4f8",
