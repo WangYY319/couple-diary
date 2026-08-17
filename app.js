@@ -3866,7 +3866,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
-    { v: 'v106', date: '2026-08-17', changes: '题库上限150题/满库时提示是否清空投递题目重新开始/投递成功显示当前题库容量' },
+    { v: 'v107', date: '2026-08-17', changes: '撤销题库上限设定/恢复无限制投递/移除题库已满弹窗' },
     { v: 'v105', date: '2026-08-17', changes: '新增亲密问答板块(情侣关系题库50题)/两个问答板块支持双击标题投递自定义题目/投递题目隔天随机出现/题库云同步' },
     { v: 'v104', date: '2026-08-17', changes: '随机问答留白优化/双方完成后新增备注功能(50字双击编辑+云同步)' },
     { v: 'v103', date: '2026-08-17', changes: '取消头像修改功能改为角色信息卡片(名字+出生日期+年龄)/信息卡片字体优化/角色出生日期云同步' },
@@ -7281,51 +7281,9 @@ const RandomQA = {
 
   _getSubmitted() { return Store.get('quiz_submitted', []); },
   _getMergedBank() { return [...this.QUESTION_BANK, ...this._getSubmitted()]; },
-  MAX_BANK: 150,
   openSubmit() { QASubmit.open(this); },
   _saveSubmitted(q, a) {
     const list = Store.get('quiz_submitted', []);
-    const mergedLen = this.QUESTION_BANK.length + list.length;
-    if (mergedLen >= this.MAX_BANK) {
-      // 题库已满，提示是否清空投递题目重新开始
-      const overlay = document.getElementById('qaBankFullOverlay');
-      if (overlay) {
-        document.getElementById('qaBankFullTitle').textContent = this._title || '随机问答';
-        overlay.style.display = 'flex';
-        const confirmBtn = document.getElementById('qaBankFullConfirm');
-        const cancelBtn = document.getElementById('qaBankFullCancel');
-        // 清除旧的事件监听
-        const newConfirm = confirmBtn.cloneNode(true);
-        const newCancel = cancelBtn.cloneNode(true);
-        confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
-        cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-        newConfirm.onclick = () => {
-          // 清空投递题目，加入新题目
-          Store.set('quiz_submitted', [{ q, a, by: App.currentRole, ts: Date.now() }]);
-          if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted('quiz');
-          const ds = todayStr();
-          Store.remove('quiz_q_' + ds);
-          Store.remove('quiz_qv_' + ds);
-          this._questions = this._getTodayQuestions();
-          overlay.style.display = 'none';
-          QASubmit.close();
-          showToast('题库已更新！投递题目已重置 ✅', 2000);
-        };
-        newCancel.onclick = () => { overlay.style.display = 'none'; };
-      } else {
-        if (confirm('题库已满（150题），是否清空已投递的题目并重新开始？')) {
-          Store.set('quiz_submitted', [{ q, a, by: App.currentRole, ts: Date.now() }]);
-          if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted('quiz');
-          const ds = todayStr();
-          Store.remove('quiz_q_' + ds);
-          Store.remove('quiz_qv_' + ds);
-          this._questions = this._getTodayQuestions();
-          QASubmit.close();
-          showToast('题库已更新！投递题目已重置 ✅', 2000);
-        }
-      }
-      return;
-    }
     list.push({ q, a, by: App.currentRole, ts: Date.now() });
     Store.set('quiz_submitted', list);
     if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted('quiz');
@@ -7333,7 +7291,7 @@ const RandomQA = {
     Store.remove('quiz_q_' + ds);
     Store.remove('quiz_qv_' + ds);
     this._questions = this._getTodayQuestions();
-    showToast(`题目投递成功！当前题库 ${mergedLen + 1}/${this.MAX_BANK}，隔天可出现 ✅`, 2000);
+    showToast('题目投递成功！隔天可出现在问答中 ✅', 2000);
   },
   _syncSubmitted(remoteList) {
     if (!Array.isArray(remoteList)) return;
@@ -7757,52 +7715,12 @@ function createQAModule(config) {
     },
 
     // ====== 题目投递 ======
-    MAX_BANK: 150,
     openSubmit() {
       QASubmit.open(this);
     },
 
     _saveSubmitted(q, a) {
       const list = Store.get(this._prefix + '_submitted', []);
-      const mergedLen = this.QUESTION_BANK.length + list.length;
-      if (mergedLen >= this.MAX_BANK) {
-        // 题库已满，提示是否清空投递题目重新开始
-        const overlay = document.getElementById('qaBankFullOverlay');
-        if (overlay) {
-          document.getElementById('qaBankFullTitle').textContent = this._title || this._prefix;
-          overlay.style.display = 'flex';
-          const confirmBtn = document.getElementById('qaBankFullConfirm');
-          const cancelBtn = document.getElementById('qaBankFullCancel');
-          const newConfirm = confirmBtn.cloneNode(true);
-          const newCancel = cancelBtn.cloneNode(true);
-          confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
-          cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-          newConfirm.onclick = () => {
-            Store.set(this._prefix + '_submitted', [{ q, a, by: App.currentRole, ts: Date.now() }]);
-            if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted(this._prefix);
-            const ds = todayStr();
-            Store.remove(this._prefix + '_q_' + ds);
-            Store.remove(this._prefix + '_qv_' + ds);
-            this._questions = this._getTodayQuestions();
-            overlay.style.display = 'none';
-            QASubmit.close();
-            showToast('题库已更新！投递题目已重置 ✅', 2000);
-          };
-          newCancel.onclick = () => { overlay.style.display = 'none'; };
-        } else {
-          if (confirm('题库已满（150题），是否清空已投递的题目并重新开始？')) {
-            Store.set(this._prefix + '_submitted', [{ q, a, by: App.currentRole, ts: Date.now() }]);
-            if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted(this._prefix);
-            const ds = todayStr();
-            Store.remove(this._prefix + '_q_' + ds);
-            Store.remove(this._prefix + '_qv_' + ds);
-            this._questions = this._getTodayQuestions();
-            QASubmit.close();
-            showToast('题库已更新！投递题目已重置 ✅', 2000);
-          }
-        }
-        return;
-      }
       list.push({ q, a, by: App.currentRole, ts: Date.now() });
       Store.set(this._prefix + '_submitted', list);
       if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted(this._prefix);
@@ -7810,7 +7728,7 @@ function createQAModule(config) {
       Store.remove(this._prefix + '_q_' + ds);
       Store.remove(this._prefix + '_qv_' + ds);
       this._questions = this._getTodayQuestions();
-      showToast(`题目投递成功！当前题库 ${mergedLen + 1}/${this.MAX_BANK}，隔天可出现 ✅`, 2000);
+      showToast('题目投递成功！隔天可出现在问答中 ✅', 2000);
     },
 
     _syncSubmitted(remoteList) {
