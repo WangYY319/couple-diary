@@ -616,6 +616,7 @@ const Cloud = {
     const role = App.currentRole;
     const quizAnswers = Store.get(`quiz_a_${ds}_${role}`, []);
     const quizQuestions = Store.get(`quiz_q_${ds}`, null);
+    const quizQVer = typeof RandomQA !== 'undefined' ? RandomQA.QUESTION_VERSION : '';
     const vocabCount = Store.get(`vocab_count_${ds}_${role}`, 0);
     const vocabProg = Store.get(`vocab_prog_${ds}_${role}`, null);
 
@@ -623,7 +624,7 @@ const Cloud = {
       await fetch(this._url(`extra/${ds}/${role}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quizAnswers, quizQuestions, vocabCount, vocabProg, ts: Date.now() })
+        body: JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, ts: Date.now() })
       });
     } catch (e) { /* ignore */ }
   },
@@ -670,9 +671,22 @@ const Cloud = {
       changed = true;
     }
 
-    // 确保题目一致（如果自己还没有题目，用对方的）
-    if (remote.quizQuestions && !Store.get(`quiz_q_${ds}`, null)) {
-      Store.set(`quiz_q_${ds}`, remote.quizQuestions);
+    // 确保题目一致：始终比较并使用远端题目（先推送到云端的为准）
+    if (remote.quizQuestions && remote.quizQuestions.length === 5) {
+      const localQ = Store.get(`quiz_q_${ds}`, null);
+      const localQVer = Store.get(`quiz_qv_${ds}`, '');
+      const myVer = typeof RandomQA !== 'undefined' ? RandomQA.QUESTION_VERSION : '';
+      const remoteQStr = JSON.stringify(remote.quizQuestions);
+      const localQStr = localQ ? JSON.stringify(localQ) : '';
+      // 远端题目与本地不同，或本地版本号缺失/不匹配 → 使用远端题目
+      if (remoteQStr !== localQStr || localQVer !== myVer) {
+        Store.set(`quiz_q_${ds}`, remote.quizQuestions);
+        if (typeof RandomQA !== 'undefined') {
+          Store.set(`quiz_qv_${ds}`, RandomQA.QUESTION_VERSION);
+          RandomQA._questions = remote.quizQuestions;
+        }
+        changed = true;
+      }
     }
 
     // 更新刷词统计
@@ -693,8 +707,11 @@ const Cloud = {
     }
 
     if (changed) {
-      // 刷新UI
-      if (typeof RandomQA !== 'undefined') RandomQA.render();
+      // 刷新UI - 确保题目和答案都是最新的
+      if (typeof RandomQA !== 'undefined') {
+        RandomQA._questions = RandomQA._getTodayQuestions();
+        RandomQA.render();
+      }
       if (typeof EnglishVocab !== 'undefined') EnglishVocab.render();
     }
   },
@@ -3687,6 +3704,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v100', date: '2026-08-17', changes: '问答同步修复: 题库版本校验强制刷新旧缓存/题目强制同步(先推送为准)/答案同步后重新加载题目' },
     { v: 'v99', date: '2026-08-16', changes: '照片自适应压缩+失败检测/问答情侣题库+完成提示同步/地标标注重构+绿色双方标/版本日志' },
     { v: 'v98', date: '2026-08-16', changes: '配对码U2A6KA默认化/版本号统一/照片上传可靠性增强' },
     { v: 'v95', date: '2026-08-15', changes: 'SW缓存策略修复/地标打卡初始版/随机问答初始版' },
@@ -6709,6 +6727,9 @@ const RandomQA = {
   _answers: [],
   _currentIndex: 0,
 
+  // 题库版本号：题库内容变化时递增，用于使旧缓存失效
+  QUESTION_VERSION: 'v99couples',
+
   // 日期种子伪随机：保证双方同一天看到相同题目
   _seededShuffle(arr, seed) {
     let h = 0;
@@ -6725,7 +6746,11 @@ const RandomQA = {
   _getTodayQuestions() {
     const dateStr = todayStr();
     const cached = Store.get(`quiz_q_${dateStr}`, null);
-    if (cached && cached.length === 5) return cached;
+    const cachedVer = Store.get(`quiz_qv_${dateStr}`, '');
+    // 版本校验：题库变化后旧缓存失效，必须重新生成
+    if (cached && cached.length === 5 && cachedVer === this.QUESTION_VERSION) {
+      return cached;
+    }
     const shuffled = this._seededShuffle(
       this.QUESTION_BANK.map((_, i) => i),
       dateStr
@@ -6733,6 +6758,7 @@ const RandomQA = {
     const indices = shuffled.slice(0, 5);
     const questions = indices.map(i => ({ ...this.QUESTION_BANK[i], idx: i }));
     Store.set(`quiz_q_${dateStr}`, questions);
+    Store.set(`quiz_qv_${dateStr}`, this.QUESTION_VERSION);
     return questions;
   },
 
