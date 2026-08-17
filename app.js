@@ -906,17 +906,24 @@ const Cloud = {
 
   // ====== 照片云同步 ======
 
-  // 上传照片列表到云端
+  // 上传照片列表到云端（带重试）
   async pushPhotoList() {
     if (!this.pairCode) return;
     const photoIds = Photos.photos.map(p => p.id);
-    try {
-      await fetch(this._url('photos_list'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(photoIds)
-      });
-    } catch (e) { /* ignore */ }
+    for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        const r = await fetch(this._url('photos_list'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(photoIds)
+        });
+        if (r.ok) return true;
+      } catch (e) { /* retry */ }
+      if (attempt < this.MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+      }
+    }
+    return false;
   },
 
   // 从云端同步照片
@@ -949,28 +956,52 @@ const Cloud = {
       }
     }
 
-    // 上传本地有但云端没有的照片（带失败追踪 + 最大重试限制）
-    const failedUploads = Store.get('photo_upload_failed', []);
+    // 清理云端孤立照片（本地已删但云端残留），释放命名空间配额
+    await Photos.cleanupCloudPhotos();
+
+    // 上传本地有但云端没有的照片（带失败追踪 + 配额管理）
     const MAX_SYNC_RETRIES = 10;
     let uploadFailed = false;
+    let uploadSuccessCount = 0;
     const stillFailed = [];
     for (const id of localIds) {
       if (!remoteIds.includes(id)) {
         const photo = Photos.photos.find(p => p.id === id);
         if (photo) {
+          // 上传前确保照片已压缩到 < 30KB（避免占用过多配额）
+          if (photo.blob.size > 35 * 1024) {
+            const file = new File([photo.blob], 'temp.jpg', { type: photo.blob.type || 'image/jpeg' });
+            const compressed = await Photos._compressImage(file);
+            if (compressed && compressed.size < photo.blob.size) {
+              photo.blob = compressed;
+              await Photos._put(id, compressed);
+            }
+          }
           const result = await this.uploadFile(photo.blob, `photos/${id}`);
           if (result) {
-            // 上传成功
+            uploadSuccessCount++;
+            Store.remove(`photo_retry_${id}`);
           } else {
-            // 记录重试次数
-            const retryCount = Store.get(`photo_retry_${id}`, 0) + 1;
-            Store.set(`photo_retry_${id}`, retryCount);
-            if (retryCount < MAX_SYNC_RETRIES) {
+            // 首次上传失败 → 尝试压缩已有照片腾出配额后重试一次
+            const retryCount = Store.get(`photo_retry_${id}`, 0);
+            if (retryCount === 0) {
+              // 尝试压缩已有照片释放空间
+              await Photos.compressExistingPhotos();
+              const retryResult = await this.uploadFile(photo.blob, `photos/${id}`);
+              if (retryResult) {
+                uploadSuccessCount++;
+                Store.remove(`photo_retry_${id}`);
+                continue;
+              }
+            }
+            // 仍然失败
+            const newRetryCount = retryCount + 1;
+            Store.set(`photo_retry_${id}`, newRetryCount);
+            if (newRetryCount < MAX_SYNC_RETRIES) {
               stillFailed.push(id);
               uploadFailed = true;
             } else {
-              // 超过最大重试，放弃
-              showToast(`照片 ${id.slice(-6)} 多次同步失败，请检查网络后重新上传`, 4000);
+              showToast(`照片 ${id.slice(-6)} 多次同步失败，已超出配额或网络问题`, 4000);
               Store.remove(`photo_retry_${id}`);
             }
           }
@@ -987,8 +1018,11 @@ const Cloud = {
       Photos.render();
       showToast('对方上传了新照片 📸');
     }
-    if (uploadFailed && !newPhotos) {
-      showToast(`${stillFailed.length} 张照片待同步，下次自动重试 (${stillFailed.length}张)`, 3000);
+    if (uploadSuccessCount > 0 && !newPhotos) {
+      showToast(`${uploadSuccessCount} 张照片已同步 ✅`, 2000);
+    }
+    if (uploadFailed && !newPhotos && uploadSuccessCount === 0) {
+      showToast(`${stillFailed.length} 张照片待同步，下次自动重试`, 3000);
     }
   },
 
@@ -3704,6 +3738,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v101', date: '2026-08-17', changes: '照片同步根因修复: 压缩目标降至30KB(2条/照片)/已有照片自动压缩/云端孤立数据清理/配额管理重试' },
     { v: 'v100', date: '2026-08-17', changes: '问答同步修复: 题库版本校验强制刷新旧缓存/题目强制同步(先推送为准)/答案同步后重新加载题目' },
     { v: 'v99', date: '2026-08-16', changes: '照片自适应压缩+失败检测/问答情侣题库+完成提示同步/地标标注重构+绿色双方标/版本日志' },
     { v: 'v98', date: '2026-08-16', changes: '配对码U2A6KA默认化/版本号统一/照片上传可靠性增强' },
@@ -5650,6 +5685,83 @@ const VoiceRecord = {
     } catch (e) { /* ignore */ }
   },
 
+  // 压缩已有照片：重新压缩 IndexedDB 中过大的照片，腾出云端配额
+  async compressExistingPhotos() {
+    const keys = await this._getAllKeys();
+    let compressed = 0;
+    const reuploadIds = [];
+    for (const key of keys) {
+      const blob = await this._get(key);
+      if (!blob) continue;
+      // 压缩超过 35KB 的照片（目标 < 30KB = 1 个分块）
+      if (blob.size > 35 * 1024) {
+        const file = new File([blob], 'temp.jpg', { type: blob.type || 'image/jpeg' });
+        const newBlob = await this._compressImage(file);
+        if (newBlob && newBlob.size < blob.size) {
+          await this._put(key, newBlob);
+          const idx = this.photos.findIndex(p => p.id === key);
+          if (idx >= 0) this.photos[idx].blob = newBlob;
+          reuploadIds.push(key);
+          compressed++;
+        }
+      }
+    }
+    if (compressed > 0) {
+      this.render();
+      // 重新上传压缩后的照片到云端：先删旧分块再传新的
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+        for (const id of reuploadIds) {
+          const p = this.photos.find(p => p.id === id);
+          if (!p) continue;
+          // 删除旧的云端分块（可能有多块旧数据）
+          await Cloud.deleteFile(`photos/${id}`).catch(() => {});
+          // 上传压缩后的新照片
+          const ok = await Cloud.uploadFile(p.blob, `photos/${id}`);
+          if (!ok) {
+            console.warn(`[Photos] 照片 ${id} 压缩后重新上传失败`);
+          }
+        }
+        await Cloud.pushPhotoList();
+      }
+      showToast(`已压缩 ${compressed} 张照片，释放云端空间`, 3000);
+    }
+    return compressed;
+  },
+
+  // 清理云端已删除照片的分块数据
+  async cleanupCloudPhotos() {
+    if (typeof Cloud === 'undefined' || !Cloud.pairCode) return;
+    let remoteIds;
+    try {
+      const r = await fetch(Cloud._url('photos_list'));
+      if (!r.ok) return;
+      remoteIds = await r.json();
+    } catch (e) { return; }
+    if (!Array.isArray(remoteIds)) return;
+
+    const localIds = this.photos.map(p => p.id);
+    let cleaned = 0;
+    // 云端有但本地没有的照片 → 删除其云端分块
+    for (const id of remoteIds) {
+      if (!localIds.includes(id)) {
+        await Cloud.deleteFile(`photos/${id}`).catch(() => {});
+        cleaned++;
+      }
+    }
+    // 更新云端照片列表（只保留本地仍有的）
+    const validIds = localIds.filter(id => remoteIds.includes(id));
+    if (JSON.stringify(validIds) !== JSON.stringify(remoteIds)) {
+      try {
+        await fetch(Cloud._url('photos_list'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validIds)
+        });
+      } catch (e) { /* ignore */ }
+    }
+    return cleaned;
+  },
+
   async loadAll() {
     try {
       const db = await this._openDB();
@@ -6037,13 +6149,22 @@ const Photos = {
       this.render();
       if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
         for (const p of newPhotos) {
-          Cloud.uploadFile(p.blob, `photos/${p.id}`).then((result) => {
+          Cloud.uploadFile(p.blob, `photos/${p.id}`).then(async (result) => {
             if (result) {
-              Cloud.pushPhotoList();
+              await Cloud.pushPhotoList();
+              showToast('照片同步成功 ✅', 1500);
             } else {
-              Store.set('photo_upload_failed',
-                [...Store.get('photo_upload_failed', []), p.id]);
-              showToast(`照片 ${p.id.slice(-6)} 同步失败，将在下次自动重试`, 3000);
+              // 首次同步失败 → 压缩已有照片释放配额后重试
+              await Photos.compressExistingPhotos().catch(() => {});
+              const retry = await Cloud.uploadFile(p.blob, `photos/${p.id}`);
+              if (retry) {
+                await Cloud.pushPhotoList();
+                showToast('照片同步成功 ✅（已压缩优化）', 2000);
+              } else {
+                Store.set('photo_upload_failed',
+                  [...Store.get('photo_upload_failed', []), p.id]);
+                showToast(`照片 ${p.id.slice(-6)} 同步失败，将在下次自动重试`, 3000);
+              }
             }
           });
         }
@@ -6054,12 +6175,15 @@ const Photos = {
   },
 
   async _compressImage(file) {
-    const MAX_BYTES = 400 * 1024; // 目标压缩后 < 400KB
+    // 目标 < 30KB：MantleDB 每命名空间限 100 条记录，所有数据共享同一命名空间
+    // 30KB → base64 ≈ 40KB → 仅需 1 个分块 + 1 条 meta = 2 条记录/照片
+    // 旧方案 100KB → 4 条记录/照片，20 张就撑满命名空间
+    const MAX_BYTES = 30 * 1024;
     const steps = [
-      { maxDim: 800, quality: 0.85 },
-      { maxDim: 800, quality: 0.65 },
-      { maxDim: 600, quality: 0.5 },
-      { maxDim: 480, quality: 0.4 },
+      { maxDim: 640, quality: 0.6 },
+      { maxDim: 500, quality: 0.45 },
+      { maxDim: 400, quality: 0.35 },
+      { maxDim: 320, quality: 0.28 },
     ];
     for (let s = 0; s < steps.length; s++) {
       const { maxDim, quality } = steps[s];
@@ -6067,8 +6191,8 @@ const Photos = {
       if (!blob) continue;
       if (blob.size <= MAX_BYTES || s === steps.length - 1) return blob;
     }
-    // 兜底
-    return this._resizeToBlob(file, 480, 0.3);
+    // 兜底：最小尺寸最低质量
+    return this._resizeToBlob(file, 320, 0.22);
   },
 
   _resizeToBlob(file, maxDim, quality) {
@@ -6102,6 +6226,34 @@ const Photos = {
       if (blob) this.photos.push({ id: key, blob });
     }
     this.render();
+    // 自动压缩过大的已有照片（异步执行，不阻塞首屏）
+    if (this.photos.length > 0) {
+      this._autoCompress();
+    }
+  },
+
+  // 后台自动压缩 + 云端清理
+  async _autoCompress() {
+    try {
+      const keys = await this._getAllKeys();
+      let needCompress = false;
+      for (const key of keys) {
+        const blob = await this._get(key);
+        if (blob && blob.size > 35 * 1024) {
+          needCompress = true;
+          break;
+        }
+      }
+      if (needCompress) {
+        await this.compressExistingPhotos();
+      }
+      // 清理云端孤立数据
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+        await this.cleanupCloudPhotos();
+      }
+    } catch (e) {
+      console.warn('[Photos] 自动压缩失败', e);
+    }
   },
 
   render() {
