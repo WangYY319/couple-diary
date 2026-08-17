@@ -674,6 +674,14 @@ const Cloud = {
   },
 
   // 同步问答和刷词数据到云端
+  // 获取当前日期所在季度标识（如 2026q3）
+  _getQuarter() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const q = Math.floor(now.getMonth() / 3) + 1;
+    return `${year}q${q}`;
+  },
+
   async pushQuizVocab() {
     if (!this.pairCode) return;
     const ds = todayStr();
@@ -690,8 +698,9 @@ const Cloud = {
     const iqaNote = Store.get(`iqa_note_${ds}_${role}`, '');
 
     const body = JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, quizNote, iqaAnswers, iqaQuestions, iqaQVer, iqaNote, ts: Date.now() });
-    // 使用独立命名空间 + 带重试的 POST，避免配额耗尽导致同步失败
-    const ok = await this._retryPOST(this._url(`extra/${ds}/${role}`, 'qa'), body, this.MAX_RETRIES);
+    // 按季度分命名空间（每季度约180条，100条限制下可用约50天，一个季度基本够用）
+    const qaNs = `qa-${this._getQuarter()}`;
+    const ok = await this._retryPOST(this._url(`extra/${ds}/${role}`, qaNs), body, this.MAX_RETRIES);
     if (!ok) {
       console.warn('[Cloud] pushQuizVocab: 问答数据同步失败');
     }
@@ -702,8 +711,9 @@ const Cloud = {
     if (!this.pairCode) return;
     const ds = todayStr();
     const otherRole = App.currentRole === 'TAO' ? 'YAN' : 'TAO';
+    const qaNs = `qa-${this._getQuarter()}`;
     try {
-      const r = await fetch(this._url(`extra/${ds}/${otherRole}`, 'qa'));
+      const r = await fetch(this._url(`extra/${ds}/${otherRole}`, qaNs));
       if (!r.ok) {
         if (r.status !== 404) console.warn(`[Cloud] pullQuizVocab: HTTP ${r.status}`);
         return null;
@@ -1061,15 +1071,122 @@ const Cloud = {
     } catch (e) { /* ignore */ }
   },
 
-  // ====== 照片云同步 ======
+  // ====== 照片云同步（多批次命名空间） ======
 
-  // 上传照片列表到云端（带重试）
+  // 每批次最大照片数（每张2条记录，40张=80条，留20条余量）
+  PHOTOS_PER_BATCH: 40,
+
+  // 获取照片批次注册表
+  async _getPhotoBatches() {
+    try {
+      const r = await fetch(this._url('photo_batches'));
+      if (r.ok) return await r.json();
+    } catch (e) { /* ignore */ }
+    return { batches: [], active: null };
+  },
+
+  // 更新照片批次注册表
+  async _setPhotoBatches(batches) {
+    try {
+      await this._retryPOST(this._url('photo_batches'), JSON.stringify(batches), this.MAX_RETRIES);
+    } catch (e) { /* ignore */ }
+  },
+
+  // 获取当前活跃的照片批次 nsType（如 'photos-b01-20260817'）
+  async _getActivePhotoBatch() {
+    const reg = await this._getPhotoBatches();
+    if (reg.active) return reg.active;
+    // 没有活跃批次 → 创建第一个批次
+    return await this._createNewPhotoBatch();
+  },
+
+  // 创建新的照片批次
+  async _createNewPhotoBatch() {
+    const reg = await this._getPhotoBatches();
+    const batchNum = String(reg.batches.length + 1).padStart(2, '0');
+    const today = new Date();
+    const dateStr = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
+    const batchName = `photos-b${batchNum}-${dateStr}`;
+    reg.batches.push(batchName);
+    reg.active = batchName;
+    await this._setPhotoBatches(reg);
+    console.log(`[Cloud] 新建照片批次: ${batchName}`);
+    return batchName;
+  },
+
+  // 检查当前批次是否已满
+  async _isBatchFull(batchName) {
+    try {
+      const r = await fetch(this._url('photos_list', batchName));
+      if (r.ok) {
+        const list = await r.json();
+        return Array.isArray(list) && list.length >= this.PHOTOS_PER_BATCH;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  },
+
+  // 获取活跃批次（自动检查是否需要开新批次）
+  async _ensureActivePhotoBatch() {
+    let active = await this._getActivePhotoBatch();
+    if (await this._isBatchFull(active)) {
+      active = await this._createNewPhotoBatch();
+    }
+    return active;
+  },
+
+  // 从所有批次拉取照片ID列表（合并）
+  async _getAllRemotePhotoIds() {
+    const reg = await this._getPhotoBatches();
+    if (reg.batches.length === 0) return [];
+
+    const allIds = [];
+    for (const batch of reg.batches) {
+      try {
+        const r = await fetch(this._url('photos_list', batch));
+        if (r.ok) {
+          const list = await r.json();
+          if (Array.isArray(list)) {
+            for (const id of list) {
+              if (!allIds.includes(id)) allIds.push(id);
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+    return allIds;
+  },
+
+  // 查找照片ID所在的批次
+  async _findPhotoBatch(id) {
+    const reg = await this._getPhotoBatches();
+    for (const batch of reg.batches) {
+      const ids = await this._getBatchPhotoIds(batch);
+      if (ids && ids.includes(id)) return batch;
+    }
+    return null;
+  },
+
+  // 获取单个批次的照片ID列表
+  async _getBatchPhotoIds(batch) {
+    try {
+      const r = await fetch(this._url('photos_list', batch));
+      if (r.ok) {
+        const list = await r.json();
+        return Array.isArray(list) ? list : [];
+      }
+    } catch (e) { /* ignore */ }
+    return null;
+  },
+
+  // 上传照片列表到云端（上传到活跃批次）
   async pushPhotoList() {
     if (!this.pairCode) return;
+    const active = await this._getActivePhotoBatch();
     const photoIds = Photos.photos.map(p => p.id);
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       try {
-        const r = await fetch(this._url('photos_list', 'photos'), {
+        const r = await fetch(this._url('photos_list', active), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(photoIds)
@@ -1083,30 +1200,29 @@ const Cloud = {
     return false;
   },
 
-  // 从云端同步照片
+  // 从云端同步照片（多批次命名空间）
   async syncPhotos() {
     if (!this.pairCode) return;
 
-    // 获取云端照片列表
-    let remoteIds;
-    try {
-      const r = await fetch(this._url('photos_list', 'photos'));
-      if (!r.ok) return;
-      remoteIds = await r.json();
-    } catch (e) { return; }
-
+    // 从所有批次获取云端照片列表
+    const remoteIds = await this._getAllRemotePhotoIds();
     if (!remoteIds || !Array.isArray(remoteIds)) return;
 
     const localIds = Photos.photos.map(p => p.id);
     let newPhotos = false;
 
-    // 下载本地没有的照片
+    // 下载本地没有的照片（需要先找到在哪个批次）
+    const reg = await this._getPhotoBatches();
     for (const id of remoteIds) {
       if (!localIds.includes(id)) {
-        const blob = await this.downloadFile(`photos/${id}`, 'photos');
+        // 从各批次尝试下载
+        let blob = null;
+        for (const batch of reg.batches) {
+          blob = await this.downloadFile(`photos/${id}`, batch);
+          if (blob) break;
+        }
         if (blob) {
           Photos.photos.push({ id, blob });
-          // 保存到本地 IndexedDB
           await Photos._put(id, blob);
           newPhotos = true;
         }
@@ -1116,16 +1232,18 @@ const Cloud = {
     // 清理云端孤立照片（本地已删但云端残留），释放命名空间配额
     await Photos.cleanupCloudPhotos();
 
-    // 上传本地有但云端没有的照片（带失败追踪 + 配额管理）
+    // 上传本地有但云端没有的照片（上传到活跃批次，满了自动开新批次）
     const MAX_SYNC_RETRIES = 10;
     let uploadFailed = false;
     let uploadSuccessCount = 0;
     const stillFailed = [];
+    let activeBatch = await this._ensureActivePhotoBatch();
+
     for (const id of localIds) {
       if (!remoteIds.includes(id)) {
         const photo = Photos.photos.find(p => p.id === id);
         if (photo) {
-          // 上传前确保照片已压缩到 < 30KB（避免占用过多配额）
+          // 上传前确保照片已压缩到 < 30KB
           if (photo.blob.size > 35 * 1024) {
             const file = new File([photo.blob], 'temp.jpg', { type: photo.blob.type || 'image/jpeg' });
             const compressed = await Photos._compressImage(file);
@@ -1134,7 +1252,11 @@ const Cloud = {
               await Photos._put(id, compressed);
             }
           }
-          const result = await this.uploadFile(photo.blob, `photos/${id}`, null, 'photos');
+          // 检查当前批次是否已满，满了开新批次
+          if (await this._isBatchFull(activeBatch)) {
+            activeBatch = await this._createNewPhotoBatch();
+          }
+          const result = await this.uploadFile(photo.blob, `photos/${id}`, null, activeBatch);
           if (result) {
             uploadSuccessCount++;
             Store.remove(`photo_retry_${id}`);
@@ -1142,9 +1264,8 @@ const Cloud = {
             // 首次上传失败 → 尝试压缩已有照片腾出配额后重试一次
             const retryCount = Store.get(`photo_retry_${id}`, 0);
             if (retryCount === 0) {
-              // 尝试压缩已有照片释放空间
               await Photos.compressExistingPhotos();
-              const retryResult = await this.uploadFile(photo.blob, `photos/${id}`, null, 'photos');
+              const retryResult = await this.uploadFile(photo.blob, `photos/${id}`, null, activeBatch);
               if (retryResult) {
                 uploadSuccessCount++;
                 Store.remove(`photo_retry_${id}`);
@@ -1168,7 +1289,7 @@ const Cloud = {
     // 更新失败列表（只保留未超限的）
     Store.set('photo_upload_failed', stillFailed);
 
-    // 更新云端照片列表
+    // 更新云端照片列表（更新到活跃批次）
     await this.pushPhotoList();
 
     if (newPhotos) {
@@ -3975,6 +4096,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v109', date: '2026-08-17', changes: '照片云端无限扩容: 按批次自动分命名空间(每批40张,满了自动开新仓)/所有批次照片合并显示/问答按季度分命名空间/首屏多批次拉取' },
     { v: 'v108', date: '2026-08-17', changes: '核心修复: 云端命名空间拆分(照片/语音/问答/背景图各自独立100条配额)/问答同步修复(独立命名空间+重试机制+错误日志)/旧命名空间一次性清理/甜蜜语录双击投稿+投递者标识+云同步/打卡导出加入随机问答和亲密问答内容' },
     { v: 'v105', date: '2026-08-17', changes: '新增亲密问答板块(情侣关系题库50题)/两个问答板块支持双击标题投递自定义题目/投递题目隔天随机出现/题库云同步' },
     { v: 'v104', date: '2026-08-17', changes: '随机问答留白优化/双方完成后新增备注功能(50字双击编辑+云同步)' },
@@ -5966,12 +6088,14 @@ const VoiceRecord = {
         for (const id of reuploadIds) {
           const p = this.photos.find(p => p.id === id);
           if (!p) continue;
-          // 删除旧的云端分块（可能有多块旧数据）
-          await Cloud.deleteFile(`photos/${id}`, 'photos').catch(() => {});
-          // 上传压缩后的新照片
-          const ok = await Cloud.uploadFile(p.blob, `photos/${id}`, null, 'photos');
-          if (!ok) {
-            console.warn(`[Photos] 照片 ${id} 压缩后重新上传失败`);
+          // 找到照片所在的批次，删除旧分块后重新上传
+          const batch = await Cloud._findPhotoBatch(id);
+          if (batch) {
+            await Cloud.deleteFile(`photos/${id}`, batch).catch(() => {});
+            const ok = await Cloud.uploadFile(p.blob, `photos/${id}`, null, batch);
+            if (!ok) {
+              console.warn(`[Photos] 照片 ${id} 压缩后重新上传失败`);
+            }
           }
         }
         await Cloud.pushPhotoList();
@@ -5984,33 +6108,41 @@ const VoiceRecord = {
   // 清理云端已删除照片的分块数据
   async cleanupCloudPhotos() {
     if (typeof Cloud === 'undefined' || !Cloud.pairCode) return;
-    let remoteIds;
-    try {
-      const r = await fetch(Cloud._url('photos_list', 'photos'));
-      if (!r.ok) return;
-      remoteIds = await r.json();
-    } catch (e) { return; }
-    if (!Array.isArray(remoteIds)) return;
+    // 从所有批次获取云端照片列表
+    const allRemoteIds = await Cloud._getAllRemotePhotoIds();
+    if (!Array.isArray(allRemoteIds)) return;
 
     const localIds = this.photos.map(p => p.id);
+    const reg = await Cloud._getPhotoBatches();
     let cleaned = 0;
-    // 云端有但本地没有的照片 → 删除其云端分块
-    for (const id of remoteIds) {
+    // 云端有但本地没有的照片 → 从各批次删除其云端分块
+    for (const id of allRemoteIds) {
       if (!localIds.includes(id)) {
-        await Cloud.deleteFile(`photos/${id}`, 'photos').catch(() => {});
-        cleaned++;
+        // 找到照片所在的批次并删除
+        for (const batch of reg.batches) {
+          const batchIds = await Cloud._getBatchPhotoIds(batch);
+          if (batchIds && batchIds.includes(id)) {
+            await Cloud.deleteFile(`photos/${id}`, batch).catch(() => {});
+            cleaned++;
+            break;
+          }
+        }
       }
     }
-    // 更新云端照片列表（只保留本地仍有的）
-    const validIds = localIds.filter(id => remoteIds.includes(id));
-    if (JSON.stringify(validIds) !== JSON.stringify(remoteIds)) {
-      try {
-        await fetch(Cloud._url('photos_list', 'photos'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(validIds)
-        });
-      } catch (e) { /* ignore */ }
+    // 更新每个批次的照片列表（只保留本地仍有的）
+    for (const batch of reg.batches) {
+      const batchIds = await Cloud._getBatchPhotoIds(batch);
+      if (!batchIds) continue;
+      const validIds = localIds.filter(id => batchIds.includes(id));
+      if (JSON.stringify(validIds) !== JSON.stringify(batchIds)) {
+        try {
+          await fetch(Cloud._url('photos_list', batch), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(validIds)
+          });
+        } catch (e) { /* ignore */ }
+      }
     }
     return cleaned;
   },
@@ -6496,26 +6628,29 @@ const Photos = {
       showToast(msg);
       this.render();
       if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
-        for (const p of newPhotos) {
-          Cloud.uploadFile(p.blob, `photos/${p.id}`, null, 'photos').then(async (result) => {
-            if (result) {
-              await Cloud.pushPhotoList();
-              showToast('照片同步成功 ✅', 1500);
-            } else {
-              // 首次同步失败 → 压缩已有照片释放配额后重试
-              await Photos.compressExistingPhotos().catch(() => {});
-              const retry = await Cloud.uploadFile(p.blob, `photos/${p.id}`, null, 'photos');
-              if (retry) {
+        // 先获取活跃批次
+        Cloud._ensureActivePhotoBatch().then(activeBatch => {
+          for (const p of newPhotos) {
+            Cloud.uploadFile(p.blob, `photos/${p.id}`, null, activeBatch).then(async (result) => {
+              if (result) {
                 await Cloud.pushPhotoList();
-                showToast('照片同步成功 ✅（已压缩优化）', 2000);
+                showToast('照片同步成功 ✅', 1500);
               } else {
-                Store.set('photo_upload_failed',
-                  [...Store.get('photo_upload_failed', []), p.id]);
-                showToast(`照片 ${p.id.slice(-6)} 同步失败，将在下次自动重试`, 3000);
+                // 首次同步失败 → 压缩已有照片释放配额后重试
+                await Photos.compressExistingPhotos().catch(() => {});
+                const retry = await Cloud.uploadFile(p.blob, `photos/${p.id}`, null, activeBatch);
+                if (retry) {
+                  await Cloud.pushPhotoList();
+                  showToast('照片同步成功 ✅（已压缩优化）', 2000);
+                } else {
+                  Store.set('photo_upload_failed',
+                    [...Store.get('photo_upload_failed', []), p.id]);
+                  showToast(`照片 ${p.id.slice(-6)} 同步失败，将在下次自动重试`, 3000);
+                }
               }
-            }
-          });
-        }
+            });
+          }
+        });
       }
     } else if (failed > 0) {
       showToast(`${failed} 张照片上传失败，请重试`);
@@ -6653,9 +6788,15 @@ const Photos = {
         this.photos = this.photos.filter(p => p.id !== id);
         this.render();
         showToast('已删除照片');
-        // 云同步删除
+        // 云同步删除：找到照片所在批次后删除
         if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
-          Cloud.deleteFile(`photos/${id}`, 'photos').then(() => Cloud.pushPhotoList());
+          Cloud._findPhotoBatch(id).then(batch => {
+            if (batch) {
+              Cloud.deleteFile(`photos/${id}`, batch).then(() => Cloud.pushPhotoList());
+            } else {
+              Cloud.pushPhotoList();
+            }
+          });
         }
       };
     } catch (e) {
