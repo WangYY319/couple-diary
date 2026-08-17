@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="img/favicon.svg">
   <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
   <title>TAO&YAN 相处日记</title>
-  <link rel="stylesheet" href="style.css?v=104">
+  <link rel="stylesheet" href="style.css?v=105">
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -388,7 +388,7 @@
 
       <!-- 随机问答 -->
       <div class="card quiz-card">
-        <div class="card-title"><span class="icon">🎲</span> 随机问答</div>
+        <div class="card-title" ondblclick="RandomQA.openSubmit()"><span class="icon">🎲</span> 随机问答</div>
         <div class="quiz-stats-row">
           <div class="quiz-stat tao-stat">
             <span class="quiz-stat-emoji">🐱</span>
@@ -420,6 +420,67 @@
           <div class="quiz-note-label">备注</div>
           <div class="quiz-note-display" id="quizNoteDisplay" ondblclick="RandomQA._editNote()"></div>
           <input type="text" class="quiz-note-input" id="quizNoteInput" maxlength="50" placeholder="写一句今日小记..." style="display:none" onblur="RandomQA._saveNote()" onkeydown="if(event.key==='Enter')this.blur()" />
+        </div>
+      </div>
+
+      <!-- 亲密问答 -->
+      <div class="card quiz-card iqa-card">
+        <div class="card-title" ondblclick="IntimateQA.openSubmit()"><span class="icon">💖</span> 亲密问答</div>
+        <div class="quiz-stats-row">
+          <div class="quiz-stat tao-stat">
+            <span class="quiz-stat-emoji">🐱</span>
+            <span class="quiz-stat-name">TAO</span>
+            <span class="quiz-stat-count" id="iqaCountTAO">0/5</span>
+          </div>
+          <div class="quiz-stat yan-stat">
+            <span class="quiz-stat-emoji">🐶</span>
+            <span class="quiz-stat-name">YAN</span>
+            <span class="quiz-stat-count" id="iqaCountYAN">0/5</span>
+          </div>
+        </div>
+        <div class="quiz-sync-hint" id="iqaSyncHint"></div>
+        <div class="quiz-content" id="iqaContent">
+          <div class="quiz-placeholder" id="iqaPlaceholder">点击下方按钮开始今日问答 💕</div>
+          <div class="quiz-question-area" id="iqaQuestionArea" style="display:none">
+            <div class="quiz-question-text" id="iqaQuestionText"></div>
+            <div class="quiz-question-index" id="iqaQuestionIndex"></div>
+            <div class="quiz-choices" id="iqaChoices"></div>
+          </div>
+          <div class="quiz-result-area" id="iqaResultArea" style="display:none">
+            <div class="quiz-result-title">🎉 今日问答完成！</div>
+            <div class="quiz-result-list" id="iqaResultList"></div>
+          </div>
+        </div>
+        <button class="quiz-start-btn" id="iqaStartBtn" onclick="IntimateQA.start()">开始问答</button>
+        <button class="quiz-view-btn" id="iqaViewBtn" style="display:none" onclick="IntimateQA.viewPartner()">查看对方选择</button>
+        <div class="quiz-note-area" id="iqaNoteArea" style="display:none">
+          <div class="quiz-note-label">备注</div>
+          <div class="quiz-note-display" id="iqaNoteDisplay" ondblclick="IntimateQA._editNote()"></div>
+          <input type="text" class="quiz-note-input" id="iqaNoteInput" maxlength="50" placeholder="写一句今日小记..." style="display:none" onblur="IntimateQA._saveNote()" onkeydown="if(event.key==='Enter')this.blur()" />
+        </div>
+      </div>
+
+      <!-- 题目投递弹窗 -->
+      <div class="qa-submit-overlay" id="qaSubmitOverlay" style="display:none" onclick="QASubmit.close()">
+        <div class="qa-submit-modal" onclick="event.stopPropagation()">
+          <div class="qa-submit-title" id="qaSubmitTitle">投递题目</div>
+          <div class="qa-submit-field">
+            <label class="qa-submit-label">问题</label>
+            <input type="text" class="qa-submit-input" id="qaSubmitQuestion" placeholder="输入问题..." maxlength="40" autocomplete="off" />
+          </div>
+          <div class="qa-submit-field">
+            <label class="qa-submit-label">选项 A</label>
+            <input type="text" class="qa-submit-input" id="qaSubmitAnswerA" placeholder="选项 A..." maxlength="20" autocomplete="off" />
+          </div>
+          <div class="qa-submit-field">
+            <label class="qa-submit-label">选项 B</label>
+            <input type="text" class="qa-submit-input" id="qaSubmitAnswerB" placeholder="选项 B..." maxlength="20" autocomplete="off" />
+          </div>
+          <div class="qa-submit-hint">双击板块标题可投递自定义题目，隔天随机出现在问答中</div>
+          <div class="qa-submit-btns">
+            <button class="qa-submit-btn cancel" onclick="QASubmit.close()">取消</button>
+            <button class="qa-submit-btn confirm" onclick="QASubmit._submit()">投递</button>
+          </div>
         </div>
       </div>
 
@@ -915,7 +976,7 @@
   </div>
 </div>
 
-<script src="vocab-data.js?v=104"></script>
-<script src="app.js?v=104"></script>
+<script src="vocab-data.js?v=105"></script>
+<script src="app.js?v=105"></script>
 </body>
 </html>

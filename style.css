@@ -4882,6 +4882,98 @@ body.music-active #tab-0 .card {
 .quiz-note-line.tao { color: #1b7fe3; }
 .quiz-note-line.yan { color: #e8296a; }
 
+/* 题目投递弹窗 */
+.qa-submit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: overlayFadeIn 0.2s ease-out;
+}
+
+.qa-submit-modal {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 18px;
+  padding: 20px;
+  width: 290px;
+  max-width: 90vw;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+  animation: cardPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.qa-submit-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: var(--text-main);
+}
+
+.qa-submit-field {
+  margin-bottom: 10px;
+}
+
+.qa-submit-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+  display: block;
+}
+
+.qa-submit-input {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-main);
+  background: rgba(0, 0, 0, 0.02);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.qa-submit-input:focus {
+  border-color: var(--theme-accent);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.qa-submit-input::placeholder { color: #ccc; }
+
+.qa-submit-hint {
+  font-size: 10px;
+  color: #bbb;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.qa-submit-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.qa-submit-btn {
+  flex: 1;
+  padding: 9px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.qa-submit-btn:active { transform: scale(0.96); }
+.qa-submit-btn.confirm { background: var(--theme-primary); color: #fff; }
+.qa-submit-btn.cancel { background: rgba(0, 0, 0, 0.05); color: var(--text-muted); }
+
 /* 问答对比弹窗 */
 .quiz-partner-overlay {
   position: fixed;

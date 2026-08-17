@@ -491,6 +491,7 @@ const Cloud = {
         this.syncToday();
         // 单独同步问答和刷词数据（不依赖 syncToday 的 isSyncing 状态）
         this.syncQuizVocab();
+        this.syncSubmittedQuestions();
         this.syncPhotos();
         this.syncVoices();
         // 同步在线时长、信件、头像、运动时间、背景透明度
@@ -621,12 +622,16 @@ const Cloud = {
     const vocabCount = Store.get(`vocab_count_${ds}_${role}`, 0);
     const vocabProg = Store.get(`vocab_prog_${ds}_${role}`, null);
     const quizNote = Store.get(`quiz_note_${ds}_${role}`, '');
+    const iqaAnswers = Store.get(`iqa_a_${ds}_${role}`, []);
+    const iqaQuestions = Store.get(`iqa_q_${ds}`, null);
+    const iqaQVer = typeof IntimateQA !== 'undefined' ? IntimateQA.QUESTION_VERSION : '';
+    const iqaNote = Store.get(`iqa_note_${ds}_${role}`, '');
 
     try {
       await fetch(this._url(`extra/${ds}/${role}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, quizNote, ts: Date.now() })
+        body: JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, quizNote, iqaAnswers, iqaQuestions, iqaQVer, iqaNote, ts: Date.now() })
       });
     } catch (e) { /* ignore */ }
   },
@@ -716,13 +721,90 @@ const Cloud = {
       changed = true;
     }
 
+    // 同步亲密问答答案
+    const remoteIqaAnswers = remote.iqaAnswers || [];
+    const localIqaAnswers = Store.get(`iqa_a_${ds}_${otherRole}`, []);
+    if (JSON.stringify(remoteIqaAnswers) !== JSON.stringify(localIqaAnswers)) {
+      Store.set(`iqa_a_${ds}_${otherRole}`, remoteIqaAnswers);
+      changed = true;
+    }
+
+    // 确保亲密问答题目一致：始终比较并使用远端题目（先推送到云端的为准）
+    if (remote.iqaQuestions && remote.iqaQuestions.length === 5) {
+      const localIqaQ = Store.get(`iqa_q_${ds}`, null);
+      const localIqaQVer = Store.get(`iqa_qv_${ds}`, '');
+      const myIqaVer = typeof IntimateQA !== 'undefined' ? IntimateQA.QUESTION_VERSION : '';
+      const remoteIqaQStr = JSON.stringify(remote.iqaQuestions);
+      const localIqaQStr = localIqaQ ? JSON.stringify(localIqaQ) : '';
+      if (remoteIqaQStr !== localIqaQStr || localIqaQVer !== myIqaVer) {
+        Store.set(`iqa_q_${ds}`, remote.iqaQuestions);
+        if (typeof IntimateQA !== 'undefined') {
+          Store.set(`iqa_qv_${ds}`, IntimateQA.QUESTION_VERSION);
+          IntimateQA._questions = remote.iqaQuestions;
+        }
+        changed = true;
+      }
+    }
+
+    // 同步亲密问答备注
+    const remoteIqaNote = remote.iqaNote || '';
+    const localIqaNote = Store.get(`iqa_note_${ds}_${otherRole}`, '');
+    if (remoteIqaNote !== localIqaNote) {
+      Store.set(`iqa_note_${ds}_${otherRole}`, remoteIqaNote);
+      changed = true;
+    }
+
     if (changed) {
       // 刷新UI - 确保题目和答案都是最新的
       if (typeof RandomQA !== 'undefined') {
         RandomQA._questions = RandomQA._getTodayQuestions();
         RandomQA.render();
       }
+      if (typeof IntimateQA !== 'undefined') {
+        IntimateQA._questions = IntimateQA._getTodayQuestions();
+        IntimateQA.render();
+      }
       if (typeof EnglishVocab !== 'undefined') EnglishVocab.render();
+    }
+  },
+
+  // 推送已投递题目到云端
+  async pushSubmitted(prefix) {
+    if (!this.pairCode) return;
+    const data = Store.get(prefix + '_submitted', []);
+    try {
+      await fetch(this._url('custom/' + prefix + '_submitted'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+    } catch (e) {}
+  },
+
+  // 同步双方投递的题目（轮询时调用）
+  async syncSubmittedQuestions() {
+    if (!this.pairCode) return;
+    for (const prefix of ['quiz', 'iqa']) {
+      try {
+        const r = await fetch(this._url('custom/' + prefix + '_submitted'));
+        if (!r.ok) continue;
+        const remote = await r.json();
+        if (!Array.isArray(remote) || remote.length === 0) continue;
+        const local = Store.get(prefix + '_submitted', []);
+        let changed = false;
+        for (const item of remote) {
+          if (!local.find(x => x.q === item.q)) { local.push(item); changed = true; }
+        }
+        if (changed) {
+          Store.set(prefix + '_submitted', local);
+          // Invalidate cache
+          const ds = todayStr();
+          Store.remove(prefix + '_q_' + ds);
+          Store.remove(prefix + '_qv_' + ds);
+          const mod = prefix === 'quiz' ? RandomQA : (typeof IntimateQA !== 'undefined' ? IntimateQA : null);
+          if (mod) { mod._questions = mod._getTodayQuestions(); mod.render(); }
+        }
+      } catch (e) {}
     }
   },
 
@@ -1652,6 +1734,7 @@ const App = {
     HistoryView.render();
     HistoryHint.render();
     RandomQA.init();
+    IntimateQA.init();
     EnglishVocab.init();
     FormulaCard.init();
     PoemCard.init();
@@ -3783,6 +3866,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v105', date: '2026-08-17', changes: '新增亲密问答板块(情侣关系题库50题)/两个问答板块支持双击标题投递自定义题目/投递题目隔天随机出现/题库云同步' },
     { v: 'v104', date: '2026-08-17', changes: '随机问答留白优化/双方完成后新增备注功能(50字双击编辑+云同步)' },
     { v: 'v103', date: '2026-08-17', changes: '取消头像修改功能改为角色信息卡片(名字+出生日期+年龄)/信息卡片字体优化/角色出生日期云同步' },
     { v: 'v102', date: '2026-08-17', changes: '版本日志仅显示最新3条+展开收起/运动健身卡片去掉分钟文字+字体缩小/同步轮询自动拉取对方数据' },
@@ -4353,7 +4437,7 @@ const TabNav = {
     // 切换到记录页时刷新爱心状态
     if (tabIndex === 1) { Cards.renderGreet(); Photos.render(); LetterBox.updateBadges(); }
     // 切换到打卡页时刷新日历、问答、语音、历史提示
-    if (tabIndex === 2) { Calendar.render(); RandomQA.render(); VoiceRecord.render(); HistoryHint.render(); Cards.renderNight(); }
+    if (tabIndex === 2) { Calendar.render(); RandomQA.render(); IntimateQA.render(); VoiceRecord.render(); HistoryHint.render(); Cards.renderNight(); }
     // 切换到首页时更新角色显示和在线状态
     if (tabIndex === 0) {
       this.updateRoleDisplay();
@@ -6939,7 +7023,8 @@ const RandomQA = {
   _currentIndex: 0,
 
   // 题库版本号：题库内容变化时递增，用于使旧缓存失效
-  QUESTION_VERSION: 'v99couples',
+  _BASE_VERSION: 'v99couples',
+  get QUESTION_VERSION() { const s = Store.get('quiz_submitted', []); return this._BASE_VERSION + '_' + s.length; },
 
   // 日期种子伪随机：保证双方同一天看到相同题目
   _seededShuffle(arr, seed) {
@@ -6963,11 +7048,11 @@ const RandomQA = {
       return cached;
     }
     const shuffled = this._seededShuffle(
-      this.QUESTION_BANK.map((_, i) => i),
+      this._getMergedBank().map((_, i) => i),
       dateStr
     );
     const indices = shuffled.slice(0, 5);
-    const questions = indices.map(i => ({ ...this.QUESTION_BANK[i], idx: i }));
+    const questions = indices.map(i => ({ ...this._getMergedBank()[i], idx: i }));
     Store.set(`quiz_q_${dateStr}`, questions);
     Store.set(`quiz_qv_${dateStr}`, this.QUESTION_VERSION);
     return questions;
@@ -7193,6 +7278,31 @@ const RandomQA = {
     document.body.insertAdjacentHTML('beforeend', html);
   },
 
+  _getSubmitted() { return Store.get('quiz_submitted', []); },
+  _getMergedBank() { return [...this.QUESTION_BANK, ...this._getSubmitted()]; },
+  openSubmit() { QASubmit.open(this); },
+  _saveSubmitted(q, a) {
+    const list = Store.get('quiz_submitted', []);
+    list.push({ q, a, by: App.currentRole, ts: Date.now() });
+    Store.set('quiz_submitted', list);
+    if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted('quiz');
+    // Invalidate today's question cache
+    const ds = todayStr();
+    Store.remove('quiz_q_' + ds);
+    Store.remove('quiz_qv_' + ds);
+    this._questions = this._getTodayQuestions();
+    showToast('题目投递成功！隔天可出现在问答中 ✅', 2000);
+  },
+  _syncSubmitted(remoteList) {
+    if (!Array.isArray(remoteList)) return;
+    const local = Store.get('quiz_submitted', []);
+    let changed = false;
+    for (const item of remoteList) {
+      if (!local.find(x => x.q === item.q)) { local.push(item); changed = true; }
+    }
+    if (changed) { Store.set('quiz_submitted', local); this._questions = this._getTodayQuestions(); }
+  },
+
   // ====== 备注功能 ======
   _getNote() {
     const dateStr = todayStr();
@@ -7262,6 +7372,508 @@ const RandomQA = {
     if (val) showToast('备注已保存', 1200);
   }
 };
+
+// ====== 问答投递共享工具（QASubmit） ======
+const QASubmit = {
+  _currentModule: null,
+  open(module) {
+    this._currentModule = module;
+    // 移除已有弹窗
+    const existing = document.getElementById('qaSubmitOverlay');
+    if (existing) existing.remove();
+    const html = `<div id="qaSubmitOverlay" class="quiz-partner-overlay" onclick="QASubmit.close()">
+      <div class="quiz-partner-card" onclick="event.stopPropagation()">
+        <div class="quiz-partner-header">
+          <span>✍️ 投递新题目</span>
+          <button class="quiz-partner-close" onclick="QASubmit.close()">✕</button>
+        </div>
+        <div class="quiz-partner-body">
+          <div style="margin-bottom:12px;">
+            <label style="display:block;font-size:13px;color:#888;margin-bottom:6px;">问题</label>
+            <input id="qaSubmitQuestion" type="text" maxlength="50" placeholder="输入二选一问题（最多50字）" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #eee;border-radius:8px;font-size:14px;" />
+          </div>
+          <div style="margin-bottom:12px;">
+            <label style="display:block;font-size:13px;color:#888;margin-bottom:6px;">选项 A</label>
+            <input id="qaSubmitAnswerA" type="text" maxlength="20" placeholder="选项A（最多20字）" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #eee;border-radius:8px;font-size:14px;" />
+          </div>
+          <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:13px;color:#888;margin-bottom:6px;">选项 B</label>
+            <input id="qaSubmitAnswerB" type="text" maxlength="20" placeholder="选项B（最多20字）" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #eee;border-radius:8px;font-size:14px;" />
+          </div>
+          <button onclick="QASubmit._submit()" style="width:100%;padding:12px;background:linear-gradient(135deg,#ff7eb3,#ff758c);color:#fff;border:none;border-radius:10px;font-size:15px;cursor:pointer;">投递题目</button>
+          <p style="font-size:12px;color:#aaa;text-align:center;margin-top:10px;">投递的题目隔天有机会出现在问答中</p>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  },
+  _submit() {
+    const qInput = document.getElementById('qaSubmitQuestion');
+    const aInput = document.getElementById('qaSubmitAnswerA');
+    const bInput = document.getElementById('qaSubmitAnswerB');
+    if (!qInput || !aInput || !bInput) return;
+    const q = qInput.value.trim();
+    const a = aInput.value.trim();
+    const b = bInput.value.trim();
+    if (!q) { showToast('请输入问题'); return; }
+    if (!a || !b) { showToast('请填写两个选项'); return; }
+    if (a === b) { showToast('两个选项不能相同'); return; }
+    if (this._currentModule && typeof this._currentModule._saveSubmitted === 'function') {
+      this._currentModule._saveSubmitted(q, [a, b]);
+    }
+    this.close();
+  },
+  close() {
+    const el = document.getElementById('qaSubmitOverlay');
+    if (el) el.remove();
+    this._currentModule = null;
+  }
+};
+
+// ====== 问答模块工厂（createQAModule） ======
+function createQAModule(config) {
+  const { prefix, title, version, bank } = config;
+  return {
+    _prefix: prefix,
+    _title: title,
+    _BASE_VERSION: version,
+    QUESTION_BANK: bank,
+    _questions: [],
+    _answers: [],
+    _currentIndex: 0,
+
+    // 元素 ID 助手：prefix + name
+    _id(name) {
+      return this._prefix + name;
+    },
+
+    // 题库版本号：基础版本 + 已投递题目数量，投递后自动使旧缓存失效
+    get QUESTION_VERSION() {
+      return this._BASE_VERSION + '_' + Store.get(this._prefix + '_submitted', []).length;
+    },
+
+    // 日期种子伪随机：保证双方同一天看到相同题目
+    _seededShuffle(arr, seed) {
+      let h = 0;
+      for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+      const rng = () => { h = (h * 9301 + 49297) % 233280; return h / 233280; };
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    },
+
+    _getSubmitted() {
+      return Store.get(this._prefix + '_submitted', []);
+    },
+
+    // 合并内置题库 + 已投递题目
+    _getMergedBank() {
+      return [...this.QUESTION_BANK, ...this._getSubmitted()];
+    },
+
+    _getTodayQuestions() {
+      const dateStr = todayStr();
+      const cached = Store.get(`${this._prefix}_q_${dateStr}`, null);
+      const cachedVer = Store.get(`${this._prefix}_qv_${dateStr}`, '');
+      // 版本校验：题库变化后旧缓存失效，必须重新生成
+      if (cached && cached.length === 5 && cachedVer === this.QUESTION_VERSION) {
+        return cached;
+      }
+      const bank = this._getMergedBank();
+      const shuffled = this._seededShuffle(
+        bank.map((_, i) => i),
+        dateStr
+      );
+      const indices = shuffled.slice(0, 5);
+      const questions = indices.map(i => ({ ...bank[i], idx: i }));
+      Store.set(`${this._prefix}_q_${dateStr}`, questions);
+      Store.set(`${this._prefix}_qv_${dateStr}`, this.QUESTION_VERSION);
+      return questions;
+    },
+
+    _getAnswers(role) {
+      const dateStr = todayStr();
+      return Store.get(`${this._prefix}_a_${dateStr}_${role}`, []);
+    },
+
+    _setAnswers(role, answers) {
+      const dateStr = todayStr();
+      Store.set(`${this._prefix}_a_${dateStr}_${role}`, answers);
+    },
+
+    init() {
+      this._questions = this._getTodayQuestions();
+      this.render();
+    },
+
+    render() {
+      const taoAnswers = this._getAnswers('TAO');
+      const yanAnswers = this._getAnswers('YAN');
+
+      const taoEl = document.getElementById(this._id('CountTAO'));
+      const yanEl = document.getElementById(this._id('CountYAN'));
+      if (taoEl) taoEl.textContent = `${taoAnswers.length}/5`;
+      if (yanEl) yanEl.textContent = `${yanAnswers.length}/5`;
+
+      const myRole = App.currentRole;
+      const myAnswers = this._getAnswers(myRole);
+      const otherRole = myRole === 'TAO' ? 'YAN' : 'TAO';
+      const otherAnswers = this._getAnswers(otherRole);
+      const startBtn = document.getElementById(this._id('StartBtn'));
+      const viewBtn = document.getElementById(this._id('ViewBtn'));
+      const hintEl = document.getElementById(this._id('SyncHint'));
+      const placeholder = document.getElementById(this._id('Placeholder'));
+      const qArea = document.getElementById(this._id('QuestionArea'));
+      const rArea = document.getElementById(this._id('ResultArea'));
+
+      const iDone = myAnswers.length >= 5;
+      const otherDone = otherAnswers.length >= 5;
+
+      if (iDone) {
+        // 我已完成
+        if (startBtn) startBtn.style.display = 'none';
+        if (qArea) qArea.style.display = 'none';
+        if (rArea) rArea.style.display = '';
+
+        if (otherDone) {
+          // 双方都完成 → 可查看对方答案
+          if (viewBtn) {
+            viewBtn.style.display = '';
+            viewBtn.textContent = '👁 查看对方选择';
+          }
+          if (hintEl) hintEl.innerHTML = '<span class="quiz-hint-done">✅ 双方都已完成今日问答，点击查看对方选择</span>';
+          // 显示备注区域
+          this._renderNote();
+        } else {
+          // 我已完成，对方未完成
+          if (viewBtn) viewBtn.style.display = 'none';
+          if (hintEl) hintEl.innerHTML = `<span class="quiz-hint-wait">⏳ 你已完成今日问答，等待 ${otherRole} 完成后可互相查看答案</span>`;
+          // 隐藏备注区域
+          const noteArea = document.getElementById(this._id('NoteArea'));
+          if (noteArea) noteArea.style.display = 'none';
+        }
+        this._showResults(myAnswers);
+      } else {
+        // 我未完成
+        if (viewBtn) viewBtn.style.display = 'none';
+        if (rArea) rArea.style.display = 'none';
+        // 隐藏备注区域
+        const noteArea = document.getElementById(this._id('NoteArea'));
+        if (noteArea) noteArea.style.display = 'none';
+
+        if (otherDone) {
+          // 对方已完成，我还没做
+          if (hintEl) hintEl.innerHTML = `<span class="quiz-hint-other">💬 ${otherRole} 已完成今日问答，做完后可查看对方答案</span>`;
+        } else {
+          if (hintEl) hintEl.innerHTML = '';
+        }
+
+        if (startBtn) {
+          startBtn.style.display = '';
+          startBtn.textContent = myAnswers.length > 0 ? '继续问答' : '开始问答';
+        }
+        if (placeholder) placeholder.style.display = myAnswers.length > 0 ? 'none' : '';
+        if (qArea) qArea.style.display = myAnswers.length > 0 ? '' : 'none';
+      }
+    },
+
+    start() {
+      const myRole = App.currentRole;
+      this._answers = this._getAnswers(myRole);
+      this._currentIndex = this._answers.length;
+
+      if (this._currentIndex >= 5) {
+        this.render();
+        return;
+      }
+
+      document.getElementById(this._id('Placeholder')).style.display = 'none';
+      document.getElementById(this._id('QuestionArea')).style.display = '';
+      document.getElementById(this._id('ResultArea')).style.display = 'none';
+      document.getElementById(this._id('StartBtn')).style.display = 'none';
+      document.getElementById(this._id('ViewBtn')).style.display = 'none';
+
+      this._showQuestion();
+    },
+
+    _showQuestion() {
+      const q = this._questions[this._currentIndex];
+      if (!q) { this._finish(); return; }
+
+      document.getElementById(this._id('QuestionText')).textContent = q.q;
+      document.getElementById(this._id('QuestionIndex')).textContent = `第 ${this._currentIndex + 1} / 5 题`;
+
+      const choicesEl = document.getElementById(this._id('Choices'));
+      choicesEl.innerHTML = '';
+      q.a.forEach((choice, i) => {
+        const btn = document.createElement('button');
+        btn.className = `quiz-choice ${i === 0 ? 'choice-a' : 'choice-b'}`;
+        btn.innerHTML = `<span class="quiz-choice-label">${i === 0 ? 'A' : 'B'}</span><span class="quiz-choice-text">${choice}</span>`;
+        btn.onclick = () => this._answer(i);
+        choicesEl.appendChild(btn);
+      });
+    },
+
+    _answer(choiceIndex) {
+      this._answers.push(choiceIndex);
+      this._setAnswers(App.currentRole, this._answers);
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushQuizVocab();
+      this._currentIndex++;
+
+      if (this._currentIndex >= 5) {
+        this._finish();
+      } else {
+        // 短暂动画后显示下一题
+        const choicesEl = document.getElementById(this._id('Choices'));
+        choicesEl.style.pointerEvents = 'none';
+        choicesEl.style.opacity = '0.5';
+        setTimeout(() => {
+          choicesEl.style.pointerEvents = '';
+          choicesEl.style.opacity = '';
+          this._showQuestion();
+        }, 300);
+      }
+
+      // 更新计数
+      this.render();
+    },
+
+    _finish() {
+      document.getElementById(this._id('QuestionArea')).style.display = 'none';
+      document.getElementById(this._id('StartBtn')).style.display = 'none';
+      showToast('🎉 今日问答完成！');
+      // 立即推送，让对方看到你已完成
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+        Cloud.pushQuizVocab();
+      }
+      this.render();
+    },
+
+    _showResults(myAnswers) {
+      const rArea = document.getElementById(this._id('ResultArea'));
+      rArea.style.display = '';
+
+      const listEl = document.getElementById(this._id('ResultList'));
+      let html = '';
+      this._questions.forEach((q, i) => {
+        const myChoice = myAnswers[i];
+        html += `<div class="quiz-result-item">
+          <div class="quiz-result-q">${i + 1}. ${q.q}</div>
+          <div class="quiz-result-a">你的选择：<span class="quiz-result-choice">${String.fromCharCode(65 + myChoice)}. ${q.a[myChoice]}</span></div>
+        </div>`;
+      });
+      listEl.innerHTML = html;
+    },
+
+    viewPartner() {
+      const myRole = App.currentRole;
+      const otherRole = myRole === 'TAO' ? 'YAN' : 'TAO';
+      const myAnswers = this._getAnswers(myRole);
+      const otherAnswers = this._getAnswers(otherRole);
+
+      // 必须双方都完成全部5题才能查看
+      if (myAnswers.length < 5) {
+        showToast('请先完成你的今日问答');
+        return;
+      }
+      if (otherAnswers.length < 5) {
+        showToast(`${otherRole} 还未完成今日问答，完成后可互相查看`);
+        return;
+      }
+
+      // 移除已有弹窗
+      const existing = document.querySelector('.quiz-partner-overlay');
+      if (existing) existing.remove();
+
+      let html = `<div class="quiz-partner-overlay" onclick="this.remove()">
+        <div class="quiz-partner-card" onclick="event.stopPropagation()">
+          <div class="quiz-partner-header">
+            <span>${otherRole === 'TAO' ? '🐱' : '🐶'} ${otherRole} 的选择</span>
+            <button class="quiz-partner-close" onclick="this.closest('.quiz-partner-overlay').remove()">✕</button>
+          </div>
+          <div class="quiz-partner-body">`;
+
+      this._questions.forEach((q, i) => {
+        const myChoice = myAnswers[i];
+        const otherChoice = otherAnswers[i];
+        const same = myChoice === otherChoice;
+        html += `<div class="quiz-compare-item ${same ? 'match' : 'differ'}">
+          <div class="quiz-compare-q">${i + 1}. ${q.q}</div>
+          <div class="quiz-compare-choices">
+            <div class="quiz-compare-row"><span class="quiz-compare-tag ${myRole === 'TAO' ? 'tao' : 'yan'}">${myRole}</span><span>${String.fromCharCode(65 + myChoice)}. ${q.a[myChoice]}</span></div>
+            <div class="quiz-compare-row"><span class="quiz-compare-tag ${otherRole === 'TAO' ? 'tao' : 'yan'}">${otherRole}</span><span>${String.fromCharCode(65 + otherChoice)}. ${q.a[otherChoice]}</span></div>
+          </div>
+          ${same ? '<div class="quiz-compare-badge match">💕 默契一致</div>' : '<div class="quiz-compare-badge differ">🤔 意见不同</div>'}
+        </div>`;
+      });
+
+      html += `</div></div></div>`;
+      document.body.insertAdjacentHTML('beforeend', html);
+    },
+
+    // ====== 题目投递 ======
+    openSubmit() {
+      QASubmit.open(this);
+    },
+
+    _saveSubmitted(q, a) {
+      const list = Store.get(this._prefix + '_submitted', []);
+      list.push({ q, a, by: App.currentRole, ts: Date.now() });
+      Store.set(this._prefix + '_submitted', list);
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted(this._prefix);
+      // Invalidate today's question cache
+      const ds = todayStr();
+      Store.remove(this._prefix + '_q_' + ds);
+      Store.remove(this._prefix + '_qv_' + ds);
+      this._questions = this._getTodayQuestions();
+      showToast('题目投递成功！隔天可出现在问答中 ✅', 2000);
+    },
+
+    _syncSubmitted(remoteList) {
+      if (!Array.isArray(remoteList)) return;
+      const local = Store.get(this._prefix + '_submitted', []);
+      let changed = false;
+      for (const item of remoteList) {
+        if (!local.find(x => x.q === item.q)) { local.push(item); changed = true; }
+      }
+      if (changed) {
+        Store.set(this._prefix + '_submitted', local);
+        this._questions = this._getTodayQuestions();
+      }
+    },
+
+    // ====== 备注功能 ======
+    _getNote() {
+      const dateStr = todayStr();
+      // 合并双方备注：TAO 和 YAN 各自的备注
+      const taoNote = Store.get(`${this._prefix}_note_${dateStr}_TAO`, '');
+      const yanNote = Store.get(`${this._prefix}_note_${dateStr}_YAN`, '');
+      return { TAO: taoNote, YAN: yanNote };
+    },
+
+    _renderNote() {
+      const noteArea = document.getElementById(this._id('NoteArea'));
+      if (!noteArea) return;
+      noteArea.style.display = '';
+      const notes = this._getNote();
+      const myRole = App.currentRole;
+      const otherRole = myRole === 'TAO' ? 'YAN' : 'TAO';
+      const display = document.getElementById(this._id('NoteDisplay'));
+      const input = document.getElementById(this._id('NoteInput'));
+      if (input) input.style.display = 'none';
+      if (!display) return;
+      // 显示双方备注
+      let html = '';
+      if (notes[myRole]) {
+        html += `<div class="quiz-note-line ${myRole.toLowerCase()}">${myRole === 'TAO' ? '🐱' : '🐶'} ${this._escapeHtml(notes[myRole])}</div>`;
+      }
+      if (notes[otherRole]) {
+        html += `<div class="quiz-note-line ${otherRole.toLowerCase()}">${otherRole === 'TAO' ? '🐱' : '🐶'} ${this._escapeHtml(notes[otherRole])}</div>`;
+      }
+      if (!html) html = '';
+      display.innerHTML = html;
+    },
+
+    _escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    },
+
+    _editNote() {
+      const myRole = App.currentRole;
+      const dateStr = todayStr();
+      const existing = Store.get(`${this._prefix}_note_${dateStr}_${myRole}`, '');
+      const display = document.getElementById(this._id('NoteDisplay'));
+      const input = document.getElementById(this._id('NoteInput'));
+      if (!display || !input) return;
+      display.style.display = 'none';
+      input.style.display = '';
+      input.value = existing;
+      input.focus();
+    },
+
+    _saveNote() {
+      const myRole = App.currentRole;
+      const dateStr = todayStr();
+      const input = document.getElementById(this._id('NoteInput'));
+      const display = document.getElementById(this._id('NoteDisplay'));
+      if (!input) return;
+      const val = input.value.trim().slice(0, 50);
+      Store.set(`${this._prefix}_note_${dateStr}_${myRole}`, val);
+      input.style.display = 'none';
+      if (display) display.style.display = '';
+      // 云同步
+      if (typeof Cloud !== 'undefined' && Cloud.pairCode) {
+        Cloud.pushQuizVocab();
+      }
+      this._renderNote();
+      if (val) showToast('备注已保存', 1200);
+    }
+  };
+}
+
+// ====== 亲密问答模块（IntimateQA） ======
+const IntimateQA = createQAModule({
+  prefix: 'iqa',
+  title: '亲密问答',
+  version: 'v1intimate',
+  bank: [
+    { q: '你认为爱情中最重要的是？', a: ['忠诚与信任', '理解与包容'] },
+    { q: '吵架后你更希望对方？', a: ['主动来找你', '给你空间冷静'] },
+    { q: '你觉得最浪漫的事？', a: ['被记住每个细节', '被突然的惊喜感动'] },
+    { q: '你理想中的求婚场景？', a: ['两人独处的温馨时刻', '亲友见证的盛大场面'] },
+    { q: '难过时你最需要？', a: ['一个温暖的拥抱', '有人耐心倾听'] },
+    { q: '你觉得爱的承诺？', a: ['说出口的誓言', '日复一日的陪伴'] },
+    { q: '异地时你最怕？', a: ['联系不上对方', '渐渐没有话题'] },
+    { q: '你更看重的未来规划？', a: ['一起买房安定下来', '一起旅行体验世界'] },
+    { q: '对方哪里最吸引你？', a: ['认真专注的样子', '对你温柔的眼神'] },
+    { q: '你觉得吵架？', a: ['是感情的磨合剂', '会伤害感情应尽量避免'] },
+    { q: '你更喜欢的睡前互动？', a: ['聊聊今天的事', '安静地相拥入眠'] },
+    { q: '关于前任的话题？', a: ['坦诚相待不留秘密', '过去就不再提起'] },
+    { q: '你觉得纪念日？', a: ['必须隆重庆祝', '平平淡淡才是真'] },
+    { q: '对方压力大时你会？', a: ['默默陪伴不说话', '想办法逗他开心'] },
+    { q: '你更希望对方表达爱？', a: ['经常说我爱你', '用行动默默付出'] },
+    { q: '你觉得最好的相处？', a: ['无话不谈像挚友', '心照不宣的默契'] },
+    { q: '一起做决定时？', a: ['有商有量共同决定', '谁擅长谁来做主'] },
+    { q: '你更在意对方的过去还是未来？', a: ['过去的经历塑造了他', '未来的方向更重要'] },
+    { q: '你觉得安全感？', a: ['事事有回应', '彼此信任不约束'] },
+    { q: '你理想的二人世界？', a: ['热闹的烟火日常', '安静的二人独处'] },
+    { q: '对方忘记重要日子？', a: ['直接表达失落', '体谅对方太忙'] },
+    { q: '你觉得距离产生美？', a: ['小别胜新婚', '日久才生情'] },
+    { q: '你更希望的称呼方式？', a: ['专属的甜蜜昵称', '自然地叫名字'] },
+    { q: '关于金钱观？', a: ['各自独立AA制', '共同打理不分彼此'] },
+    { q: '你更想要的陪伴？', a: ['形影不离的亲密', '各自精彩互不干扰'] },
+    { q: '你觉得爱情保鲜的秘诀？', a: ['不断制造惊喜', '保持自我成长'] },
+    { q: '对方生病时你会？', a: ['守在身边寸步不离', '照顾好饮食起居'] },
+    { q: '你更喜欢的约会？', a: ['精心准备的正式约会', '随性自然的日常相处'] },
+    { q: '你觉得最好的道歉？', a: ['真诚地说对不起', '用一个拥抱化解'] },
+    { q: '你更希望被记住？', a: ['你说过的小心愿', '你不经意的小习惯'] },
+    { q: '关于对方的异性朋友？', a: ['大方介绍互相认识', '保持适当距离就好'] },
+    { q: '你觉得最动听的话？', a: ['有我在别怕', '遇见你真好'] },
+    { q: '一起面对困难时？', a: ['互相鼓励共渡难关', '分工合作各司其职'] },
+    { q: '你更看重的品质？', a: ['善良温柔的内心', '坚强担当的肩膀'] },
+    { q: '你觉得爱情里？', a: ['要主动表达需求', '对方应该懂你心思'] },
+    { q: '你更喜欢的早安？', a: ['一条暖心的消息', '睁眼就看到对方'] },
+    { q: '关于未来孩子？', a: ['期待一起孕育生命', '想过二人世界就好'] },
+    { q: '你更在意的仪式感？', a: ['节日的精心准备', '日常的点滴用心'] },
+    { q: '对方情绪低落时？', a: ['主动询问怎么了', '静静陪着等他开口'] },
+    { q: '你觉得最好的礼物？', a: ['贵重的心意', '用心的手工'] },
+    { q: '你更希望的相处节奏？', a: ['轰轰烈烈热烈相爱', '细水长流慢慢变老'] },
+    { q: '关于双方的家人？', a: ['尽早融入彼此家庭', '保持各自独立空间'] },
+    { q: '你觉得最幸福的瞬间？', a: ['被无条件接纳', '一起实现小目标'] },
+    { q: '你更希望的沟通方式？', a: ['有话直说不藏着', '委婉体面地表达'] },
+    { q: '对方让你吃醋时？', a: ['直接说出来求安心', '自己消化不表现出来'] },
+    { q: '你觉得爱情长久靠？', a: ['持续的吸引力', '深厚的责任感'] },
+    { q: '你更想要的浪漫？', a: ['烛光晚餐的仪式', '雨天共撑一把伞'] },
+    { q: '关于个人空间？', a: ['需要独处的时间', '喜欢一直黏在一起'] },
+    { q: '你更希望对方记住？', a: ['你的喜好和小情绪', '你重要的日子'] },
+    { q: '你觉得最深的相爱？', a: ['见过彼此最糟还不离开', '一起变成更好的自己'] }
+  ]
+});
 
 // ====== 英语刷词模块（27考研词汇乱序版） ======
 const EnglishVocab = {
