@@ -568,6 +568,7 @@ const Cloud = {
           CloudSync.syncLandmarks();
           CloudSync.syncThemeColor();
           CloudSync.syncSweetSubmitted();
+          CloudSync.syncPrivateWhispers();
           ReadMark.syncAll();
           RoleName.syncFromCloud();
         }
@@ -1833,6 +1834,25 @@ const CloudSync = {
         }
       }
     } catch (e) { /* ignore */ }
+  },
+
+  // 同步私密絮语
+  async syncPrivateWhispers() {
+    if (!Cloud.pairCode) return;
+    try {
+      const remote = await this.get('private_whispers');
+      if (Array.isArray(remote) && remote.length > 0) {
+        if (typeof PrivateWhisper !== 'undefined') {
+          const beforeLen = PrivateWhisper._getList().length;
+          PrivateWhisper._syncSubmitted(remote);
+          const afterLen = PrivateWhisper._getList().length;
+          if (afterLen > beforeLen) {
+            // 有新内容，toast 提示
+            showToast('对方投递了新的私密絮语 💜', 2000);
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 };
 
@@ -1932,6 +1952,7 @@ const App = {
     TabNav.init();
     MusicPlayer.init();
     SweetText.init();
+    PrivateWhisper.init();
     Photos.loadAll();
     VoiceRecord.init();
     LoveRain.init();
@@ -4096,6 +4117,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v110', date: '2026-08-19', changes: '新增私密絮语板块(自动滚动+手动滑动+按投递顺序排列)/双击标题投稿+投递者标识/云同步双方絮语/设置面板可切换显示' },
     { v: 'v109', date: '2026-08-17', changes: '照片云端无限扩容: 按批次自动分命名空间(每批40张,满了自动开新仓)/所有批次照片合并显示/问答按季度分命名空间/首屏多批次拉取' },
     { v: 'v108', date: '2026-08-17', changes: '核心修复: 云端命名空间拆分(照片/语音/问答/背景图各自独立100条配额)/问答同步修复(独立命名空间+重试机制+错误日志)/旧命名空间一次性清理/甜蜜语录双击投稿+投递者标识+云同步/打卡导出加入随机问答和亲密问答内容' },
     { v: 'v105', date: '2026-08-17', changes: '新增亲密问答板块(情侣关系题库50题)/两个问答板块支持双击标题投递自定义题目/投递题目隔天随机出现/题库云同步' },
@@ -4712,6 +4734,7 @@ const DetailMenu = {
     0: [
       { icon: '🎭', name: '亲密主角', selector: '.role-card' },
       { icon: '💌', name: '甜蜜语录', selector: '.sweet-text-card' },
+      { icon: '🔒', name: '私密絮语', selector: '.private-whisper-card' },
       { icon: '🎵', name: '音乐播放', selector: '.music-card' }
     ],
     1: [
@@ -6518,6 +6541,211 @@ const SweetSubmit = {
 
   close() {
     const el = document.getElementById('sweetSubmitOverlay');
+    if (el) el.remove();
+  }
+};
+
+// ====== 私密絮语模块 ======
+const PrivateWhisper = {
+  _STORE_KEY: 'private_whispers',
+  _CLOUD_KEY: 'private_whispers',
+  _scrollOffset: 0,
+  _isDragging: false,
+  _dragStartY: 0,
+  _dragStartOffset: 0,
+  _autoScrollTimer: null,
+
+  // 获取所有絮语（按投递时间正序排列）
+  _getList() {
+    const list = Store.get(this._STORE_KEY, []);
+    // 按时间戳正序排列（先投递的在上）
+    return list.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  },
+
+  _saveList(list) {
+    Store.set(this._STORE_KEY, list);
+  },
+
+  init() {
+    this.render();
+    this._bindDrag();
+    this._startAutoScroll();
+  },
+
+  render() {
+    const track = document.getElementById('privateWhisperTrack');
+    if (!track) return;
+    const list = this._getList();
+
+    if (list.length === 0) {
+      track.innerHTML = '<div class="private-whisper-empty">双击标题投递第一条私密絮语 ✨</div>';
+      track.classList.remove('auto-scroll');
+      return;
+    }
+
+    // 生成 HTML（列表复制一份用于无缝滚动）
+    let html = '';
+    for (let i = 0; i < 2; i++) {
+      for (const item of list) {
+        html += `<div class="private-whisper-item">
+          <span class="whisper-text">${this._escapeHtml(item.text)}</span>
+          <span class="whisper-by">${item.by || 'TAO'}</span>
+        </div>`;
+      }
+    }
+    track.innerHTML = html;
+    track.classList.add('auto-scroll');
+
+    // 根据条目数量调整滚动速度（越多越慢，保证每条都能看清）
+    const duration = Math.max(8, list.length * 2.5);
+    track.style.animationDuration = `${duration}s`;
+  },
+
+  _escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  },
+
+  // 自动滚动（使用 CSS animation，这里只做暂停/恢复控制）
+  _startAutoScroll() {
+    const track = document.getElementById('privateWhisperTrack');
+    if (track && track.classList.contains('auto-scroll')) {
+      track.classList.remove('paused');
+    }
+  },
+
+  _pauseAutoScroll() {
+    const track = document.getElementById('privateWhisperTrack');
+    if (track) track.classList.add('paused');
+  },
+
+  // 手动拖拽滑动
+  _bindDrag() {
+    const container = document.getElementById('privateWhisperContainer');
+    const track = document.getElementById('privateWhisperTrack');
+    if (!container || !track) return;
+
+    let currentY = 0;
+
+    const onStart = (e) => {
+      this._isDragging = true;
+      this._pauseAutoScroll();
+      const touch = e.touches ? e.touches[0] : e;
+      this._dragStartY = touch.clientY;
+      // 获取当前 transform 值
+      const style = window.getComputedStyle(track);
+      const matrix = new DOMMatrix(style.transform);
+      this._dragStartOffset = matrix.m42;
+    };
+
+    const onMove = (e) => {
+      if (!this._isDragging) return;
+      e.preventDefault();
+      const touch = e.touches ? e.touches[0] : e;
+      const deltaY = touch.clientY - this._dragStartY;
+      currentY = this._dragStartOffset + deltaY;
+      track.style.transform = `translateY(${currentY}px)`;
+    };
+
+    const onEnd = () => {
+      if (!this._isDragging) return;
+      this._isDragging = false;
+      track.style.transform = '';
+      // 短暂延迟后恢复自动滚动
+      setTimeout(() => this._startAutoScroll(), 500);
+    };
+
+    container.addEventListener('mousedown', onStart);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onEnd);
+    container.addEventListener('touchstart', onStart, { passive: true });
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd);
+
+    // 鼠标悬停暂停
+    container.addEventListener('mouseenter', () => this._pauseAutoScroll());
+    container.addEventListener('mouseleave', () => {
+      if (!this._isDragging) this._startAutoScroll();
+    });
+  },
+
+  // 双击标题投递
+  openSubmit() {
+    PrivateWhisperSubmit.open();
+  },
+
+  // 保存投递的絮语
+  _saveSubmitted(text) {
+    const list = Store.get(this._STORE_KEY, []);
+    list.push({ text, by: App.currentRole, ts: Date.now() });
+    this._saveList(list);
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.set(this._CLOUD_KEY, list);
+    }
+    this.render();
+    showToast('私密絮语投递成功！💜', 2000);
+  },
+
+  // 同步远端投递絮语
+  _syncSubmitted(remoteList) {
+    if (!Array.isArray(remoteList)) return;
+    const local = Store.get(this._STORE_KEY, []);
+    let changed = false;
+    for (const item of remoteList) {
+      if (item && item.text && !local.find(x => x.ts === item.ts && x.by === item.by)) {
+        local.push(item);
+        changed = true;
+      }
+    }
+    if (changed) {
+      this._saveList(local);
+      this.render();
+    }
+  }
+};
+
+// ====== 私密絮语投递弹窗 ======
+const PrivateWhisperSubmit = {
+  open() {
+    const existing = document.getElementById('privateWhisperSubmitOverlay');
+    if (existing) existing.remove();
+    const html = `<div id="privateWhisperSubmitOverlay" class="quiz-partner-overlay" onclick="PrivateWhisperSubmit.close()">
+      <div class="quiz-partner-card" onclick="event.stopPropagation()">
+        <div class="quiz-partner-header">
+          <span>🔒 投递私密絮语</span>
+          <button class="quiz-partner-close" onclick="PrivateWhisperSubmit.close()">✕</button>
+        </div>
+        <div class="quiz-partner-body">
+          <div style="margin-bottom:12px;">
+            <label style="display:block;font-size:12px;color:#888;margin-bottom:4px;">絮语内容</label>
+            <input id="privateWhisperSubmitText" type="text" maxlength="30" placeholder="输入私密絮语（最多30字）"
+              style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;" autocomplete="off" />
+          </div>
+          <button onclick="PrivateWhisperSubmit._submit()"
+            style="width:100%;padding:10px;border:none;border-radius:8px;background:#9b59b6;color:#fff;font-size:14px;cursor:pointer;">投递絮语</button>
+          <p style="text-align:center;font-size:11px;color:#aaa;margin-top:10px;">投递后按时间顺序滚动展示</p>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    setTimeout(() => {
+      const input = document.getElementById('privateWhisperSubmitText');
+      if (input) input.focus();
+    }, 100);
+  },
+
+  _submit() {
+    const input = document.getElementById('privateWhisperSubmitText');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) { showToast('请输入絮语内容'); return; }
+    PrivateWhisper._saveSubmitted(text);
+    this.close();
+  },
+
+  close() {
+    const el = document.getElementById('privateWhisperSubmitOverlay');
     if (el) el.remove();
   }
 };

@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="img/favicon.svg">
   <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
   <title>TAO&YAN 相处日记</title>
-  <link rel="stylesheet" href="style.css?v=109">
+  <link rel="stylesheet" href="style.css?v=110">
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -218,6 +218,18 @@
       <div class="card sweet-text-card">
         <div class="card-title" ondblclick="SweetText.openSubmit()"><span class="icon">💌</span> 甜蜜语录</div>
         <div class="sweet-text-display" id="sweetText" onclick="SweetText.refresh()">点击获取甜蜜语录</div>
+      </div>
+
+      <!-- 私密絮语 -->
+      <div class="card private-whisper-card">
+        <div class="card-title" ondblclick="PrivateWhisper.openSubmit()"><span class="icon">🔒</span> 私密絮语</div>
+        <div class="private-whisper-container" id="privateWhisperContainer">
+          <div class="private-whisper-track" id="privateWhisperTrack">
+            <div class="private-whisper-empty">双击标题投递第一条私密絮语 ✨</div>
+          </div>
+          <div class="private-whisper-mask top"></div>
+          <div class="private-whisper-mask bottom"></div>
+        </div>
       </div>
 
       <!-- 音乐播放 -->
@@ -976,7 +988,7 @@
   </div>
 </div>
 
-<script src="vocab-data.js?v=109"></script>
-<script src="app.js?v=109"></script>
+<script src="vocab-data.js?v=110"></script>
+<script src="app.js?v=110"></script>
 </body>
 </html>
