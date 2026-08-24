@@ -3993,7 +3993,7 @@ body.music-active #tab-0 .card {
 
 .private-whisper-container {
   position: relative;
-  height: 56px;
+  height: 80px;
   overflow: hidden;
   background: linear-gradient(135deg, rgba(180, 150, 220, 0.10), rgba(255, 200, 220, 0.10));
   border-radius: 18px;
@@ -4032,23 +4032,23 @@ body.music-active #tab-0 .card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  height: 28px;
-  line-height: 28px;
+  padding: 4px 16px;
+  min-height: 28px;
+  line-height: 1.5;
   font-size: 13px;
   color: #555;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
 }
 
 .private-whisper-item .whisper-text {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
   text-align: left;
   font-weight: 500;
+  padding-right: 4px;
 }
 
 .private-whisper-item .whisper-by {
@@ -4067,7 +4067,7 @@ body.music-active #tab-0 .card {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 56px;
+  height: 80px;
   font-size: 13px;
   color: #aaa;
 }

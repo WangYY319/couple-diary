@@ -8,8 +8,8 @@ const Store = {
     try { const v = localStorage.getItem('ty_' + key); return v ? JSON.parse(v) : def; }
     catch { return def; }
   },
-  set(key, val) { localStorage.setItem('ty_' + key, JSON.stringify(val)); },
-  remove(key) { localStorage.removeItem('ty_' + key); },
+  set(key, val) { try { localStorage.setItem('ty_' + key, JSON.stringify(val)); } catch(e) { console.warn('[Store] set failed:', key, e); } },
+  remove(key) { try { localStorage.removeItem('ty_' + key); } catch(e) { /* ignore */ } },
 
   getDay(dateStr) {
     const all = this.get('days', {});
@@ -362,6 +362,11 @@ const Cloud = {
         });
         if (!resp.ok) console.warn('[SYNC] pushDay: single day POST failed, falling back to days_all');
       } catch (e) { console.warn('[SYNC] pushDay: single day POST error:', e); }
+      // 推送前再次拉取云端最新数据并合并，防止推送期间对方有新写入导致数据覆盖
+      const finalCheck = await this.pullAllDays();
+      if (finalCheck && typeof finalCheck === 'object') {
+        Store.mergeRemoteDays(finalCheck);
+      }
       // 始终更新云端全部日记备份（这是可靠的数据同步方式）
       await this.pushAllDays();
       this.lastSyncAt = Date.now();
@@ -407,17 +412,28 @@ const Cloud = {
   // 同步所有数据（进入应用时）
   async syncAll() {
     if (!this.pairCode) return;
-    if (this.isSyncing) return;
+    if (this.isSyncing) {
+      // 安全机制：如果 isSyncing 锁定超过 60 秒，强制重置（防止死锁）
+      if (this._syncStartedAt && (Date.now() - this._syncStartedAt > 60000)) {
+        console.warn('[SYNC] syncAll: isSyncing locked for >60s, force resetting');
+        this.isSyncing = false;
+      } else {
+        return;
+      }
+    }
     this.isSyncing = true;
-
-    // 一次性清理旧命名空间数据（释放base命名空间配额）
-    await this.cleanupOldNamespace();
+    this._syncStartedAt = Date.now();
 
     try {
+      // 一次性清理旧命名空间数据（移入 try-catch 内，防止异常导致 isSyncing 死锁）
+      await this.cleanupOldNamespace();
+
       // 1. 先拉取云端全部日记备份，始终合并（防止本地数据不完整）
       const allRemoteDays = await this.pullAllDays();
+      let pullSuccess = false;
       let anyChanged = false;
       if (allRemoteDays && typeof allRemoteDays === 'object') {
+        pullSuccess = true;
         // 始终合并 days_all 数据（不仅是在缺少日期时）
         const changed = Store.mergeRemoteDays(allRemoteDays);
         if (changed) {
@@ -438,6 +454,7 @@ const Cloud = {
       for (const ds of dates) {
         const remote = await this.pullDay(ds);
         if (remote && typeof remote === 'object') {
+          pullSuccess = true;
           // 检查远端数据是否有实际内容（避免拉回已清除的空数据）
           const hasContent = remote.greet?.tao || remote.greet?.yan ||
                              remote.words?.tao || remote.words?.yan ||
@@ -448,15 +465,23 @@ const Cloud = {
           const localSingle = { [ds]: remote };
           const changed = Store.mergeRemoteDays(localSingle);
           if (changed) anyChanged = true;
-          // 推送合并后的数据回云端（通过 days_all，不依赖单日条目）
         } else if (Store.getDay(ds)) {
           // 云端单日没有，但本地有，通过 pushDay 推送（会更新 days_all）
           await this.pushDay(ds);
         }
       }
 
-      // 3. 推送全部日记备份到云端（更新备份）- 这是最可靠的同步方式
-      await this.pushAllDays();
+      // 3. 推送全部日记备份到云端 — 仅在拉取成功时推送，防止用不完整的本地数据覆盖云端
+      if (pullSuccess) {
+        // 推送前再次拉取云端最新数据并合并，防止推送期间对方有新写入
+        const finalCheck = await this.pullAllDays();
+        if (finalCheck && typeof finalCheck === 'object') {
+          Store.mergeRemoteDays(finalCheck);
+        }
+        await this.pushAllDays();
+      } else {
+        console.warn('[SYNC] syncAll: pull failed, skipping pushAllDays to prevent data overwrite');
+      }
 
       this.lastSyncAt = Date.now();
       if (anyChanged) {
@@ -581,7 +606,7 @@ const Cloud = {
           Setting.refreshStatus();
         }
       }
-    }, 30000); // 30 秒
+    }, 10000); // 10 秒（原 30 秒，缩短以提升实时性）
   },
 
   stopPolling() {
@@ -592,11 +617,18 @@ const Cloud = {
   async syncToday() {
     if (!this.pairCode) return;
     if (this.isSyncing) {
-      // 即使正在同步today，也要同步quiz/vocab（不受isSyncing影响）
-      this.syncQuizVocab();
-      return;
+      // 安全机制：如果 isSyncing 锁定超过 60 秒，强制重置（防止死锁导致永久不同步）
+      if (this._syncStartedAt && (Date.now() - this._syncStartedAt > 60000)) {
+        console.warn('[SYNC] syncToday: isSyncing locked for >60s, force resetting');
+        this.isSyncing = false;
+      } else {
+        // 即使正在同步today，也要同步quiz/vocab（不受isSyncing影响）
+        this.syncQuizVocab();
+        return;
+      }
     }
     this.isSyncing = true;
+    this._syncStartedAt = Date.now();
     try {
       const ds = todayStr();
       console.log('[SYNC] syncToday: pulling for', ds);
@@ -1940,6 +1972,8 @@ const App = {
           CloudSync.syncPomodoroHistory();
           CloudSync.syncLandmarks();
           CloudSync.syncThemeColor();
+          CloudSync.syncSweetSubmitted();
+          CloudSync.syncPrivateWhispers();
           ReadMark.syncAll();
           RoleName.syncFromCloud();
         }
@@ -2062,6 +2096,8 @@ const App = {
         CloudSync.syncPomodoroHistory();
         CloudSync.syncLandmarks();
         CloudSync.syncThemeColor();
+        CloudSync.syncSweetSubmitted();
+        CloudSync.syncPrivateWhispers();
         ReadMark.syncAll();
         RoleName.syncFromCloud();
       }
@@ -2071,6 +2107,10 @@ const App = {
       // 即使 syncAll 失败，也要启动轮询确保后续同步
       Cloud.startPolling();
       Cloud.syncQuizVocab();
+      if (typeof CloudSync !== 'undefined') {
+        CloudSync.syncSweetSubmitted();
+        CloudSync.syncPrivateWhispers();
+      }
       showToast('已配对成功，开始你们的日记吧 💕');
     });
   },
@@ -2177,6 +2217,8 @@ const App = {
           CloudSync.syncPomodoroHistory();
           CloudSync.syncLandmarks();
           CloudSync.syncThemeColor();
+          CloudSync.syncSweetSubmitted();
+          CloudSync.syncPrivateWhispers();
           ReadMark.syncAll();
           RoleName.syncFromCloud();
         }
@@ -2185,6 +2227,10 @@ const App = {
         // 即使 syncAll 失败，也要启动轮询确保后续同步
         Cloud.startPolling();
         Cloud.syncQuizVocab();
+        if (typeof CloudSync !== 'undefined') {
+          CloudSync.syncSweetSubmitted();
+          CloudSync.syncPrivateWhispers();
+        }
       });
     }
   },
@@ -2294,9 +2340,16 @@ const App = {
         CloudSync.syncPomodoroHistory();
         CloudSync.syncLandmarks();
         CloudSync.syncThemeColor();
+        CloudSync.syncSweetSubmitted();
+        CloudSync.syncPrivateWhispers();
         ReadMark.syncAll();
         RoleName.syncFromCloud();
       }
+
+      // 刷新私密絮语 UI
+      if (typeof PrivateWhisper !== 'undefined') PrivateWhisper.render();
+      // 刷新甜蜜语录 UI
+      if (typeof SweetText !== 'undefined') SweetText.refresh();
 
       // 刷新所有 UI
       Cards.renderAll();
