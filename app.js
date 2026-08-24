@@ -127,6 +127,8 @@ const Cloud = {
   // 初始化：从 localStorage 恢复配对码，如果丢失则从 IndexedDB 恢复
   async init() {
     this.pairCode = Store.get('pairCode', null);
+    this.isFreshLogin = false; // 标记是否为清缓存后的新登录
+
     if (!this.pairCode) {
       // LocalStorage 可能被清除，从 IndexedDB 恢复
       const backup = await this._getBackup();
@@ -138,6 +140,9 @@ const Cloud = {
         if (backup.pairHistory) {
           Store.set('pairHistory', backup.pairHistory);
         }
+        // 标记为清缓存恢复，后续同步优先从云端拉取
+        this.isFreshLogin = true;
+        console.log('[Cloud] 配对码从 IndexedDB 备份恢复（清缓存场景）');
       }
     } else {
       // 确保 IndexedDB 也有备份
@@ -389,7 +394,16 @@ const Cloud = {
   async pushAllDays() {
     if (!this.pairCode) return;
     const allDays = Store.getAllDays();
-    if (!allDays || Object.keys(allDays).length === 0) return;
+    if (!allDays || Object.keys(allDays).length === 0) {
+      // 防止清缓存后用空数据覆盖云端：本地为空时先拉取云端恢复
+      console.warn('[SYNC] pushAllDays: local empty, pulling from cloud before push');
+      const remote = await this.pullAllDays();
+      if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
+        Store.mergeRemoteDays(remote);
+        return; // 数据已恢复到本地，下次 syncAll 会正常推送
+      }
+      return; // 云端也为空，无需推送
+    }
     try {
       await fetch(this._url('days_all'), {
         method: 'POST',
@@ -730,9 +744,63 @@ const Cloud = {
     const iqaQVer = typeof IntimateQA !== 'undefined' ? IntimateQA.QUESTION_VERSION : '';
     const iqaNote = Store.get(`iqa_note_${ds}_${role}`, '');
 
-    const body = JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, quizNote, iqaAnswers, iqaQuestions, iqaQVer, iqaNote, ts: Date.now() });
-    // 按季度分命名空间（每季度约180条，100条限制下可用约50天，一个季度基本够用）
+    // 防止清缓存后用空数据覆盖云端：先拉取云端自己的旧数据，如果本地为空但云端有数据，则用云端数据恢复本地
     const qaNs = `qa-${this._getQuarter()}`;
+    try {
+      const existingR = await fetch(this._url(`extra/${ds}/${role}`, qaNs));
+      if (existingR.ok) {
+        const existing = await existingR.json();
+        // 如果本地答题数据为空但云端有答题数据，说明本地被清缓存了，用云端恢复
+        if (existing) {
+          let needRestore = false;
+          if (quizAnswers.length === 0 && existing.quizAnswers && existing.quizAnswers.length > 0) {
+            Store.set(`quiz_a_${ds}_${role}`, existing.quizAnswers);
+            needRestore = true;
+          }
+          if (iqaAnswers.length === 0 && existing.iqaAnswers && existing.iqaAnswers.length > 0) {
+            Store.set(`iqa_a_${ds}_${role}`, existing.iqaAnswers);
+            needRestore = true;
+          }
+          if (!quizQuestions && existing.quizQuestions) {
+            Store.set(`quiz_q_${ds}`, existing.quizQuestions);
+            needRestore = true;
+          }
+          if (!iqaQuestions && existing.iqaQuestions) {
+            Store.set(`iqa_q_${ds}`, existing.iqaQuestions);
+            needRestore = true;
+          }
+          if (vocabCount === 0 && existing.vocabCount > 0) {
+            Store.set(`vocab_count_${ds}_${role}`, existing.vocabCount);
+            Store.set(`vocab_prog_${ds}_${role}`, existing.vocabProg);
+            needRestore = true;
+          }
+          if (needRestore) {
+            console.log('[SYNC] pushQuizVocab: detected cache clear, restored from cloud');
+            // 重新读取恢复后的数据
+            const restoredQuiz = Store.get(`quiz_a_${ds}_${role}`, []);
+            const restoredIqa = Store.get(`iqa_a_${ds}_${role}`, []);
+            const restoredQq = Store.get(`quiz_q_${ds}`, null);
+            const restoredIq = Store.get(`iqa_q_${ds}`, null);
+            const restoredVc = Store.get(`vocab_count_${ds}_${role}`, 0);
+            const restoredVp = Store.get(`vocab_prog_${ds}_${role}`, null);
+            const body = JSON.stringify({
+              quizAnswers: restoredQuiz, quizQuestions: restoredQq, quizQVer,
+              vocabCount: restoredVc, vocabProg: restoredVp, quizNote,
+              iqaAnswers: restoredIqa, iqaQuestions: restoredIq, iqaQVer, iqaNote,
+              ts: Date.now()
+            });
+            await this._retryPOST(this._url(`extra/${ds}/${role}`, qaNs), body, this.MAX_RETRIES);
+            // 刷新 UI
+            if (typeof RandomQA !== 'undefined') { RandomQA._questions = RandomQA._getTodayQuestions(); RandomQA.render(); }
+            if (typeof IntimateQA !== 'undefined') { IntimateQA._questions = IntimateQA._getTodayQuestions(); IntimateQA.render(); }
+            if (typeof EnglishVocab !== 'undefined') EnglishVocab.render();
+            return;
+          }
+        }
+      }
+    } catch (e) { /* 拉取失败继续推送 */ }
+
+    const body = JSON.stringify({ quizAnswers, quizQuestions, quizQVer, vocabCount, vocabProg, quizNote, iqaAnswers, iqaQuestions, iqaQVer, iqaNote, ts: Date.now() });
     const ok = await this._retryPOST(this._url(`extra/${ds}/${role}`, qaNs), body, this.MAX_RETRIES);
     if (!ok) {
       console.warn('[Cloud] pushQuizVocab: 问答数据同步失败');
