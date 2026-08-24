@@ -1959,28 +1959,36 @@ const App = {
       }
     });
 
-    // 切回前台时同步
+    // 切回前台时同步（添加防抖，避免频繁切换标签页时同步风暴）
+    let _visibilitySyncTimer = null;
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && Cloud.isPaired() && !App.isHistory) {
-        Cloud.syncAll();
-        Cloud.syncQuizVocab();
-        Cloud.syncPhotos();
-        Cloud.syncVoices();
-        if (typeof CloudSync !== 'undefined') {
-          CloudSync.syncOnlineDuration();
-          CloudSync.syncLetters();
-          CloudSync.syncAvatars();
-          CloudSync.syncExerciseTime();
-          CloudSync.syncBgOpacity();
-          CloudSync.syncPomodoro();
-          CloudSync.syncPomodoroHistory();
-          CloudSync.syncLandmarks();
-          CloudSync.syncThemeColor();
-          CloudSync.syncSweetSubmitted();
-          CloudSync.syncPrivateWhispers();
-          ReadMark.syncAll();
-          RoleName.syncFromCloud();
-        }
+        // 防抖：500ms内多次切换只执行一次
+        if (_visibilitySyncTimer) clearTimeout(_visibilitySyncTimer);
+        _visibilitySyncTimer = setTimeout(() => {
+          Cloud.syncAll();
+          Cloud.syncQuizVocab();
+          Cloud.syncPhotos();
+          Cloud.syncVoices();
+          // 次要同步延迟执行
+          setTimeout(() => {
+            if (typeof CloudSync !== 'undefined') {
+              CloudSync.syncOnlineDuration();
+              CloudSync.syncLetters();
+              CloudSync.syncAvatars();
+              CloudSync.syncExerciseTime();
+              CloudSync.syncBgOpacity();
+              CloudSync.syncPomodoro();
+              CloudSync.syncPomodoroHistory();
+              CloudSync.syncLandmarks();
+              CloudSync.syncThemeColor();
+              CloudSync.syncSweetSubmitted();
+              CloudSync.syncPrivateWhispers();
+              ReadMark.syncAll();
+              RoleName.syncFromCloud();
+            }
+          }, 500);
+        }, 500);
       }
     });
 
@@ -1997,32 +2005,7 @@ const App = {
 
     Background.load();
 
-    // 初始化新模块
-    TabNav.init();
-    MusicPlayer.init();
-    SweetText.init();
-    PrivateWhisper.init();
-    Photos.loadAll();
-    VoiceRecord.init();
-    LoveRain.init();
-    HistoryView.render();
-    HistoryHint.render();
-    RandomQA.init();
-    IntimateQA.init();
-    EnglishVocab.init();
-    FormulaCard.init();
-    PoemCard.init();
-    LifeTip.init();
-    Joke.init();
-    HotNews.init();
-    LetterBox.init();
-    ExerciseTime.init();
-    HistoryCard.init();
-    GeoCard.init();
-    Pomodoro.init();
-    LandmarkCheckin.init();
-    ReadMark.renderAll();
-    DataPivot.render();
+    // 非关键模块已移至 enterApp() 中延迟初始化，避免阻塞首屏渲染
     // 首页在线时长统计
     OnlineDuration.refresh();
     // 渲染角色头像
@@ -2196,7 +2179,7 @@ const App = {
   },
 
   enterApp() {
-    // 隐藏入口和配对页面
+    // ===== 阶段1：立即渲染关键UI（用户可立即看到界面） =====
     document.getElementById('entryScreen').style.display = 'none';
     document.getElementById('pairScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'flex';
@@ -2213,36 +2196,94 @@ const App = {
       Setting.restoreFont();
     }
 
-    // 进入时同步（仅当本地有数据时才拉取云端，避免拉回已清除的旧数据）
+    // ===== 阶段2：延迟初始化非关键模块（不阻塞首屏渲染） =====
+    const _deferInit = () => {
+      // 核心交互模块（优先级较高）
+      TabNav.init();
+      MusicPlayer.init();
+      SweetText.init();
+      PrivateWhisper.init();
+      Photos.loadAll();
+      VoiceRecord.init();
+      LoveRain.init();
+      HistoryView.render();
+      HistoryHint.render();
+      RandomQA.init();
+      IntimateQA.init();
+
+      // 娱乐/工具模块（可延迟）
+      FormulaCard.init();
+      PoemCard.init();
+      LifeTip.init();
+      Joke.init();
+      HotNews.init();
+      LetterBox.init();
+      ExerciseTime.init();
+      HistoryCard.init();
+      GeoCard.init();
+      Pomodoro.init();
+      LandmarkCheckin.init();
+      ReadMark.renderAll();
+      DataPivot.render();
+
+      // 首页在线时长统计
+      OnlineDuration.refresh();
+      // 渲染角色头像
+      AvatarPicker.renderAll();
+
+      // 首页在线状态刷新
+      if (Cloud.isPaired()) {
+        Setting.refreshStatus();
+        Setting.startStatusPolling();
+      }
+      Setting.restoreTheme();
+
+      // EnglishVocab 延迟加载（词库数据量大，仅在需要时加载）
+      EnglishVocab.init();
+    };
+
+    // 使用 requestIdleCallback 在浏览器空闲时初始化，避免阻塞交互
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(_deferInit, { timeout: 2000 });
+    } else {
+      setTimeout(_deferInit, 300);
+    }
+
+    // ===== 阶段3：云同步（错峰执行，避免同时发起大量请求） =====
     if (Cloud.isPaired()) {
       Cloud.heartbeat();
+      // 先执行核心同步（syncAll），完成后再错峰执行其他同步
       Cloud.syncAll().then(() => {
         Cloud.startPolling();
-        // 即时同步照片、语音、信件、在线时长
+        // 核心同步：照片、语音、投递题目、问答数据
         Cloud.syncPhotos();
         Cloud.syncVoices();
-        // 先同步投递题目，再同步问答数据（确保题库一致后再推送/拉取答题进度）
         Cloud.syncSubmittedQuestions();
-        // 同步问答和刷词数据
         Cloud.syncQuizVocab();
-        if (typeof CloudSync !== 'undefined') {
-          CloudSync.syncOnlineDuration();
-          CloudSync.syncLetters();
-          CloudSync.syncAvatars();
-          CloudSync.syncExerciseTime();
-          CloudSync.syncBgOpacity();
-          CloudSync.syncPomodoro();
-          CloudSync.syncPomodoroHistory();
-          CloudSync.syncLandmarks();
-          CloudSync.syncThemeColor();
-          CloudSync.syncSweetSubmitted();
-          CloudSync.syncPrivateWhispers();
-          ReadMark.syncAll();
-          RoleName.syncFromCloud();
-        }
-        // IP地址显示已移除
+        // 次要同步：延迟500ms错峰执行，避免网络拥塞
+        setTimeout(() => {
+          if (typeof CloudSync !== 'undefined') {
+            CloudSync.syncOnlineDuration();
+            CloudSync.syncLetters();
+            CloudSync.syncAvatars();
+            CloudSync.syncExerciseTime();
+            CloudSync.syncBgOpacity();
+          }
+        }, 500);
+        // 低优先级同步：延迟1000ms
+        setTimeout(() => {
+          if (typeof CloudSync !== 'undefined') {
+            CloudSync.syncPomodoro();
+            CloudSync.syncPomodoroHistory();
+            CloudSync.syncLandmarks();
+            CloudSync.syncThemeColor();
+            CloudSync.syncSweetSubmitted();
+            CloudSync.syncPrivateWhispers();
+            ReadMark.syncAll();
+            RoleName.syncFromCloud();
+          }
+        }, 1000);
       }).catch(() => {
-        // 即使 syncAll 失败，也要启动轮询确保后续同步
         Cloud.startPolling();
         Cloud.syncSubmittedQuestions();
         Cloud.syncQuizVocab();
@@ -8772,8 +8813,9 @@ const EnglishVocab = {
   // 2027考研英语大纲词汇（来源: GitHub开源词库 KyleBing/english-vocabulary）
   // 共9602词（官方大纲5500词 + 派生词/复合词）
   DAILY_GOAL: 100,
+  _vocabLoaded: false,
   get WORD_LIST() {
-    return typeof KAORYAN_WORDS !== 'undefined' ? KAORYAN_WORDS : this._FALLBACK_WORDS;
+    return (typeof KAORYAN_WORDS !== 'undefined') ? KAORYAN_WORDS : this._FALLBACK_WORDS;
   },
 
   // 本地兜底词表（网络加载失败时使用）
