@@ -904,12 +904,8 @@ const Cloud = {
         }
         if (changed) {
           Store.set(prefix + '_submitted', local);
-          // Invalidate cache
-          const ds = todayStr();
-          Store.remove(prefix + '_q_' + ds);
-          Store.remove(prefix + '_qv_' + ds);
-          const mod = prefix === 'quiz' ? RandomQA : (typeof IntimateQA !== 'undefined' ? IntimateQA : null);
-          if (mod) { mod._questions = mod._getTodayQuestions(); mod.render(); }
+          // 每日题目不再依赖投递题目，无需使缓存失效或重新生成
+          // 投递题目仅同步存储，不影响每日题库一致性
         }
       } catch (e) {}
     }
@@ -1980,6 +1976,17 @@ const App = {
       }
     });
 
+    // 0点定时更新：每分钟检测日期变化，跨天自动重新生成题库并同步
+    this._lastDateStr = todayStr();
+    this._midnightTimer = setInterval(() => {
+      const currentDateStr = todayStr();
+      if (currentDateStr !== this._lastDateStr) {
+        console.log('[MIDNIGHT] Date changed:', this._lastDateStr, '->', currentDateStr);
+        this._lastDateStr = currentDateStr;
+        this._onNewDay();
+      }
+    }, 60000); // 每分钟检测一次
+
     Background.load();
 
     // 初始化新模块
@@ -2233,6 +2240,37 @@ const App = {
         }
       });
     }
+  },
+
+  // 跨天更新：0点自动重新生成题库并同步
+  _onNewDay() {
+    // 重新生成随机问答和亲密问答的今日题目
+    if (typeof RandomQA !== 'undefined') {
+      const ds = todayStr();
+      Store.remove('quiz_q_' + ds);
+      Store.remove('quiz_qv_' + ds);
+      RandomQA._questions = RandomQA._getTodayQuestions();
+      RandomQA.render();
+    }
+    if (typeof IntimateQA !== 'undefined') {
+      const ds = todayStr();
+      Store.remove('iqa_q_' + ds);
+      Store.remove('iqa_qv_' + ds);
+      IntimateQA._questions = IntimateQA._getTodayQuestions();
+      IntimateQA.render();
+    }
+    // 刷新日历和导航
+    Calendar.render();
+    Cards.renderAll();
+    Cards.updateRolePermissions();
+    this.updateNav();
+    // 云同步拉取对方数据
+    if (Cloud.isPaired()) {
+      Cloud.syncAll();
+      Cloud.syncQuizVocab();
+      Cloud.syncSubmittedQuestions();
+    }
+    showToast('🌙 新的一天，题库已更新！', 3000);
   },
 
   applyTheme(theme) {
@@ -7590,67 +7628,71 @@ const HistoryHint = {
 
 // ====== 随机问答模块 ======
 const RandomQA = {
-  // 二选一题库：适合情侣关系的兴趣爱好和处理感情
+  // 二选一题库：侧重兴趣爱好、生活方式、趣味场景
   QUESTION_BANK: [
-    { q: '吵架后你更倾向于？', a: ['冷静后主动沟通', '立刻把话说清楚'] },
-    { q: '纪念日你更希望？', a: ['收到精心准备的礼物', '一起体验新事物'] },
-    { q: '你觉得爱情中更重要的是？', a: ['互相理解包容', '共同成长进步'] },
-    { q: '理想的二人周末？', a: ['一起做饭看电影', '出门探索新地方'] },
-    { q: '对方难过时你会？', a: ['安静陪伴在身边', '想办法逗对方开心'] },
-    { q: '你更在意对方的？', a: ['说的话和承诺', '实际行动和付出'] },
-    { q: '约会迟到时你的反应？', a: ['担心对方出了什么事', '有点不高兴但理解'] },
-    { q: '你表达爱的方式？', a: ['说出口的甜言蜜语', '默默为对方做事'] },
-    { q: '吵架时谁先低头？', a: ['谁错了谁先道歉', '不管对错我先哄'] },
-    { q: '你更喜欢的相处模式？', a: ['形影不离天天黏一起', '各有空间但心在一起'] },
-    { q: '收到什么会让你更感动？', a: ['手写的信或卡片', '对方记得你随口说过的话'] },
-    { q: '你觉得浪漫是？', a: ['偶尔的惊喜和仪式感', '日常的细心和陪伴'] },
-    { q: '一起旅行时你负责？', a: ['做攻略订酒店', '负责吃喝玩乐'] },
-    { q: '对方生气时你怎么办？', a: ['先道歉再慢慢解释', '给对方空间等气消'] },
-    { q: '你更希望对方记住？', a: ['你的生日和纪念日', '你不喜欢吃的东西'] },
-    { q: '深夜聊天的内容？', a: ['聊聊未来和梦想', '分享今天有趣的事'] },
-    { q: '你觉得最甜的事？', a: ['突然被抱住', '被夸奖和肯定'] },
-    { q: '冷战时你更想？', a: ['对方主动来找你', '找个台阶赶紧和好'] },
-    { q: '你更看重对方哪点？', a: ['温柔体贴的性格', '积极上进的态度'] },
-    { q: '一起养宠物你选？', a: ['猫（安静独立）', '狗（热情粘人）'] },
-    { q: '你觉得最好的道歉？', a: ['真诚地说对不起', '用一个拥抱代替'] },
-    { q: '你更喜欢的约会？', a: ['高级餐厅烛光晚餐', '路边摊散步聊天'] },
-    { q: '对方加班很晚你会？', a: ['等对方一起睡', '先睡但留一盏灯'] },
-    { q: '你理想的家？', a: ['温馨有烟火气', '简约干净有格调'] },
-    { q: '分手的话题你会？', a: ['绝口不提保护感情', '坦诚讨论共同面对'] },
-    { q: '你觉得安全感来自？', a: ['对方主动报备和分享', '彼此信任不需要证明'] },
-    { q: '一起看剧时？', a: ['一起追同一部', '各看各的但坐一起'] },
-    { q: '你更想要的生日？', a: ['精心策划的惊喜派对', '只有两个人的简单庆祝'] },
-    { q: '对方做错事你的态度？', a: ['好好说但会指出问题', '小事就算了不计较'] },
-    { q: '你觉得异地恋？', a: ['距离不是问题心在一起', '需要更多沟通和信任'] },
-    { q: '一起攒钱的目标？', a: ['旅行基金去想去的地方', '攒着买房安家'] },
-    { q: '你更吃哪一套？', a: ['霸道总裁式的宠溺', '温柔细腻的体贴'] },
-    { q: '吵架后的和好方式？', a: ['一起吃顿好的', '一个拥抱一个吻'] },
-    { q: '你觉得最好的情话？', a: ['有你在我就不怕', '和你在一起很开心'] },
-    { q: '对方生病时你会？', a: ['寸步不离地照顾', '买好药叮嘱按时吃'] },
-    { q: '你更喜欢的早安？', a: ['一条暖心的消息', '身边人的一句早安'] },
-    { q: '共同做家务时？', a: ['一人做一半公平分配', '谁有空谁做不计较'] },
-    { q: '你更在意的仪式感？', a: ['每个纪念日都认真过', '日常的小惊喜更重要'] },
-    { q: '你觉得最好的陪伴？', a: ['放下手机认真听对方说话', '什么都不说只是靠着'] },
-    { q: '一起运动你选？', a: ['跑步骑车户外', '瑜伽跳舞室内'] },
-    { q: '对方的哪个瞬间最打动你？', a: ['认真做事的侧脸', '突然看向你的微笑'] },
-    { q: '你理想的老后生活？', a: ['一起住到乡下种花养草', '到处旅行看世界'] },
-    { q: '你觉得最重要的约定？', a: ['吵架不过夜', '不轻易说分手'] },
-    { q: '对方送你不喜欢的东西？', a: ['开心收下并感谢', '委婉说出真实想法'] },
-    { q: '你更喜欢对方怎么叫你？', a: ['专属的小名或昵称', '直接叫名字'] },
-    { q: '一起拍照时？', a: ['摆好姿势认真拍', '抓拍自然瞬间'] },
-    { q: '你觉得最暖的瞬间？', a: ['天冷了把你的手放进他口袋', '你说了什么他都认真听'] },
-    { q: '关于未来的计划？', a: ['一起规划共同的目标', '走一步看一步顺其自然'] },
-    { q: '你更希望对方在你低落时？', a: ['什么都不问就抱住你', '耐心问你怎么了'] },
-    { q: '你觉得爱情长久的关键？', a: ['不断发现对方新的优点', '接受对方的缺点和不足'] },
+    // 兴趣爱好类
+    { q: '周末空闲时间你更想？', a: ['宅家追剧打游戏', '出门逛街探店'] },
+    { q: '你更喜欢的运动方式？', a: ['跑步游泳等有氧', '瑜伽普拉提等拉伸'] },
+    { q: '音乐你更偏好？', a: ['流行摇滚充满活力', '民谣古典安静治愈'] },
+    { q: '看电影你更选？', a: ['科幻动作大片', '爱情文艺小众片'] },
+    { q: '你更喜欢的放松方式？', a: ['泡咖啡馆看书', '公园散步发呆'] },
+    { q: '旅行你更偏向？', a: ['海岛沙滩晒太阳', '山林徒步探险'] },
+    { q: '你更想学的技能？', a: ['摄影拍出好看的照片', '烹饪做出美味佳肴'] },
+    { q: '阅读你更喜欢？', a: ['小说散文故事类', '科普历史知识类'] },
+    { q: '你更喜欢的手工？', a: ['画画涂鸦搞创作', '拼乐高做模型'] },
+    { q: '游戏你更爱？', a: ['主机/PC单机大作', '手机休闲小游戏'] },
+    { q: '你更喜欢的饮品？', a: ['咖啡奶茶续命', '果汁茶饮养生'] },
+    { q: '拍照你更偏好？', a: ['风景建筑大场面', '人像美食小细节'] },
+    { q: '你更想拥有的特长？', a: ['唱歌好听到让人陶醉', '跳舞帅气到让人尖叫'] },
+    { q: '社交活动你更爱？', a: ['密室剧本杀脑力局', 'KTV聚餐热闹局'] },
+    { q: '你更喜欢的宠物？', a: ['猫（高冷独立）', '狗（热情粘人）'] },
+    { q: '你更喜欢的季节？', a: ['春夏充满活力', '秋冬温馨舒适'] },
+    { q: '你更想尝试的极限运动？', a: ['跳伞潜水刺激型', '滑雪攀岩技术型'] },
+    { q: '你更喜欢的穿搭风格？', a: ['休闲舒适运动风', '精致时尚通勤风'] },
+    { q: '你更喜欢的早餐？', a: ['中式豆浆油条包子', '西式面包咖啡三明治'] },
+    { q: '你更喜欢的解压方式？', a: ['吃顿好的犒劳自己', '运动出汗释放压力'] },
+    { q: '你更想去的度假地？', a: ['国外异域风情体验', '国内小众秘境探索'] },
+    { q: '你更喜欢的花？', a: ['玫瑰郁金香热烈型', '满天星尤加利清新型'] },
+    { q: '你更喜欢的数字？', a: ['偶数（对称完美）', '奇数（独特个性）'] },
+    { q: '你更喜欢的天气？', a: ['晴天阳光明媚', '雨天听着雨声'] },
+    // 生活方式类
+    { q: '你理想的居住环境？', a: ['市中心繁华便利', '郊区安静宽敞'] },
+    { q: '你更喜欢的家装风格？', a: ['温馨复古有烟火气', '极简现代有设计感'] },
+    { q: '你更喜欢的作息？', a: ['早睡早起晨型人', '晚睡晚起夜猫子'] },
+    { q: '你更喜欢的购物方式？', a: ['线上网购方便快捷', '线下逛街享受过程'] },
+    { q: '你更喜欢的支付方式？', a: ['手机扫码一切', '现金卡更有实感'] },
+    { q: '你更喜欢的沟通方式？', a: ['文字消息想清楚再说', '语音电话直接聊'] },
+    { q: '你更喜欢的起床方式？', a: ['自然醒慢慢赖床', '闹钟一响立刻起'] },
+    { q: '你更喜欢的收纳风格？', a: ['断舍离极简主义', '满满当当安全感'] },
+    // 趣味场景类
+    { q: '如果有一周假期你更想？', a: ['出国旅行看世界', '在家躺平充充电'] },
+    { q: '你更想拥有的超能力？', a: ['瞬间移动省去通勤', '时间暂停多睡一会'] },
+    { q: '如果中彩票你更想？', a: ['环游世界享受人生', '买房投资安稳度日'] },
+    { q: '你更想回到哪个年代？', a: ['古代体验慢生活', '未来看看高科技'] },
+    { q: '你更想拥有的能力？', a: ['过目不忘的记忆力', '共情理解读心术'] },
+    { q: '末日来临你更想？', a: ['和家人在一起平静度过', '拼命寻找生存的机会'] },
+    { q: '你更想去的虚拟世界？', a: ['武侠江湖仗剑天涯', '科幻星际探索宇宙'] },
+    { q: '如果学一门乐器你选？', a: ['吉他钢琴流行款', '古筝笛子传统款'] },
+    { q: '你更想养的绿植？', a: ['多肉仙人掌好养型', '开花植物观赏型'] },
+    { q: '你更喜欢的甜品种类？', a: ['蛋糕奶油绵密型', '冰淇淋冰沙清爽型'] },
+    { q: '你更想尝试的创作？', a: ['写小说记录故事', '拍视频记录生活'] },
+    { q: '你更喜欢的收藏？', a: ['邮票钱币有历史感', '潮玩手办有趣味'] },
+    { q: '你更喜欢的运动赛事？', a: ['足球篮球团队对抗', '网球乒乓个人对决'] },
+    { q: '你更想学的语言？', a: ['日语韩语动漫韩剧', '法语德语欧洲风情'] },
+    { q: '你更喜欢的夜生活？', a: ['夜市小吃烟火气', '酒吧livehouse氛围'] },
+    { q: '你更喜欢的健身方式？', a: ['健身房器械专业训练', '户外跑跳自由运动'] },
+    { q: '你更想尝试的美食？', a: ['日料刺身精致型', '火锅烧烤豪放型'] },
+    { q: '你更喜欢的饮料温度？', a: ['冰镇透心凉', '热饮暖胃'] },
+    { q: '你更喜欢的文化体验？', a: ['博物馆看展览', '音乐节看演出'] },
   ],
 
   _questions: [],
   _answers: [],
   _currentIndex: 0,
 
-  // 题库版本号：题库内容变化时递增，用于使旧缓存失效
-  _BASE_VERSION: 'v99couples',
-  get QUESTION_VERSION() { const s = Store.get('quiz_submitted', []); return this._BASE_VERSION + '_' + s.length; },
+  // 题库版本号：固定值，不再依赖投递题目数量，确保双方版本一致
+  _BASE_VERSION: 'v100couples',
+  get QUESTION_VERSION() { return this._BASE_VERSION; },
 
   // 日期种子伪随机：保证双方同一天看到相同题目
   _seededShuffle(arr, seed) {
@@ -7673,12 +7715,15 @@ const RandomQA = {
     if (cached && cached.length === 5 && cachedVer === this.QUESTION_VERSION) {
       return cached;
     }
+    // 仅使用内置题库进行种子洗牌（不包含投递题目），确保双方题库一致
+    // 投递题目通过 syncSubmittedQuestions 同步，但不影响每日题目生成
+    const bank = this.QUESTION_BANK;
     const shuffled = this._seededShuffle(
-      this._getMergedBank().map((_, i) => i),
+      bank.map((_, i) => i),
       dateStr
     );
     const indices = shuffled.slice(0, 5);
-    const questions = indices.map(i => ({ ...this._getMergedBank()[i], idx: i }));
+    const questions = indices.map(i => ({ ...bank[i], idx: i }));
     Store.set(`quiz_q_${dateStr}`, questions);
     Store.set(`quiz_qv_${dateStr}`, this.QUESTION_VERSION);
     return questions;
@@ -7912,10 +7957,7 @@ const RandomQA = {
     list.push({ q, a, by: App.currentRole, ts: Date.now() });
     Store.set('quiz_submitted', list);
     if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted('quiz');
-    const ds = todayStr();
-    Store.remove('quiz_q_' + ds);
-    Store.remove('quiz_qv_' + ds);
-    this._questions = this._getTodayQuestions();
+    // 投递题目不再影响每日题库生成，无需使缓存失效
     showToast('题目投递成功！隔天可出现在问答中 ✅', 2000);
   },
   _syncSubmitted(remoteList) {
@@ -8072,9 +8114,9 @@ function createQAModule(config) {
       return this._prefix + name;
     },
 
-    // 题库版本号：基础版本 + 已投递题目数量，投递后自动使旧缓存失效
+    // 题库版本号：固定值，不再依赖投递题目数量，确保双方版本一致
     get QUESTION_VERSION() {
-      return this._BASE_VERSION + '_' + Store.get(this._prefix + '_submitted', []).length;
+      return this._BASE_VERSION;
     },
 
     // 日期种子伪随机：保证双方同一天看到相同题目
@@ -8107,7 +8149,8 @@ function createQAModule(config) {
       if (cached && cached.length === 5 && cachedVer === this.QUESTION_VERSION) {
         return cached;
       }
-      const bank = this._getMergedBank();
+      // 仅使用内置题库进行种子洗牌（不包含投递题目），确保双方题库一致
+      const bank = this.QUESTION_BANK;
       const shuffled = this._seededShuffle(
         bank.map((_, i) => i),
         dateStr
@@ -8349,10 +8392,7 @@ function createQAModule(config) {
       list.push({ q, a, by: App.currentRole, ts: Date.now() });
       Store.set(this._prefix + '_submitted', list);
       if (typeof Cloud !== 'undefined' && Cloud.pairCode) Cloud.pushSubmitted(this._prefix);
-      const ds = todayStr();
-      Store.remove(this._prefix + '_q_' + ds);
-      Store.remove(this._prefix + '_qv_' + ds);
-      this._questions = this._getTodayQuestions();
+      // 投递题目不再影响每日题库生成，无需使缓存失效
       showToast('题目投递成功！隔天可出现在问答中 ✅', 2000);
     },
 
@@ -8444,7 +8484,7 @@ function createQAModule(config) {
 const IntimateQA = createQAModule({
   prefix: 'iqa',
   title: '亲密问答',
-  version: 'v1intimate',
+  version: 'v2intimate',
   bank: [
     { q: '你认为爱情中最重要的是？', a: ['忠诚与信任', '理解与包容'] },
     { q: '吵架后你更希望对方？', a: ['主动来找你', '给你空间冷静'] },
