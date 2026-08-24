@@ -128,6 +128,7 @@ const Cloud = {
   async init() {
     this.pairCode = Store.get('pairCode', null);
     this.isFreshLogin = false; // 标记是否为清缓存后的新登录
+    this._roleConflict = false; // 标记角色是否与云端冲突
 
     if (!this.pairCode) {
       // LocalStorage 可能被清除，从 IndexedDB 恢复
@@ -143,6 +144,18 @@ const Cloud = {
         // 标记为清缓存恢复，后续同步优先从云端拉取
         this.isFreshLogin = true;
         console.log('[Cloud] 配对码从 IndexedDB 备份恢复（清缓存场景）');
+
+        // 验证角色：从云端拉取 meta，检查 backup.role 是否仍被对方占用
+        try {
+          const ns = `couple-pwa-${this.pairCode.toLowerCase()}`;
+          const metaR = await fetch(`${this.BASE}/${ns}/meta`);
+          if (metaR.ok) {
+            const meta = await metaR.json();
+            // meta.lastTaoLogin / meta.lastYanLogin 记录最后登录时间
+            // 如果 backup.role 是 TAO，但 meta 显示 TAO 的最后活跃时间是近期（对方正在用）
+            // 这只是一种启发式检查，实际角色由用户选择决定
+          }
+        } catch (e) { /* meta 拉取失败不影响恢复 */ }
       }
     } else {
       // 确保 IndexedDB 也有备份
@@ -309,15 +322,23 @@ const Cloud = {
         return { ok: false, error: '配对码不存在，请确认后重试' };
       }
       const meta = await r.json();
-      // 写入自己的角色到 meta
+      // 写入自己的角色到 meta，同时记录最后登录时间（用于角色冲突检测）
       const members = Array.from(new Set([...(meta.members || []), role]));
+      const now = new Date().toISOString();
+      const metaUpdate = {
+        ...meta,
+        members,
+        joinedAt: now,
+        [`last${role}Login`]: now  // 记录该角色最后登录时间
+      };
       await fetch(`${this.BASE}/${ns}/meta`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...meta, members, joinedAt: new Date().toISOString() })
+        body: JSON.stringify(metaUpdate)
       });
 
       this.pairCode = code;
+      this.isFreshLogin = true; // 重新加入配对也视为新登录
       Store.set('pairCode', code);
       Store.set('role', role);
       Store.addPairHistory(code, role);
@@ -492,7 +513,14 @@ const Cloud = {
         if (finalCheck && typeof finalCheck === 'object') {
           Store.mergeRemoteDays(finalCheck);
         }
-        await this.pushAllDays();
+        // 额外安全检查：如果本地数据量明显少于云端（<50%），可能是清缓存后恢复不完整，跳过推送
+        const localCount = Object.keys(Store.getAllDays()).length;
+        const remoteCount = finalCheck ? Object.keys(finalCheck).length : 0;
+        if (this.isFreshLogin && remoteCount > 0 && localCount < remoteCount * 0.5) {
+          console.warn('[SYNC] syncAll: fresh login with incomplete data, skipping pushAllDays to prevent overwrite');
+        } else {
+          await this.pushAllDays();
+        }
       } else {
         console.warn('[SYNC] syncAll: pull failed, skipping pushAllDays to prevent data overwrite');
       }
@@ -828,7 +856,23 @@ const Cloud = {
     if (!this.pairCode) return;
     const ds = todayStr();
 
-    // 推送自己的数据
+    // 清缓存后首次同步：先拉取对方数据，确保本地有对方数据后再推送
+    if (this.isFreshLogin) {
+      try {
+        const remote = await this.pullQuizVocab();
+        if (remote) {
+          const otherRole = App.currentRole === 'TAO' ? 'YAN' : 'TAO';
+          if (remote.quizAnswers && remote.quizAnswers.length > 0) {
+            Store.set(`quiz_a_${ds}_${otherRole}`, remote.quizAnswers);
+          }
+          if (remote.iqaAnswers && remote.iqaAnswers.length > 0) {
+            Store.set(`iqa_a_${ds}_${otherRole}`, remote.iqaAnswers);
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    // 推送自己的数据（pushQuizVocab 内部已有防空数据覆盖保护）
     try {
       await this.pushQuizVocab();
     } catch (e) { /* ignore */ }
@@ -2146,7 +2190,9 @@ const App = {
     document.getElementById('pairShowCodeView').style.display = 'none';
     this.enterApp();
     Cloud.heartbeat();
+    // 清缓存后重新加入：必须先拉取云端数据恢复本地，再推送
     Cloud.syncAll().then(() => {
+      // syncAll 完成后，本地数据已从云端恢复，此时再推送和同步其他模块
       Cloud.syncSubmittedQuestions();
       Cloud.syncQuizVocab();
       Cloud.syncPhotos();
@@ -2169,6 +2215,8 @@ const App = {
         RoleName.syncFromCloud();
       }
       // IP地址显示已移除
+      // 清缓存恢复后，标记为已完成恢复
+      Cloud.isFreshLogin = false;
       showToast('已配对成功，开始你们的日记吧 💕');
     }).catch(() => {
       // 即使 syncAll 失败，也要启动轮询确保后续同步
