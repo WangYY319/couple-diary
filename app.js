@@ -904,8 +904,16 @@ const Cloud = {
         }
         if (changed) {
           Store.set(prefix + '_submitted', local);
-          // 每日题目不再依赖投递题目，无需使缓存失效或重新生成
-          // 投递题目仅同步存储，不影响每日题库一致性
+          // 投递题目发生变化：失效今日题库缓存，让 _getTodayQuestions 重新从合并后的题库生成
+          // 双方同步后拥有相同的投递题目集合 → 相同的合并题库 → 相同的5道每日题目
+          const ds = todayStr();
+          Store.remove(prefix + '_q_' + ds);
+          Store.remove(prefix + '_qv_' + ds);
+          const mod = prefix === 'quiz' ? RandomQA : (typeof IntimateQA !== 'undefined' ? IntimateQA : null);
+          if (mod) {
+            mod._questions = mod._getTodayQuestions();
+            mod.render();
+          }
         }
       } catch (e) {}
     }
@@ -2088,6 +2096,7 @@ const App = {
     this.enterApp();
     Cloud.heartbeat();
     Cloud.syncAll().then(() => {
+      Cloud.syncSubmittedQuestions();
       Cloud.syncQuizVocab();
       Cloud.syncPhotos();
       Cloud.syncVoices();
@@ -2212,6 +2221,8 @@ const App = {
         // 即时同步照片、语音、信件、在线时长
         Cloud.syncPhotos();
         Cloud.syncVoices();
+        // 先同步投递题目，再同步问答数据（确保题库一致后再推送/拉取答题进度）
+        Cloud.syncSubmittedQuestions();
         // 同步问答和刷词数据
         Cloud.syncQuizVocab();
         if (typeof CloudSync !== 'undefined') {
@@ -2233,6 +2244,7 @@ const App = {
       }).catch(() => {
         // 即使 syncAll 失败，也要启动轮询确保后续同步
         Cloud.startPolling();
+        Cloud.syncSubmittedQuestions();
         Cloud.syncQuizVocab();
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncSweetSubmitted();
@@ -2243,8 +2255,12 @@ const App = {
   },
 
   // 跨天更新：0点自动重新生成题库并同步
-  _onNewDay() {
-    // 重新生成随机问答和亲密问答的今日题目
+  async _onNewDay() {
+    // 1. 先同步双方投递的题目（确保两人拥有相同的投递题目集合）
+    if (Cloud.isPaired()) {
+      await Cloud.syncSubmittedQuestions();
+    }
+    // 2. 失效今日题库缓存，重新从合并后的题库生成（内置+已同步的投递题目）
     if (typeof RandomQA !== 'undefined') {
       const ds = todayStr();
       Store.remove('quiz_q_' + ds);
@@ -2259,16 +2275,15 @@ const App = {
       IntimateQA._questions = IntimateQA._getTodayQuestions();
       IntimateQA.render();
     }
-    // 刷新日历和导航
+    // 3. 刷新日历和导航
     Calendar.render();
     Cards.renderAll();
     Cards.updateRolePermissions();
     this.updateNav();
-    // 云同步拉取对方数据
+    // 4. 同步其余云端数据
     if (Cloud.isPaired()) {
       Cloud.syncAll();
       Cloud.syncQuizVocab();
-      Cloud.syncSubmittedQuestions();
     }
     showToast('🌙 新的一天，题库已更新！', 3000);
   },
@@ -7715,9 +7730,9 @@ const RandomQA = {
     if (cached && cached.length === 5 && cachedVer === this.QUESTION_VERSION) {
       return cached;
     }
-    // 仅使用内置题库进行种子洗牌（不包含投递题目），确保双方题库一致
-    // 投递题目通过 syncSubmittedQuestions 同步，但不影响每日题目生成
-    const bank = this.QUESTION_BANK;
+    // 使用内置题库 + 已同步的投递题目进行种子洗牌
+    // 投递题目在生成前已通过 syncSubmittedQuestions / _onNewDay 同步完毕
+    const bank = this._getMergedBank();
     const shuffled = this._seededShuffle(
       bank.map((_, i) => i),
       dateStr
@@ -8149,8 +8164,8 @@ function createQAModule(config) {
       if (cached && cached.length === 5 && cachedVer === this.QUESTION_VERSION) {
         return cached;
       }
-      // 仅使用内置题库进行种子洗牌（不包含投递题目），确保双方题库一致
-      const bank = this.QUESTION_BANK;
+      // 使用内置题库 + 已同步的投递题目进行种子洗牌
+      const bank = this._getMergedBank();
       const shuffled = this._seededShuffle(
         bank.map((_, i) => i),
         dateStr
