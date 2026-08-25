@@ -6653,49 +6653,18 @@ const VoiceRecord = {
 
 // ====== 甜蜜文案模块 ======
 const SweetText = {
-  phrases: [
-    '你是我最想留住的幸运',
-    '今天的你也很可爱呢',
-    '想和你一起看星星月亮',
-    '有你在身边就是幸福',
-    '你笑起来真好看',
-    '想牵着你的手走很远',
-    '你是我的小太阳呀',
-    '余生请多指教啦',
-    '每天想你多一点',
-    '你是我最好的礼物',
-    '和你在一起就很安心',
-    '想和你一起变老呢',
-    '你是我遇见的小确幸',
-    '余生很长都给你',
-    '只想对你一个人温柔',
-    '你是我最甜的梦',
-    '世界再大只想你',
-    '有你的日子都是甜',
-    '你是我独家的记忆',
-    '想一直赖在你身边',
-    '你是我最爱的风景',
-    '春风十里不如你',
-    '你是我的全世界呀',
-    '想和你共度余生',
-    '你是我心里的光',
-    '每一天因你而美好',
-    '只想和你慢慢变老',
-    '你是我最大的幸运',
-    '和你在一起就很快乐',
-    '你是我最温柔的风'
-  ],
+  // 内置语录已清空，仅保留投递内容
+  phrases: [],
 
   lastIndex: -1,
 
   // 获取已投递的自定义语录
   _getCustom() { return Store.get('sweet_submitted', []); },
 
-  // 合并内置语录和自定义语录
+  // 仅返回投递内容（内置已清空）
   _getAll() {
     const custom = this._getCustom();
-    // 内置语录为字符串，自定义语录为 {text, by, ts} 对象
-    return [...this.phrases, ...custom.map(c => ({ text: c.text, by: c.by }))];
+    return custom.map(c => ({ text: c.text, by: c.by }));
   },
 
   init() {
@@ -6704,6 +6673,8 @@ const SweetText = {
     const all = this._getAll();
     if (saved >= 0 && saved < all.length) {
       this.display(all[saved]);
+    } else if (all.length === 0) {
+      this.display({ text: '双击标题投递你的甜蜜语录吧 💕', by: '' });
     }
   },
 
@@ -6713,6 +6684,11 @@ const SweetText = {
     el.classList.add('fading');
     setTimeout(() => {
       const all = this._getAll();
+      if (all.length === 0) {
+        this.display({ text: '双击标题投递你的甜蜜语录吧 💕', by: '' });
+        el.classList.remove('fading');
+        return;
+      }
       let idx;
       do {
         idx = Math.floor(Math.random() * all.length);
@@ -6731,7 +6707,9 @@ const SweetText = {
       el.innerHTML = item;
     } else if (item && item.text) {
       // 自定义语录显示投递者
-      el.innerHTML = `${item.text}<span class="sweet-by">${item.by}投递</span>`;
+      el.innerHTML = item.by
+        ? `${item.text}<span class="sweet-by">${item.by}投递</span>`
+        : item.text;
     }
   },
 
