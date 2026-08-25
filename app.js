@@ -356,11 +356,11 @@ const Cloud = {
     if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
   },
 
-  // 推送当天数据到云端（先拉取合并，防止覆盖对方的打卡）
+  // 推送当天数据到云端（先拉取合并，防止覆盖对方的记录）
   async pushDay(dateStr) {
     if (!this.pairCode) { console.warn('[SYNC] pushDay: no pairCode'); return; }
     try {
-      // 1. 先拉取云端数据并合并（防止覆盖对方的打卡）
+      // 1. 先拉取云端数据并合并（防止覆盖对方的记录）
       let remote = await this.pullDay(dateStr);
       // 如果单日数据不存在，从 days_all 备份获取
       if (!remote) {
@@ -527,7 +527,7 @@ const Cloud = {
 
       this.lastSyncAt = Date.now();
       if (anyChanged) {
-        // 检查今天是否双方都打卡了，如果是则计算连续天数
+        // 检查今天是否双方都完成了，如果是则计算连续天数
         const todayDs = todayStr();
         const todayData = Store.getDay(todayDs);
         if (todayData && todayData.greet && todayData.greet.tao && todayData.greet.yan && !todayData.greet.count) {
@@ -548,7 +548,7 @@ const Cloud = {
         }
         if (typeof Calendar !== 'undefined') Calendar.render();
         if (typeof App !== 'undefined') App.updateNav();
-        showToast('已同步对方的打卡 💕');
+        showToast('已同步对方的记录 💕');
       }
     } catch (e) { /* ignore */ }
     this.isSyncing = false;
@@ -636,6 +636,7 @@ const Cloud = {
           CloudSync.syncThemeColor();
           CloudSync.syncSweetSubmitted();
           CloudSync.syncPrivateWhispers();
+          CloudSync.syncMindList();
           ReadMark.syncAll();
           RoleName.syncFromCloud();
         }
@@ -707,7 +708,7 @@ const Cloud = {
             });
           }
 
-          // 检查是否双方都打卡了，如果是则计算连续天数并触发效果
+          // 检查是否双方都完成了，如果是则计算连续天数并触发效果
           if (merged && merged.greet && merged.greet.tao && merged.greet.yan && !merged.greet.count) {
             const allDays = Store.getAllDays();
             let count = 0;
@@ -729,13 +730,13 @@ const Cloud = {
             Cards.updateRolePermissions();
             Calendar.render();
             App.updateNav();
-            showToast('💕 打卡完成！两人合成了完整爱心');
+            showToast('💕 记录完成！两人合成了完整爱心');
           } else {
             Cards.renderAll();
             Cards.updateRolePermissions();
             Calendar.render();
             App.updateNav();
-            showToast('对方有新的打卡了 ✨');
+            showToast('对方有新的记录了 ✨');
           }
         }
       }
@@ -2001,6 +2002,82 @@ const CloudSync = {
         }
       }
     } catch (e) { /* ignore */ }
+  },
+
+  // 同步心细清单：双向合并
+  async syncMindList() {
+    if (!Cloud.pairCode) return;
+    if (typeof MindList === 'undefined') return;
+    try {
+      const remote = await this.get('mindlist');
+      if (!remote || !Array.isArray(remote) || remote.length === 0) {
+        // 云端没有，推送本地
+        if (MindList.items.length > 0) {
+          await this.set('mindlist', MindList.items.map(i => MindList._serialize(i)));
+        }
+        return;
+      }
+
+      let changed = false;
+      const localMap = new Map(MindList.items.map(i => [i.id, i]));
+      const newItems = [];
+
+      // 1. 合并云端数据到本地
+      remote.forEach(cl => {
+        const local = localMap.get(cl.id);
+        if (!local) {
+          // 新条目（对方新增的）
+          newItems.push(MindList._deserialize(cl));
+          changed = true;
+        } else {
+          // 已有条目：合并 acknowledgedBy 状态
+          if (!local.acknowledgedBy) local.acknowledgedBy = {};
+          if (cl.acknowledgedBy) {
+            let ackChanged = false;
+            for (const role of ['TAO', 'YAN']) {
+              if (cl.acknowledgedBy[role] && !local.acknowledgedBy[role]) {
+                local.acknowledgedBy[role] = true;
+                ackChanged = true;
+              }
+            }
+            if (ackChanged) changed = true;
+          }
+          // 合并内容更新（对方编辑了标签或内容）
+          if (cl.tag && cl.tag !== local.tag) { local.tag = cl.tag; changed = true; }
+          if (cl.content && cl.content !== local.content) { local.content = cl.content; changed = true; }
+        }
+      });
+
+      // 2. 检测本地有但云端没有的（本地新增，对方还没拉到）
+      const remoteIds = new Set(remote.map(r => r.id));
+      let hasLocalOnly = false;
+      MindList.items.forEach(item => {
+        if (!remoteIds.has(item.id)) hasLocalOnly = true;
+      });
+
+      // 添加新条目
+      if (newItems.length > 0) {
+        MindList.items = MindList.items.concat(newItems);
+      }
+
+      if (changed || newItems.length > 0) {
+        await MindList.saveAll();
+        MindList.render();
+      }
+
+      // 如果本地有云端没有的，或检测到内容变更，推送合并后的完整数据
+      if (hasLocalOnly || changed) {
+        await this.set('mindlist', MindList.items.map(i => MindList._serialize(i)));
+      }
+
+      // 新增条目时 toast 提示
+      if (newItems.length > 0) {
+        const newCreator = newItems[0].creator;
+        if (newCreator !== MindList._myRole()) {
+          showToast(`对方记了一条新的${newItems[0].tag} 📝`, 2500);
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 };
 
@@ -2096,6 +2173,7 @@ const App = {
               CloudSync.syncThemeColor();
               CloudSync.syncSweetSubmitted();
               CloudSync.syncPrivateWhispers();
+              CloudSync.syncMindList();
               ReadMark.syncAll();
               RoleName.syncFromCloud();
             }
@@ -2211,6 +2289,7 @@ const App = {
         CloudSync.syncThemeColor();
         CloudSync.syncSweetSubmitted();
         CloudSync.syncPrivateWhispers();
+        CloudSync.syncMindList();
         ReadMark.syncAll();
         RoleName.syncFromCloud();
       }
@@ -2225,6 +2304,7 @@ const App = {
       if (typeof CloudSync !== 'undefined') {
         CloudSync.syncSweetSubmitted();
         CloudSync.syncPrivateWhispers();
+        CloudSync.syncMindList();
       }
       showToast('已配对成功，开始你们的日记吧 💕');
     });
@@ -2244,11 +2324,11 @@ const App = {
     Pair.showSwitchView();
   },
 
-  // 解除配对（不清除打卡数据，仅断开配对连接）
+  // 解除配对（不清除记录数据，仅断开配对连接）
   async unpair() {
     await Cloud.unpair();
     Store.remove('role');
-    // 不删除 days 数据，保留历史打卡记录
+    // 不删除 days 数据，保留历史记录
     this.currentRole = null;
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('pairScreen').style.display = 'none';
@@ -2256,7 +2336,7 @@ const App = {
     const entry = document.getElementById('entryScreen');
     entry.style.display = 'flex';
     entry.classList.remove('hidden');
-    showToast('已解除配对，打卡记录已保留');
+    showToast('已解除配对，记录已保留');
   },
 
   // 退出登录：清除当前会话，回到角色选择页（保留配对历史）
@@ -2290,7 +2370,7 @@ const App = {
       this.exitHistory();
       showToast('已返回今天');
     } else {
-      TabNav.switch(2); // 跳转到打卡页（含日历）
+      TabNav.switch(2); // 跳转到记录页（含日历）
     }
   },
 
@@ -2334,6 +2414,7 @@ const App = {
       Joke.init();
       HotNews.init();
       LetterBox.init();
+      MindList.init();
       ExerciseTime.init();
       HistoryCard.init();
       GeoCard.init();
@@ -2395,6 +2476,7 @@ const App = {
             CloudSync.syncThemeColor();
             CloudSync.syncSweetSubmitted();
             CloudSync.syncPrivateWhispers();
+            CloudSync.syncMindList();
             ReadMark.syncAll();
             RoleName.syncFromCloud();
           }
@@ -2406,6 +2488,7 @@ const App = {
         if (typeof CloudSync !== 'undefined') {
           CloudSync.syncSweetSubmitted();
           CloudSync.syncPrivateWhispers();
+          CloudSync.syncMindList();
         }
       });
     }
@@ -2552,6 +2635,7 @@ const App = {
         CloudSync.syncThemeColor();
         CloudSync.syncSweetSubmitted();
         CloudSync.syncPrivateWhispers();
+        CloudSync.syncMindList();
         ReadMark.syncAll();
         RoleName.syncFromCloud();
       }
@@ -2560,6 +2644,8 @@ const App = {
       if (typeof PrivateWhisper !== 'undefined') PrivateWhisper.render();
       // 刷新甜蜜语录 UI
       if (typeof SweetText !== 'undefined') SweetText.refresh();
+      // 刷新心细清单 UI
+      if (typeof MindList !== 'undefined') MindList.render();
 
       // 刷新所有 UI
       Cards.renderAll();
@@ -2841,7 +2927,7 @@ const Calendar = {
       dayDate.setHours(0, 0, 0, 0);
       const isPast = dayDate < today;
       const dayData = allDays[ds];
-      // 绿点仅在双方共同打卡（爱心打卡）后显示
+      // 绿点仅在双方共同完成（爱心记录）后显示
       const bothChecked = dayData && dayData.greet && dayData.greet.tao && dayData.greet.yan ? 'both-checked' : '';
       const hasData = dayData ? 'has-data' : '';
       const pastClass = isPast ? 'past' : '';
@@ -2902,41 +2988,41 @@ const Calendar = {
     if (!dayData) {
       cardHtml += '<div class="day-card-empty">该日期暂无记录</div>';
     } else {
-      // 爱心打卡
+      // 爱心记录
       const greet = dayData.greet || {};
       const greetItems = [];
-      if (greet.tao) greetItems.push('<span class="dc-badge done">TAO 已打卡</span>');
-      else greetItems.push('<span class="dc-badge todo">TAO 未打卡</span>');
-      if (greet.yan) greetItems.push('<span class="dc-badge done">YAN 已打卡</span>');
-      else greetItems.push('<span class="dc-badge todo">YAN 未打卡</span>');
+      if (greet.tao) greetItems.push('<span class="dc-badge done">TAO 已完成</span>');
+      else greetItems.push('<span class="dc-badge todo">TAO 待完成</span>');
+      if (greet.yan) greetItems.push('<span class="dc-badge done">YAN 已完成</span>');
+      else greetItems.push('<span class="dc-badge todo">YAN 待完成</span>');
       if (greet.count) greetItems.push(`<span class="dc-badge info">累计 ${greet.count} 次</span>`);
-      cardHtml += `<div class="dc-row"><span class="dc-label">❤️ 爱心打卡</span><div class="dc-badges">${greetItems.join('')}</div></div>`;
+      cardHtml += `<div class="dc-row"><span class="dc-label">❤️ 爱心记录</span><div class="dc-badges">${greetItems.join('')}</div></div>`;
 
-      // 打卡语录
+      // 今日碎念
       const words = dayData.words || {};
-      cardHtml += '<div class="dc-section-title">💬 打卡语录</div>';
+      cardHtml += '<div class="dc-section-title">💬 今日碎念</div>';
       if (words.tao) cardHtml += `<div class="dc-entry"><span class="dc-tag tao">TAO</span><span class="dc-text">${this._escape(words.tao)}</span></div>`;
       if (words.yan) cardHtml += `<div class="dc-entry"><span class="dc-tag yan">YAN</span><span class="dc-text">${this._escape(words.yan)}</span></div>`;
       if (!words.tao && !words.yan) cardHtml += '<div class="dc-entry dc-muted">暂无记录</div>';
 
-      // 打卡愿望
+      // 心底期许
       const wish = dayData.wish || {};
-      cardHtml += '<div class="dc-section-title">🌟 打卡愿望</div>';
+      cardHtml += '<div class="dc-section-title">🌟 心底期许</div>';
       if (wish.tao) cardHtml += `<div class="dc-entry"><span class="dc-tag tao">TAO</span><span class="dc-text">${this._escape(wish.tao)}</span></div>`;
       if (wish.yan) cardHtml += `<div class="dc-entry"><span class="dc-tag yan">YAN</span><span class="dc-text">${this._escape(wish.yan)}</span></div>`;
       if (!wish.tao && !wish.yan) cardHtml += '<div class="dc-entry dc-muted">暂无记录</div>';
 
-      // 晚安打卡
+      // 晚安道别
       const night = dayData.night || {};
       const nightItems = [];
       if (night.tao) nightItems.push('<span class="dc-badge done">TAO 已晚安</span>');
       else nightItems.push('<span class="dc-badge todo">TAO 未晚安</span>');
       if (night.yan) nightItems.push('<span class="dc-badge done">YAN 已晚安</span>');
       else nightItems.push('<span class="dc-badge todo">YAN 未晚安</span>');
-      cardHtml += `<div class="dc-row"><span class="dc-label">🌙 晚安打卡</span><div class="dc-badges">${nightItems.join('')}</div></div>`;
+      cardHtml += `<div class="dc-row"><span class="dc-label">🌙 晚安道别</span><div class="dc-badges">${nightItems.join('')}</div></div>`;
     }
 
-    // 在线时长（无论是否有打卡记录都显示）
+    // 在线时长（无论是否有记录都显示）
     try {
       const onlineData = Store.get('online_duration', {});
       const dayOnline = onlineData[dateStr] || { tao: 0, yan: 0 };
@@ -3004,43 +3090,43 @@ const DateSearch = {
 
     if (!dayData) {
       resultEl.style.display = 'block';
-      resultEl.innerHTML = `<div class="search-result-header">${dateDisplay}</div><div class="search-result-empty">该日期暂无打卡记录</div>`;
+      resultEl.innerHTML = `<div class="search-result-header">${dateDisplay}</div><div class="search-result-empty">该日期暂无记录</div>`;
       return;
     }
 
     let html = `<div class="search-result-header">${dateDisplay}</div>`;
     html += '<div class="search-result-body">';
 
-    // 爱心打卡
+    // 爱心记录
     const greet = dayData.greet || {};
     const greetItems = [];
-    if (greet.tao) greetItems.push('<span class="search-badge done">TAO 已打卡</span>');
-    else greetItems.push('<span class="search-badge todo">TAO 未打卡</span>');
-    if (greet.yan) greetItems.push('<span class="search-badge done">YAN 已打卡</span>');
-    else greetItems.push('<span class="search-badge todo">YAN 未打卡</span>');
+    if (greet.tao) greetItems.push('<span class="search-badge done">TAO 已完成</span>');
+    else greetItems.push('<span class="search-badge todo">TAO 待完成</span>');
+    if (greet.yan) greetItems.push('<span class="search-badge done">YAN 已完成</span>');
+    else greetItems.push('<span class="search-badge todo">YAN 待完成</span>');
     if (greet.count) greetItems.push(`<span class="search-badge info">累计 ${greet.count} 次</span>`);
-    html += `<div class="search-result-row"><span class="search-label">❤️ 爱心打卡</span>${greetItems.join('')}</div>`;
+    html += `<div class="search-result-row"><span class="search-label">❤️ 爱心记录</span>${greetItems.join('')}</div>`;
 
-    // 打卡语录
+    // 今日碎念
     const words = dayData.words || {};
     if (words.tao) html += `<div class="search-result-row"><span class="search-tag tao">TAO</span><span class="search-text">${this._escape(words.tao)}</span></div>`;
     if (words.yan) html += `<div class="search-result-row"><span class="search-tag yan">YAN</span><span class="search-text">${this._escape(words.yan)}</span></div>`;
-    if (!words.tao && !words.yan) html += `<div class="search-result-row"><span class="search-label">💬 打卡语录</span><span class="search-badge todo">暂无</span></div>`;
+    if (!words.tao && !words.yan) html += `<div class="search-result-row"><span class="search-label">💬 今日碎念</span><span class="search-badge todo">暂无</span></div>`;
 
-    // 打卡愿望
+    // 心底期许
     const wish = dayData.wish || {};
     if (wish.tao) html += `<div class="search-result-row"><span class="search-tag tao">TAO</span><span class="search-text">${this._escape(wish.tao)}</span></div>`;
     if (wish.yan) html += `<div class="search-result-row"><span class="search-tag yan">YAN</span><span class="search-text">${this._escape(wish.yan)}</span></div>`;
-    if (!wish.tao && !wish.yan) html += `<div class="search-result-row"><span class="search-label">🌟 打卡愿望</span><span class="search-badge todo">暂无</span></div>`;
+    if (!wish.tao && !wish.yan) html += `<div class="search-result-row"><span class="search-label">🌟 心底期许</span><span class="search-badge todo">暂无</span></div>`;
 
-    // 晚安打卡
+    // 晚安道别
     const night = dayData.night || {};
     const nightItems = [];
     if (night.tao) nightItems.push('<span class="search-badge done">TAO 已晚安</span>');
     else nightItems.push('<span class="search-badge todo">TAO 未晚安</span>');
     if (night.yan) nightItems.push('<span class="search-badge done">YAN 已晚安</span>');
     else nightItems.push('<span class="search-badge todo">YAN 未晚安</span>');
-    html += `<div class="search-result-row"><span class="search-label">🌙 晚安打卡</span>${nightItems.join('')}</div>`;
+    html += `<div class="search-result-row"><span class="search-label">🌙 晚安道别</span>${nightItems.join('')}</div>`;
 
     html += '</div>';
     // 使用日历叠加卡片方式展示
@@ -3101,6 +3187,7 @@ const Cards = {
     this.updateLocks();
     this.updateCompleteBanner();
     this.updateRolePermissions();
+    this.checkReplyReminder();
   },
 
   updateCompleteBanner() {
@@ -3161,15 +3248,15 @@ const Cards = {
     } else if (taoDone && !yanDone) {
       leftEl.classList.add('done');
       rightEl.classList.add('hint');
-      statusEl.textContent = 'TAO 已打卡，等待 YAN ✨';
+      statusEl.textContent = 'TAO 已完成，等待 YAN ✨';
       statusEl.style.color = '#0e5fb0';
     } else if (yanDone && !taoDone) {
       leftEl.classList.add('hint');
       rightEl.classList.add('done');
-      statusEl.textContent = 'YAN 已打卡，等待 TAO ✨';
+      statusEl.textContent = 'YAN 已完成，等待 TAO ✨';
       statusEl.style.color = '#b8224f';
     } else {
-      statusEl.textContent = '双击打卡 · 双人同时完成解锁爱心';
+      statusEl.textContent = '双击记录 · 双人同时完成解锁爱心';
       statusEl.style.color = '#999';
     }
   },
@@ -3251,12 +3338,12 @@ const Cards = {
     const myDone = myRole ? data.night[myRole] : false;
     const bothDone = data.night.tao && data.night.yan;
 
-    // 如果有任一方已打卡，显示并列晚安文字
+    // 如果有任一方已完成，显示并列晚安文字
     if (data.night.tao || data.night.yan) {
       display.style.display = 'none';
       if (pairDisplay) {
         pairDisplay.style.display = 'flex';
-        // 更新打卡状态样式
+        // 更新记录状态样式
         const taoItem = pairDisplay.querySelector('.tao-gn');
         const yanItem = pairDisplay.querySelector('.yan-gn');
         if (taoItem) {
@@ -3281,7 +3368,7 @@ const Cards = {
       display.classList.remove('done');
     }
 
-    // 双方都打卡后，浮现文字 + 卡片切换暗灰模式
+    // 双方都完成后，浮现文字 + 卡片切换暗灰模式
     const nightCard = document.getElementById('card-night');
     if (reveal) {
       if (bothDone) {
@@ -3317,20 +3404,20 @@ const Cards = {
     const clickX = event ? (event.clientX || (event.touches && event.touches[0] ? event.touches[0].clientX : 0)) : 0;
     const clickY = event ? (event.clientY || (event.touches && event.touches[0] ? event.touches[0].clientY : 0)) : 0;
 
-    // 发射爱心：已打卡后不可取消，双方都完成后直接返回
+    // 发射爱心：已完成后不可取消，双方都完成后直接返回
     if (cardType === 'greet') {
       if (data.greet[role]) {
-        // 已打卡，触发小心心冒出效果但不取消
+        // 已完成，触发小心心冒出效果但不取消
         this.spawnHearts(clickX, clickY);
-        showToast('你已经打卡过了');
+        showToast('你已经完成了');
         return;
       }
       if (data.greet.tao && data.greet.yan) return;
     }
-    // 晚安随时可打卡，只需检查是否双方都已完成
+    // 晚安随时可记录，只需检查是否双方都已完成
     if (cardType === 'night' && data.night.tao && data.night.yan) return;
 
-    // 单击即可打卡（去掉双击要求）
+    // 单击即可记录（去掉双击要求）
     this.doCheckin(cardType, role);
     this.spawnHearts(clickX, clickY);
   },
@@ -3338,11 +3425,11 @@ const Cards = {
   async doCheckin(cardType, role) {
     const dateStr = App.getCurrentDate();
 
-    // 1. 立即在本地打卡
+    // 1. 立即在本地记录
     Store.updateDay(dateStr, (day) => {
       if (cardType === 'greet') {
         if (day.greet[role]) {
-          showToast('你已经打卡过了');
+          showToast('你已经完成了');
           return;
         }
         day.greet[role] = true;
@@ -3355,13 +3442,13 @@ const Cards = {
       }
     });
 
-    // 2. 立即渲染（即时反馈，显示自己的打卡）
+    // 2. 立即渲染（即时反馈，显示自己的记录）
     this.renderAll();
     Calendar.render();
     App.updateNav();
     HistoryView.render();
 
-    // 3. 拉取云端数据并合并（获取对方的打卡），然后推送
+    // 3. 拉取云端数据并合并（获取对方的记录），然后推送
     if (Cloud.pairCode) {
       try {
         console.log('[CHECKIN] doCheckin: pulling cloud for', dateStr, 'role:', role);
@@ -3383,7 +3470,7 @@ const Cards = {
       } catch (e) { console.error('[CHECKIN] doCheckin sync error:', e); }
     }
 
-    // 4. 检查"双方都打卡"的效果（使用合并后的数据）
+    // 4. 检查"双方都完成"的效果（使用合并后的数据）
     if (cardType === 'greet') {
       const updatedData = Store.getDay(dateStr);
       console.log('[CHECKIN] doCheckin final check: greet =', JSON.stringify(updatedData?.greet));
@@ -3397,12 +3484,12 @@ const Cards = {
         Store.updateDay(dateStr, (day) => { day.greet.count = count; });
         Cloud.pushDay(dateStr);
         this.renderGreet();
-        showToast('💕 打卡完成！两人合成了完整爱心');
+        showToast('💕 记录完成！两人合成了完整爱心');
       } else if (updatedData && updatedData.greet && updatedData.greet.tao && updatedData.greet.yan && updatedData.greet.count) {
         // Already counted, just render
         this.renderGreet();
       } else {
-        showToast(`${App.currentRole} 已打卡，等待另一半 ✨`);
+        showToast(`${App.currentRole} 已完成，等待另一半 ✨`);
       }
     } else if (cardType === 'night') {
       const updatedData = Store.getDay(dateStr);
@@ -3598,6 +3685,86 @@ const Cards = {
         }
       });
     });
+  },
+
+  // 一键填入模板文案
+  fillTemplate(cardType, text) {
+    if (App.isHistory) return;
+    const myRole = App.currentRole ? App.currentRole.toLowerCase() : null;
+    if (!myRole) return;
+    const data = this.getDayData();
+    if (data[cardType] && data[cardType][myRole]) {
+      showToast('已有内容，请先清空再使用模板');
+      return;
+    }
+    const boxId = 'edit-' + myRole + '-' + cardType;
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    // 触发双击进入编辑模式
+    box.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    // 延迟填入文字（等编辑模式激活后）
+    setTimeout(() => {
+      box.textContent = text;
+      box.classList.remove('edit-placeholder');
+      box.classList.add('has-content', 'editing');
+      box.classList.add(myRole === 'tao' ? 'tao-active' : 'yan-active');
+      // 聚焦并选中全部文字，方便用户修改
+      box.focus();
+      const range = document.createRange();
+      range.selectNodeContents(box);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      showToast('已填入，可修改后点 🐱/🐶 锁定', 3000);
+    }, 50);
+  },
+
+  // 检查对方是否有新留言，显示回复提醒
+  checkReplyReminder() {
+    if (App.isHistory) {
+      this.hideReplyReminder();
+      return;
+    }
+    const data = this.getDayData();
+    const myRole = App.currentRole ? App.currentRole.toLowerCase() : null;
+    if (!myRole) { this.hideReplyReminder(); return; }
+    const otherRole = myRole === 'tao' ? 'yan' : 'tao';
+
+    // 检查对方是否在今日碎念或心底期许有内容，而自己还没有
+    let hasOtherReply = false;
+    let reminderText = '';
+    if (data.words[otherRole] && !data.words[myRole]) {
+      hasOtherReply = true;
+      reminderText = `${otherRole.toUpperCase()} 在今日碎念给你留了言，去看看？`;
+    } else if (data.wish[otherRole] && !data.wish[myRole]) {
+      hasOtherReply = true;
+      reminderText = `${otherRole.toUpperCase()} 在心底期许给你留了言，去看看？`;
+    }
+
+    // 检查是否已关闭过提醒（本次会话内）
+    if (hasOtherReply && !this._replyDismissed) {
+      this.showReplyReminder(reminderText);
+    } else {
+      this.hideReplyReminder();
+    }
+  },
+
+  showReplyReminder(text) {
+    const bar = document.getElementById('replyReminderBar');
+    const textEl = document.getElementById('replyReminderText');
+    if (!bar || !textEl) return;
+    textEl.textContent = text;
+    bar.style.display = 'flex';
+  },
+
+  hideReplyReminder() {
+    const bar = document.getElementById('replyReminderBar');
+    if (bar) bar.style.display = 'none';
+  },
+
+  dismissReplyReminder() {
+    this._replyDismissed = true;
+    this.hideReplyReminder();
   }
 };
 
@@ -3607,13 +3774,13 @@ const Share = {
     if (App.isHistory) {
       const data = Store.getDay(App.viewDate);
       if (!data || !Cards.isAllDone(data)) {
-        showToast('请先完成今日全部打卡');
+        showToast('请先完成今日全部记录');
         return;
       }
     } else {
       const data = Cards.getDayData();
       if (!Cards.isAllDone(data)) {
-        showToast('请先完成今日全部打卡');
+        showToast('请先完成今日全部记录');
         return;
       }
     }
@@ -3701,28 +3868,28 @@ const Share = {
       let dayText = `📅 ${dateCN}\n`;
       let dayHasData = false;
 
-      // 打卡状态
+      // 记录状态
       if (data.greet && (data.greet.tao || data.greet.yan)) {
-        dayText += `  ❤️ 爱心打卡：${data.greet.tao ? '✓' : '○'}TAO ${data.greet.yan ? '✓' : '○'}YAN\n`;
+        dayText += `  ❤️ 爱心记录：${data.greet.tao ? '✓' : '○'}TAO ${data.greet.yan ? '✓' : '○'}YAN\n`;
         dayHasData = true;
       }
-      // 打卡语录
+      // 今日碎念
       if (data.words && (data.words.tao || data.words.yan)) {
-        dayText += `  💬 打卡语录：\n`;
+        dayText += `  💬 今日碎念：\n`;
         if (data.words.tao) dayText += `    TAO: ${data.words.tao}\n`;
         if (data.words.yan) dayText += `    YAN: ${data.words.yan}\n`;
         dayHasData = true;
       }
-      // 打卡愿望
+      // 心底期许
       if (data.wish && (data.wish.tao || data.wish.yan)) {
-        dayText += `  🌟 打卡愿望：\n`;
+        dayText += `  🌟 心底期许：\n`;
         if (data.wish.tao) dayText += `    TAO: ${data.wish.tao}\n`;
         if (data.wish.yan) dayText += `    YAN: ${data.wish.yan}\n`;
         dayHasData = true;
       }
       // 晚安
       if (data.night && (data.night.tao || data.night.yan)) {
-        dayText += `  ✨ 晚安打卡：${data.night.tao ? '✓' : '○'}TAO ${data.night.yan ? '✓' : '○'}YAN\n`;
+        dayText += `  ✨ 晚安道别：${data.night.tao ? '✓' : '○'}TAO ${data.night.yan ? '✓' : '○'}YAN\n`;
         dayHasData = true;
       }
       // 运动时间
@@ -3772,7 +3939,7 @@ const Share = {
     });
 
     if (!hasAnyData) {
-      exportText += '（所选时间段内暂无打卡记录）\n';
+      exportText += '（所选时间段内暂无记录）\n';
     }
 
     exportText += `${'='.repeat(40)}\n`;
@@ -3918,7 +4085,7 @@ const Download = {
       return;
     }
     if (!Cards.isAllDone(data)) {
-      showToast('请先完成今日全部打卡再生成卡片');
+      showToast('请先完成今日全部记录再生成卡片');
       return;
     }
 
@@ -3984,16 +4151,16 @@ const Download = {
 
     ctx.fillStyle = '#333';
     ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('👋 打卡问好', 60, y);
+    ctx.fillText('👋 今日问好', 60, y);
     y += 40;
     ctx.font = '20px sans-serif';
     ctx.fillStyle = '#22c55e';
-    ctx.fillText('❤️ 两人已完成打卡', 60, y);
+    ctx.fillText('❤️ 两人已完成记录', 60, y);
     y += 50;
 
     ctx.fillStyle = '#333';
     ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('💬 打卡语录', 60, y);
+    ctx.fillText('💬 今日碎念', 60, y);
     y += 36;
     ctx.font = 'bold 18px sans-serif';
     ctx.fillStyle = '#0e5fb0';
@@ -4010,7 +4177,7 @@ const Download = {
 
     ctx.fillStyle = '#333';
     ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('🌟 打卡愿望', 60, y);
+    ctx.fillText('🌟 心底期许', 60, y);
     y += 36;
     ctx.font = 'bold 18px sans-serif';
     ctx.fillStyle = '#0e5fb0';
@@ -4027,7 +4194,7 @@ const Download = {
 
     ctx.fillStyle = '#333';
     ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('🌙 打卡晚安', 60, y);
+    ctx.fillText('🌙 晚安道别', 60, y);
     y += 40;
     ctx.font = '20px sans-serif';
     ctx.fillStyle = '#22c55e';
@@ -4380,6 +4547,8 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v122', date: '2026-08-25', changes: '新增心细清单模块(投递信件下方)/标签+内容结构/7种预设标签+自定义/仅创建者可编辑删除/爱心互动(看到啦心里记下了)/标签筛选/最新排序/云同步双向合并' },
+    { v: 'v121', date: '2026-08-25', changes: '板块更名:打卡语录→今日碎念/打卡愿望→心底期许/全域移除打卡文字/内置3句模板一键填入/双向对话提示小字/页面顶部回复提醒机制' },
     { v: 'v120', date: '2026-08-25', changes: '清空甜蜜语录30条内置语录/仅保留投递内容/无投递时显示引导提示/表现形式不变' },
     { v: 'v119', date: '2026-08-25', changes: '私密絮语卡片高度翻倍至160px/滚动动画时长同步调整为40s/补全版本日志v114-v118' },
     { v: 'v118', date: '2026-08-24', changes: '修复清缓存后角色交叉导致数据分离/syncQuizVocab清缓存优先拉取对方数据/syncAll数据量安全检查防止空数据覆盖/joinPair标记isFreshLogin/enterAfterPair确保先拉后推' },
@@ -4389,7 +4558,7 @@ const Setting = {
     { v: 'v114', date: '2026-08-24', changes: '私密絮语文本自动换行修复/题库扩展至150题/跨天0点自动更新题库/题库版本固定防止双方不一致' },
     { v: 'v110', date: '2026-08-19', changes: '新增私密絮语板块(自动滚动+手动滑动+按投递顺序排列)/双击标题投稿+投递者标识/云同步双方絮语/设置面板可切换显示' },
     { v: 'v109', date: '2026-08-17', changes: '照片云端无限扩容: 按批次自动分命名空间(每批40张,满了自动开新仓)/所有批次照片合并显示/问答按季度分命名空间/首屏多批次拉取' },
-    { v: 'v108', date: '2026-08-17', changes: '核心修复: 云端命名空间拆分(照片/语音/问答/背景图各自独立100条配额)/问答同步修复(独立命名空间+重试机制+错误日志)/旧命名空间一次性清理/甜蜜语录双击投稿+投递者标识+云同步/打卡导出加入随机问答和亲密问答内容' },
+    { v: 'v108', date: '2026-08-17', changes: '核心修复: 云端命名空间拆分(照片/语音/问答/背景图各自独立100条配额)/问答同步修复(独立命名空间+重试机制+错误日志)/旧命名空间一次性清理/甜蜜语录双击投稿+投递者标识+云同步/记录导出加入随机问答和亲密问答内容' },
     { v: 'v105', date: '2026-08-17', changes: '新增亲密问答板块(情侣关系题库50题)/两个问答板块支持双击标题投递自定义题目/投递题目隔天随机出现/题库云同步' },
     { v: 'v104', date: '2026-08-17', changes: '随机问答留白优化/双方完成后新增备注功能(50字双击编辑+云同步)' },
     { v: 'v103', date: '2026-08-17', changes: '取消头像修改功能改为角色信息卡片(名字+出生日期+年龄)/信息卡片字体优化/角色出生日期云同步' },
@@ -4398,7 +4567,7 @@ const Setting = {
     { v: 'v100', date: '2026-08-17', changes: '问答同步修复: 题库版本校验强制刷新旧缓存/题目强制同步(先推送为准)/答案同步后重新加载题目' },
     { v: 'v99', date: '2026-08-16', changes: '照片自适应压缩+失败检测/问答情侣题库+完成提示同步/地标标注重构+绿色双方标/版本日志' },
     { v: 'v98', date: '2026-08-16', changes: '配对码U2A6KA默认化/版本号统一/照片上传可靠性增强' },
-    { v: 'v95', date: '2026-08-15', changes: 'SW缓存策略修复/地标打卡初始版/随机问答初始版' },
+    { v: 'v95', date: '2026-08-15', changes: 'SW缓存策略修复/地标记地初始版/随机问答初始版' },
   ],
 
   renderVersionLog() {
@@ -4852,10 +5021,10 @@ const Setting = {
     const msg = '确定要解除配对吗？\n\n' +
       '【解除后影响】\n' +
       '⚠️ 双方将无法再同步数据（文字、语音、照片、信件等）\n' +
-      '⚠️ 在线状态、打卡进度等实时信息将不再共享\n' +
+      '⚠️ 在线状态、记录进度等实时信息将不再共享\n' +
       '⚠️ 对方仍可看到已同步的历史数据，但新数据不再互通\n\n' +
       '【保留内容】\n' +
-      '✅ 你的打卡记录、信件、照片等已同步数据均会保留\n' +
+      '✅ 你的记录、信件、照片等已同步数据均会保留\n' +
       '✅ 解除后可重新创建新配对码或加入其他配对码';
     if (!confirm(msg)) {
       return;
@@ -4952,7 +5121,7 @@ const TabNav = {
       GeoCard.init();
       Pomodoro.init();
       LandmarkCheckin.init();
-      // 切换到娱乐页时主动同步地标打卡数据
+      // 切换到娱乐页时主动同步地标记地数据
       if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
         CloudSync.syncLandmarks();
       }
@@ -4960,7 +5129,7 @@ const TabNav = {
     }
     // 切换到记录页时刷新爱心状态
     if (tabIndex === 1) { Cards.renderGreet(); Photos.render(); LetterBox.updateBadges(); }
-    // 切换到打卡页时刷新日历、问答、语音、历史提示
+    // 切换到记录页时刷新日历、问答、语音、历史提示
     if (tabIndex === 2) { Calendar.render(); RandomQA.render(); IntimateQA.render(); VoiceRecord.render(); HistoryHint.render(); Cards.renderNight(); }
     // 切换到首页时更新角色显示和在线状态
     if (tabIndex === 0) {
@@ -5014,11 +5183,11 @@ const DetailMenu = {
     ],
     2: [
       { icon: '📅', name: '日历', selector: '.calendar-card' },
-      { icon: '💬', name: '打卡语录', selector: '#card-words' },
-      { icon: '🌟', name: '打卡愿望', selector: '#card-wish' },
+      { icon: '💬', name: '今日碎念', selector: '#card-words' },
+      { icon: '🌟', name: '心底期许', selector: '#card-wish' },
       { icon: '🎲', name: '随机问答', selector: '.quiz-card' },
       { icon: '🎤', name: '语音留言', selector: '.record-card' },
-      { icon: '✨', name: '打卡晚安', selector: '#card-night' }
+      { icon: '✨', name: '晚安道别', selector: '#card-night' }
     ],
     3: [
       { icon: '📊', name: '本周数透', selector: '.data-pivot-card' },
@@ -5032,7 +5201,7 @@ const DetailMenu = {
       { icon: '🗺️', name: '中国地理', selector: '.geo-card' },
       { icon: '💡', name: '生活技巧', selector: '.life-tip-card' },
       { icon: '😄', name: '笑话大全', selector: '.joke-card' },
-      { icon: '📍', name: '地标打卡', selector: '.landmark-card' }
+      { icon: '📍', name: '地标记地', selector: '.landmark-card' }
     ]
   },
 
@@ -7735,26 +7904,26 @@ const HistoryView = {
       html += `<div class="day-content">`;
 
       const greet = dayData.greet || {};
-      html += `<div class="status-line">爱心打卡：`;
-      html += `TAO <span class="badge ${greet.tao ? 'done' : 'todo'}">${greet.tao ? '已打卡' : '未打卡'}</span>`;
-      html += ` YAN <span class="badge ${greet.yan ? 'done' : 'todo'}">${greet.yan ? '已打卡' : '未打卡'}</span>`;
+      html += `<div class="status-line">爱心记录：`;
+      html += `TAO <span class="badge ${greet.tao ? 'done' : 'todo'}">${greet.tao ? '已完成' : '待完成'}</span>`;
+      html += ` YAN <span class="badge ${greet.yan ? 'done' : 'todo'}">${greet.yan ? '已完成' : '待完成'}</span>`;
       if (greet.count) html += ` 累计：${greet.count}次`;
       html += `</div>`;
 
       const words = dayData.words || {};
-      html += `<div class="section-title blue">💬 打卡语录</div>`;
+      html += `<div class="section-title blue">💬 今日碎念</div>`;
       if (words.tao) html += `<div class="entry"><span class="role-tag tao">TAO</span>${this.escapeHtml(words.tao)}</div>`;
       if (words.yan) html += `<div class="entry"><span class="role-tag yan">YAN</span>${this.escapeHtml(words.yan)}</div>`;
       if (!words.tao && !words.yan) html += `<div class="entry" style="color:#bbb">暂无记录</div>`;
 
       const wish = dayData.wish || {};
-      html += `<div class="section-title pink">🌟 打卡愿望</div>`;
+      html += `<div class="section-title pink">🌟 心底期许</div>`;
       if (wish.tao) html += `<div class="entry"><span class="role-tag tao">TAO</span>${this.escapeHtml(wish.tao)}</div>`;
       if (wish.yan) html += `<div class="entry"><span class="role-tag yan">YAN</span>${this.escapeHtml(wish.yan)}</div>`;
       if (!wish.tao && !wish.yan) html += `<div class="entry" style="color:#bbb">暂无记录</div>`;
 
       const night = dayData.night || {};
-      html += `<div class="status-line" style="margin-top:8px">晚安打卡：`;
+      html += `<div class="status-line" style="margin-top:8px">晚安道别：`;
       html += `TAO <span class="badge ${night.tao ? 'done' : 'todo'}">${night.tao ? '已晚安' : '未晚安'}</span>`;
       html += ` YAN <span class="badge ${night.yan ? 'done' : 'todo'}">${night.yan ? '已晚安' : '未晚安'}</span>`;
       html += `</div>`;
@@ -7863,7 +8032,7 @@ const RandomQA = {
     { q: '旅行交通你更偏好？', a: ['飞机快速直达', '高铁沿途看风景'] },
     { q: '旅行计划你更倾向？', a: ['详细攻略精确到小时', '随心所欲走到哪算哪'] },
     { q: '旅行纪念你更喜欢？', a: ['买当地特色纪念品', '拍照片视频记录回忆'] },
-    { q: '旅行节奏你更偏好？', a: ['一天打卡多个景点', '慢慢品味一个地方'] },
+    { q: '旅行节奏你更偏好？', a: ['一天游览多个景点', '慢慢品味一个地方'] },
     { q: '你更想去的海岛？', a: ['热带海岛椰林沙滩', '温带海岛礁石灯塔'] },
     { q: '你更喜欢的旅行同伴？', a: ['两个人自由行随心走', '跟团省心不用操心'] },
     { q: '旅行预算你更倾向？', a: ['该花就花享受为主', '精打细算多去几次'] },
@@ -11394,6 +11563,330 @@ const LetterBox = {
   }
 };
 
+// ====== 心细清单模块 ======
+const MindList = {
+  items: [],
+  DB_NAME: 'couple_mindlist_db',
+  DB_STORE: 'mindlist',
+  _db: null,
+  _filterTag: '',
+  PRESET_TAGS: ['爱吃的食物', '忌口', '喜欢的颜色', '发型偏好', '习惯', '小爱好', '别的碎细节'],
+
+  async init() {
+    try {
+      await this.loadAll();
+    } catch (e) {
+      console.warn('MindList: loadAll failed', e);
+      this.items = [];
+    }
+    this.render();
+    setTimeout(() => this.syncFromCloud(), 2000);
+  },
+
+  _openDB() {
+    return new Promise((resolve, reject) => {
+      if (this._db) { resolve(this._db); return; }
+      if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB not available')); return; }
+      const req = indexedDB.open(this.DB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(this.DB_STORE)) {
+          db.createObjectStore(this.DB_STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = (e) => { this._db = e.target.result; resolve(this._db); };
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async saveAll() {
+    try {
+      const db = await this._openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(this.DB_STORE, 'readwrite');
+        const store = tx.objectStore(this.DB_STORE);
+        store.clear();
+        this.items.forEach(item => store.put(item));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      });
+    } catch (e) { console.warn('MindList saveAll error', e); }
+  },
+
+  async loadAll() {
+    const db = await this._openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.DB_STORE, 'readonly');
+      const store = tx.objectStore(this.DB_STORE);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        this.items = req.result || [];
+        resolve(this.items);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  },
+
+  _genId() {
+    return 'mind_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+  },
+
+  // 序列化/反序列化（云端传输）
+  _serialize(item) {
+    return {
+      id: item.id,
+      tag: item.tag,
+      content: item.content,
+      creator: item.creator,
+      timestamp: item.timestamp,
+      acknowledgedBy: item.acknowledgedBy || {}
+    };
+  },
+
+  _deserialize(cl) {
+    return {
+      id: cl.id,
+      tag: cl.tag || '',
+      content: cl.content || '',
+      creator: cl.creator || 'TAO',
+      timestamp: cl.timestamp || 0,
+      acknowledgedBy: cl.acknowledgedBy || {}
+    };
+  },
+
+  // 获取当前角色
+  _myRole() {
+    return (typeof App !== 'undefined' && App.currentRole) ? App.currentRole.toUpperCase() : null;
+  },
+
+  // 打开编辑器（新增或编辑）
+  openEditor(itemId) {
+    const isEdit = !!itemId;
+    const item = isEdit ? this.items.find(i => i.id === itemId) : null;
+    if (isEdit && !item) return;
+    if (isEdit && item.creator !== this._myRole()) {
+      showToast('只能编辑自己写的记录');
+      return;
+    }
+
+    const existing = document.querySelector('.mindlist-editor-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'mindlist-editor-overlay';
+
+    const popup = document.createElement('div');
+    popup.className = 'mindlist-editor-popup';
+
+    popup.innerHTML = `
+      <div class="mindlist-editor-title">${isEdit ? '编辑记录' : '记一条'}</div>
+      <div class="mindlist-editor-label">选择标签</div>
+      <div class="mindlist-editor-tags" id="mindlistEditorTags">
+        ${this.PRESET_TAGS.map(t => `<span class="mindlist-editor-tag-chip${item && item.tag === t ? ' selected' : ''}" data-tag="${t}" onclick="MindList._selectTag(this)">${t}</span>`).join('')}
+      </div>
+      <div class="mindlist-editor-custom">
+        <input type="text" id="mindlistCustomTag" placeholder="或自定义标签…" value="${item && !this.PRESET_TAGS.includes(item.tag) ? item.tag : ''}" maxlength="10">
+      </div>
+      <div class="mindlist-editor-label">内容</div>
+      <textarea id="mindlistContent" class="mindlist-editor-textarea" placeholder="悄悄记下TA的偏爱与小细节。" maxlength="200">${item ? item.content : ''}</textarea>
+      <div class="mindlist-editor-actions">
+        ${isEdit ? `<button class="mindlist-editor-btn delete" onclick="MindList._delete('${itemId}')">删除</button>` : ''}
+        <button class="mindlist-editor-btn cancel" onclick="MindList._closeEditor()">取消</button>
+        <button class="mindlist-editor-btn save" onclick="MindList._save(${isEdit ? `'${itemId}'` : 'null'})">${isEdit ? '更新' : '保存'}</button>
+      </div>
+    `;
+
+    overlay.appendChild(popup);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this._closeEditor();
+    });
+    document.body.appendChild(overlay);
+
+    // 默认选中第一个标签（新增时）
+    if (!isEdit) {
+      const firstChip = popup.querySelector('.mindlist-editor-tag-chip');
+      if (firstChip) firstChip.classList.add('selected');
+    }
+
+    setTimeout(() => {
+      const ta = document.getElementById('mindlistContent');
+      if (ta) ta.focus();
+    }, 100);
+  },
+
+  _closeEditor() {
+    const overlay = document.querySelector('.mindlist-editor-overlay');
+    if (overlay) overlay.remove();
+  },
+
+  _selectTag(chip) {
+    document.querySelectorAll('.mindlist-editor-tag-chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+    // 清空自定义标签
+    const customInput = document.getElementById('mindlistCustomTag');
+    if (customInput) customInput.value = '';
+  },
+
+  _getSelectedTag() {
+    const selected = document.querySelector('.mindlist-editor-tag-chip.selected');
+    const customInput = document.getElementById('mindlistCustomTag');
+    const customVal = customInput ? customInput.value.trim() : '';
+    if (customVal) return customVal;
+    return selected ? selected.dataset.tag : '';
+  },
+
+  _save(itemId) {
+    const tag = this._getSelectedTag();
+    const content = (document.getElementById('mindlistContent') || {}).value?.trim() || '';
+    if (!tag) { showToast('请选择或输入标签'); return; }
+    if (!content) { showToast('请填写内容'); return; }
+
+    const myRole = this._myRole();
+    if (!myRole) { showToast('请先选择角色'); return; }
+
+    if (itemId) {
+      // 编辑
+      const item = this.items.find(i => i.id === itemId);
+      if (!item) return;
+      if (item.creator !== myRole) { showToast('只能编辑自己的记录'); return; }
+      item.tag = tag;
+      item.content = content;
+    } else {
+      // 新增
+      this.items.unshift({
+        id: this._genId(),
+        tag: tag,
+        content: content,
+        creator: myRole,
+        timestamp: Date.now(),
+        acknowledgedBy: {}
+      });
+    }
+
+    this.saveAll();
+    this.render();
+    this._closeEditor();
+    this._pushToCloud();
+    showToast(itemId ? '已更新' : '已记录');
+  },
+
+  _delete(itemId) {
+    const item = this.items.find(i => i.id === itemId);
+    if (!item) return;
+    if (item.creator !== this._myRole()) { showToast('只能删除自己的记录'); return; }
+    this.items = this.items.filter(i => i.id !== itemId);
+    this.saveAll();
+    this.render();
+    this._closeEditor();
+    this._pushToCloud();
+    showToast('已删除');
+  },
+
+  // 爱心互动
+  toggleHeart(itemId) {
+    const item = this.items.find(i => i.id === itemId);
+    if (!item) return;
+    const myRole = this._myRole();
+    if (!myRole) return;
+    if (!item.acknowledgedBy) item.acknowledgedBy = {};
+    item.acknowledgedBy[myRole] = !item.acknowledgedBy[myRole];
+    this.saveAll();
+    this.render();
+    this._pushToCloud();
+  },
+
+  // 标签筛选
+  filterTag(tag) {
+    this._filterTag = tag || '';
+    this.render();
+  },
+
+  // 获取所有使用过的标签（去重）
+  _getAllTags() {
+    const set = new Set();
+    this.items.forEach(i => { if (i.tag) set.add(i.tag); });
+    return Array.from(set);
+  },
+
+  // 渲染
+  render() {
+    const listEl = document.getElementById('mindlistList');
+    const filterBar = document.getElementById('mindlistFilterBar');
+    if (!listEl) return;
+
+    // 渲染标签筛选栏
+    if (filterBar) {
+      const allTags = this._getAllTags();
+      // 只显示有数据的标签
+      const tagsToShow = this.PRESET_TAGS.filter(t => allTags.includes(t))
+        .concat(allTags.filter(t => !this.PRESET_TAGS.includes(t)));
+      let filterHtml = `<span class="mindlist-filter-chip${this._filterTag === '' ? ' active' : ''}" data-tag="" onclick="MindList.filterTag('')">全部</span>`;
+      tagsToShow.forEach(t => {
+        filterHtml += `<span class="mindlist-filter-chip${this._filterTag === t ? ' active' : ''}" data-tag="${t}" onclick="MindList.filterTag('${t}')">${t}</span>`;
+      });
+      filterBar.innerHTML = filterHtml;
+    }
+
+    // 排序：最新在上
+    let items = [...this.items].sort((a, b) => b.timestamp - a.timestamp);
+
+    // 筛选
+    if (this._filterTag) {
+      items = items.filter(i => i.tag === this._filterTag);
+    }
+
+    if (items.length === 0) {
+      listEl.innerHTML = `<div class="mindlist-empty">${this.items.length === 0 ? '还没有记录，点下方按钮记一条吧' : '该分类下暂无记录'}</div>`;
+      return;
+    }
+
+    const myRole = this._myRole();
+    listEl.innerHTML = items.map(item => {
+      const isCreator = item.creator === myRole;
+      const acked = item.acknowledgedBy && item.acknowledgedBy[myRole];
+      const otherRole = item.creator === 'TAO' ? 'YAN' : 'TAO';
+      const otherAcked = item.acknowledgedBy && item.acknowledgedBy[otherRole];
+      const creatorEmoji = item.creator === 'TAO' ? '🐱' : '🐶';
+
+      return `
+        <div class="mindlist-item ${item.creator.toLowerCase()}-created">
+          <div class="mindlist-item-tag">${this._esc(item.tag)}</div>
+          <div class="mindlist-item-content">${this._esc(item.content)}</div>
+          <div class="mindlist-item-footer">
+            <span class="mindlist-item-creator">${creatorEmoji} ${item.creator}</span>
+            ${otherAcked ? `<span class="mindlist-item-acked-hint">${otherRole === 'TAO' ? '🐱' : '🐶'} 已记下</span>` : ''}
+            <div class="mindlist-item-actions">
+              ${isCreator ? `<button class="mindlist-item-edit" onclick="MindList.openEditor('${item.id}')">编辑</button>` : ''}
+              <button class="mindlist-heart-btn ${acked ? 'acked' : ''}" onclick="MindList.toggleHeart('${item.id}')">${acked ? '❤️' : '🤍'}</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  _esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  },
+
+  // 云同步
+  async _pushToCloud() {
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      await CloudSync.set('mindlist', this.items.map(i => this._serialize(i)));
+    }
+  },
+
+  async syncFromCloud() {
+    try {
+      await CloudSync.syncMindList();
+    } catch (e) {
+      console.warn('MindList sync failed', e);
+    }
+  }
+};
+
 // ====== 一键导出面板模块 ======
 const ExportPanel = {
 
@@ -11496,7 +11989,7 @@ const ExportPanel = {
     }
   },
 
-  // 第三部分：打卡导出（复用 Share.exportRange 逻辑）
+  // 第三部分：记录导出（复用 Share.exportRange 逻辑）
   exportCheckin(mode) {
     const startVal = document.getElementById('exportCheckinStart').value;
     const endVal = document.getElementById('exportCheckinEnd').value;
@@ -11530,23 +12023,23 @@ const ExportPanel = {
       let dayText = `📅 ${dateCN}\n`;
       let dayHasData = false;
       if (data.greet && (data.greet.tao || data.greet.yan)) {
-        dayText += `  ❤️ 爱心打卡：${data.greet.tao ? '✓' : '○'}TAO ${data.greet.yan ? '✓' : '○'}YAN\n`;
+        dayText += `  ❤️ 爱心记录：${data.greet.tao ? '✓' : '○'}TAO ${data.greet.yan ? '✓' : '○'}YAN\n`;
         dayHasData = true;
       }
       if (data.words && (data.words.tao || data.words.yan)) {
-        dayText += `  💬 打卡语录：\n`;
+        dayText += `  💬 今日碎念：\n`;
         if (data.words.tao) dayText += `    TAO: ${data.words.tao}\n`;
         if (data.words.yan) dayText += `    YAN: ${data.words.yan}\n`;
         dayHasData = true;
       }
       if (data.wish && (data.wish.tao || data.wish.yan)) {
-        dayText += `  🌟 打卡愿望：\n`;
+        dayText += `  🌟 心底期许：\n`;
         if (data.wish.tao) dayText += `    TAO: ${data.wish.tao}\n`;
         if (data.wish.yan) dayText += `    YAN: ${data.wish.yan}\n`;
         dayHasData = true;
       }
       if (data.night && (data.night.tao || data.night.yan)) {
-        dayText += `  ✨ 晚安打卡：${data.night.tao ? '✓' : '○'}TAO ${data.night.yan ? '✓' : '○'}YAN\n`;
+        dayText += `  ✨ 晚安道别：${data.night.tao ? '✓' : '○'}TAO ${data.night.yan ? '✓' : '○'}YAN\n`;
         dayHasData = true;
       }
       const exerciseData = Store.get('exercise_time', {});
@@ -11592,20 +12085,20 @@ const ExportPanel = {
       }
     });
     if (!hasAnyData) {
-      exportText += '（所选时间段内暂无打卡记录）\n';
+      exportText += '（所选时间段内暂无记录）\n';
     }
     exportText += `${'='.repeat(40)}\n`;
     exportText += `导出时间：${new Date().toLocaleString('zh-CN')}\n`;
 
     if (mode === 'share') {
       if (navigator.share) {
-        navigator.share({ title: 'TAO & YAN 打卡记录', text: exportText }).catch(() => {});
+        navigator.share({ title: 'TAO & YAN 记录', text: exportText }).catch(() => {});
       } else {
-        this._copyToClipboard(exportText, '打卡记录已复制');
+        this._copyToClipboard(exportText, '记录已复制');
       }
     } else {
-      this._downloadText(exportText, `相处日记_打卡_${startVal}_至_${endVal}.txt`);
-      showToast('打卡记录已导出 📄');
+      this._downloadText(exportText, `相处日记_记录_${startVal}_至_${endVal}.txt`);
+      showToast('记录已导出 📄');
     }
   },
 
@@ -11717,8 +12210,8 @@ const ExportPanel = {
     }
     text += '\n';
 
-    // 10. 地标打卡
-    text += `📍 地标打卡\n`;
+    // 10. 地标记地
+    text += `📍 地标记地\n`;
     const landmarkData = Store.get('landmark_checkins', {});
     const checked = Object.entries(landmarkData).filter(([k, v]) => v.tao || v.yan);
     if (checked.length > 0) {
@@ -11731,7 +12224,7 @@ const ExportPanel = {
         }
       });
     } else {
-      text += `  暂无打卡记录\n`;
+      text += `  暂无记录\n`;
     }
     text += '\n';
 
@@ -11777,7 +12270,7 @@ const ExportPanel = {
   }
 };
 
-// ====== 地标打卡模块（新版 - 简化同步） ======
+// ====== 地标记地模块（新版 - 简化同步） ======
 const LandmarkCheckin = {
   PROVINCES: [
     { name: '北京', cities: ['东城区','西城区','朝阳区','海淀区','丰台区','石景山区','通州区','顺义区','昌平区','大兴区','房山区','门头沟区','平谷区','密云区','怀柔区','延庆区'] },

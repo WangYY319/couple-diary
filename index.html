@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="img/favicon.svg">
   <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
   <title>TAO&YAN 相处日记</title>
-  <link rel="stylesheet" href="style.css?v=119">
+  <link rel="stylesheet" href="style.css?v=122">
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -261,7 +261,14 @@
       <div class="tab-bottom-hint">宝宝，到底啦～</div>
     </div>
     <div class="tab-page" id="tab-1" data-tab="1">
-      <!-- 打卡问好（爱心） -->
+      <!-- 回复提醒栏 -->
+      <div class="reply-reminder-bar" id="replyReminderBar" style="display:none;">
+        <span class="reply-reminder-icon">💌</span>
+        <span class="reply-reminder-text" id="replyReminderText"></span>
+        <span class="reply-reminder-close" onclick="Cards.dismissReplyReminder()">×</span>
+      </div>
+
+      <!-- 今日问好（爱心） -->
       <div class="card" id="card-greet" onclick="Cards.handleClick('greet', event)">
         <div class="card-mascot" id="mascot-greet"></div>
         <div class="card-title"><span class="icon">❤️</span> 发射爱心</div>
@@ -325,6 +332,19 @@
           <button class="letter-export-btn" onclick="LetterBox.exportAll()" title="导出分享">📤</button>
         </div>
       </div>
+
+      <!-- 心细清单 -->
+      <div class="card" id="card-mindlist">
+        <div class="card-title"><span class="icon">📝</span> 心细清单</div>
+        <div class="card-dialogue-hint">悄悄记下TA的偏爱与小细节 ✨</div>
+        <div class="mindlist-filter-bar" id="mindlistFilterBar">
+          <span class="mindlist-filter-chip active" data-tag="" onclick="MindList.filterTag('')">全部</span>
+        </div>
+        <div class="mindlist-list" id="mindlistList">
+          <div class="mindlist-empty" id="mindlistEmpty">还没有记录，点下方按钮记一条吧</div>
+        </div>
+        <button class="mindlist-add-btn" onclick="MindList.openEditor()">＋ 记一条</button>
+      </div>
       <div class="tab-bottom-hint">宝宝，到底啦～</div>
     </div>
 
@@ -338,7 +358,7 @@
 
       <!-- 全完成横幅 -->
       <div class="complete-banner" id="completeBanner" style="display:none">
-        <span class="emoji">🎉</span>今日打卡圆满完成！
+        <span class="emoji">🎉</span>今日记录圆满完成！
         <button class="share-btn-mini" onclick="Share.open()">分享 ↗</button>
       </div>
 
@@ -352,41 +372,53 @@
         <div class="calendar-grid" id="calendarGrid"></div>
       </div>
 
-      <!-- 打卡语录 -->
+      <!-- 今日碎念 -->
       <div class="card" id="card-words">
         <div class="card-mascot" id="mascot-words"></div>
-        <div class="card-title"><span class="icon">💬</span> 打卡语录</div>
+        <div class="card-title"><span class="icon">💬</span> 今日碎念</div>
+        <div class="card-dialogue-hint">写完留言，等候对方的回信 ✨</div>
+        <div class="template-chips" data-card="words">
+          <span class="template-chip" onclick="Cards.fillTemplate('words','刚刚看到一样东西，第一时间就想到你')">刚刚看到一样东西，第一时间就想到你</span>
+          <span class="template-chip" onclick="Cards.fillTemplate('words','今天遇到一件有意思的小事，想分享给你')">今天遇到一件有意思的小事，想分享给你</span>
+          <span class="template-chip" onclick="Cards.fillTemplate('words','刚刚一瞬间很想念你')">刚刚一瞬间很想念你</span>
+        </div>
         <div class="edit-area" data-owner="tao">
           <div class="edit-label TAO"><span class="dot tao-dot"></span> TAO</div>
           <div class="edit-box-wrapper">
-            <div class="edit-box" id="edit-tao-words" data-role="tao" data-card="words" data-placeholder="TAO今天想对YAN说的小秘密"></div>
+            <div class="edit-box" id="edit-tao-words" data-role="tao" data-card="words" data-placeholder="今天有什么小事，想讲给对方听？"></div>
             <button class="lock-icon-btn tao-lock" id="lock-tao-words" title="点击锁定">🐱</button>
           </div>
         </div>
         <div class="edit-area" data-owner="yan">
           <div class="edit-label YAN"><span class="dot yan-dot"></span> YAN</div>
           <div class="edit-box-wrapper">
-            <div class="edit-box" id="edit-yan-words" data-role="yan" data-card="words" data-placeholder="YAN今天想对TAO说的小秘密"></div>
+            <div class="edit-box" id="edit-yan-words" data-role="yan" data-card="words" data-placeholder="今天有什么小事，想讲给对方听？"></div>
             <button class="lock-icon-btn yan-lock" id="lock-yan-words" title="点击锁定">🐶</button>
           </div>
         </div>
       </div>
 
-      <!-- 打卡愿望 -->
+      <!-- 心底期许 -->
       <div class="card" id="card-wish">
         <div class="card-mascot" id="mascot-wish"></div>
-        <div class="card-title"><span class="icon">🌟</span> 打卡愿望</div>
+        <div class="card-title"><span class="icon">🌟</span> 心底期许</div>
+        <div class="card-dialogue-hint">写完留言，等候对方的回信 ✨</div>
+        <div class="template-chips" data-card="wish">
+          <span class="template-chip" onclick="Cards.fillTemplate('wish','希望下次可以和你一起……')">希望下次可以和你一起……</span>
+          <span class="template-chip" onclick="Cards.fillTemplate('wish','很期待哪一天，我们可以……')">很期待哪一天，我们可以……</span>
+          <span class="template-chip" onclick="Cards.fillTemplate('wish','一个小小的心愿，只说给你听')">一个小小的心愿，只说给你听</span>
+        </div>
         <div class="edit-area" data-owner="tao">
           <div class="edit-label TAO"><span class="dot tao-dot"></span> TAO</div>
           <div class="edit-box-wrapper">
-            <div class="edit-box" id="edit-tao-wish" data-role="tao" data-card="wish" data-placeholder="TAO今天对YAN的反思"></div>
+            <div class="edit-box" id="edit-tao-wish" data-role="tao" data-card="wish" data-placeholder="今天藏了什么关于我们的小期待？"></div>
             <button class="lock-icon-btn tao-lock" id="lock-tao-wish" title="点击锁定">🐱</button>
           </div>
         </div>
         <div class="edit-area" data-owner="yan">
           <div class="edit-label YAN"><span class="dot yan-dot"></span> YAN</div>
           <div class="edit-box-wrapper">
-            <div class="edit-box" id="edit-yan-wish" data-role="yan" data-card="wish" data-placeholder="YAN今天对TAO的反思"></div>
+            <div class="edit-box" id="edit-yan-wish" data-role="yan" data-card="wish" data-placeholder="今天藏了什么关于我们的小期待？"></div>
             <button class="lock-icon-btn yan-lock" id="lock-yan-wish" title="点击锁定">🐶</button>
           </div>
         </div>
@@ -510,10 +542,10 @@
         </div>
       </div>
 
-      <!-- 打卡晚安（移到最后） -->
+      <!-- 晚安道别（移到最后） -->
       <div class="card" id="card-night" onclick="Cards.handleClick('night', event)">
         <div class="card-mascot" id="mascot-night"></div>
-        <div class="card-title"><span class="icon">✨</span> 打卡晚安</div>
+        <div class="card-title"><span class="icon">✨</span> 晚安道别</div>
         <div class="goodnight-area" id="nightArea">
           <div class="goodnight-text-display" id="nightTextDisplay">双击晚安</div>
           <div class="goodnight-pair-display" id="nightPairDisplay" style="display:none">
@@ -715,9 +747,9 @@
         <button class="joke-refresh-btn" onclick="Joke.refresh()" title="换一个">🔄</button>
       </div>
 
-      <!-- 地标打卡 -->
+      <!-- 地标记地 -->
       <div class="card landmark-card">
-        <div class="card-title"><span class="icon">📍</span> 地标打卡 <span class="landmark-stats" id="landmarkStats"></span></div>
+        <div class="card-title"><span class="icon">📍</span> 地标记地 <span class="landmark-stats" id="landmarkStats"></span></div>
         <div class="landmark-hint">单击展开省市 · 双击标注颜色 · 双方都标注变绿色</div>
         <div class="landmark-grid" id="landmarkGrid"></div>
         <button class="landmark-sync-btn" onclick="CloudSync.syncLandmarks(); showToast('正在同步...');">🔄</button>
@@ -746,7 +778,7 @@
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3,9h18M9,3v18"/><path d="M14,14h4M14,17h3"/>
       </svg>
-      <span class="nav-tab-label">每日打卡</span>
+      <span class="nav-tab-label">每日记录</span>
     </button>
     <button class="nav-tab" data-tab="3" onclick="TabNav.switch(3)">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -767,7 +799,7 @@
 <!-- 分享弹窗 -->
 <div class="share-mask" id="shareMask" onclick="Share.close(event)">
   <div class="share-sheet" onclick="event.stopPropagation()">
-    <div class="share-title">分享今日打卡 💕</div>
+    <div class="share-title">分享今日记录 💕</div>
     <div class="share-subtitle">传递我们今天的小心动</div>
     <div class="share-preview">
       <div class="share-preview-card">🌟</div>
@@ -860,7 +892,7 @@
     </div>
     <div class="setting-group">
       <div class="setting-label">一键导出</div>
-      <div class="setting-desc">导出照片、信件、打卡记录、娱乐内容</div>
+      <div class="setting-desc">导出照片、信件、记录、娱乐内容</div>
       <button class="setting-btn primary" onclick="ExportPanel.open()">📦 打开导出面板</button>
     </div>
     <div class="setting-group">
@@ -899,10 +931,10 @@
       </div>
     </div>
 
-    <!-- 打卡导出 -->
-    <div class="export-section">
-      <div class="export-section-title">❤️ 每日打卡导出</div>
-      <div class="export-section-desc">与每日打卡的导出分享功能相同</div>
+    <!-- 记录导出 -->
+    <div class="export-section" id="export-checkin-section">
+      <div class="export-section-title">❤️ 每日记录导出</div>
+      <div class="export-section-desc">与每日记录的导出分享功能相同</div>
       <div class="export-date-row">
         <label>起：</label>
         <input type="date" id="exportCheckinStart" class="export-date-input">

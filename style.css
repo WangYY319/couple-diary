@@ -7163,3 +7163,424 @@ body.music-active #tab-0 .card {
   color: var(--text-muted);
   line-height: 1;
 }
+
+/* ============================
+   回复提醒栏 (Reply Reminder)
+   ============================ */
+.reply-reminder-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px 0;
+  padding: 10px 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg,
+    rgba(var(--theme-rgb), 0.08),
+    rgba(var(--theme-rgb), 0.04));
+  border: 1px solid rgba(var(--theme-rgb), 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: reminderSlideDown 0.4s ease-out;
+  cursor: pointer;
+}
+
+@keyframes reminderSlideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.reply-reminder-icon {
+  font-size: 18px;
+  animation: reminderPulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes reminderPulse {
+  0%, 100% { transform: scale(1)   rotate(0deg); }
+  50%      { transform: scale(1.15) rotate(-6deg); }
+}
+
+.reply-reminder-text {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--theme-accent);
+  line-height: 1.4;
+}
+
+.reply-reminder-close {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(var(--theme-rgb), 0.1);
+  border: none;
+  font-size: 15px;
+  line-height: 22px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.2s;
+}
+
+.reply-reminder-close:active {
+  background: rgba(var(--theme-rgb), 0.2);
+}
+
+/* ============================
+   双向对话说明小字
+   ============================ */
+.card-dialogue-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: -4px 0 8px 0;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+/* ============================
+   输入提示模板 (Template Chips)
+   ============================ */
+.template-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.template-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.template-chip {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: rgba(var(--theme-rgb), 0.06);
+  border: 1px solid rgba(var(--theme-rgb), 0.12);
+  color: var(--theme-accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.template-chip:active {
+  background: rgba(var(--theme-rgb), 0.15);
+  border-color: rgba(var(--theme-rgb), 0.3);
+  transform: scale(0.95);
+}
+
+/* ============================
+   心细清单 (MindList)
+   ============================ */
+
+/* 标签筛选栏 */
+.mindlist-filter-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 5px;
+  margin-bottom: 10px;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.mindlist-filter-bar::-webkit-scrollbar { display: none; }
+
+.mindlist-filter-chip {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mindlist-filter-chip.active {
+  background: rgba(var(--theme-rgb), 0.12);
+  color: var(--theme-accent);
+  font-weight: 600;
+}
+
+/* 列表区域 */
+.mindlist-list {
+  max-height: 320px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 8px;
+}
+
+.mindlist-empty {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 20px 0;
+}
+
+/* 单条记录 */
+.mindlist-item {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: background 0.2s;
+}
+
+.mindlist-item.tao-created {
+  border-left: 3px solid rgba(14, 95, 176, 0.3);
+}
+.mindlist-item.yan-created {
+  border-left: 3px solid rgba(184, 34, 79, 0.3);
+}
+
+/* 标签 */
+.mindlist-item-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(var(--theme-rgb), 0.08);
+  color: var(--theme-accent);
+  margin-bottom: 6px;
+}
+
+/* 内容 */
+.mindlist-item-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-main);
+  word-break: break-word;
+  margin-bottom: 6px;
+}
+
+/* 底部：创建者 + 爱心 */
+.mindlist-item-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.mindlist-item-creator {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.mindlist-item-acked-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.mindlist-item-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mindlist-item-edit {
+  border: none;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mindlist-heart-btn {
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px;
+  transition: transform 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mindlist-heart-btn:active { transform: scale(1.3); }
+.mindlist-heart-btn.acked { animation: heartPop 0.3s ease-out; }
+
+@keyframes heartPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+/* 添加按钮 */
+.mindlist-add-btn {
+  width: 100%;
+  padding: 8px;
+  border: 1px dashed rgba(var(--theme-rgb), 0.3);
+  border-radius: 12px;
+  background: rgba(var(--theme-rgb), 0.03);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--theme-accent);
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mindlist-add-btn:active {
+  background: rgba(var(--theme-rgb), 0.08);
+  transform: scale(0.98);
+}
+
+/* ============================
+   心细清单编辑弹窗
+   ============================ */
+.mindlist-editor-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.mindlist-editor-popup {
+  width: 90%;
+  max-width: 360px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  animation: editorSlideUp 0.3s ease-out;
+}
+
+@keyframes editorSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.mindlist-editor-title {
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 16px;
+  color: var(--text-main);
+}
+
+.mindlist-editor-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* 标签选择 */
+.mindlist-editor-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mindlist-editor-tag-chip {
+  padding: 5px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mindlist-editor-tag-chip.selected {
+  background: rgba(var(--theme-rgb), 0.12);
+  border-color: rgba(var(--theme-rgb), 0.3);
+  color: var(--theme-accent);
+  font-weight: 600;
+}
+
+/* 自定义标签输入 */
+.mindlist-editor-custom {
+  margin-bottom: 14px;
+}
+.mindlist-editor-custom input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: rgba(0, 0, 0, 0.02);
+  color: var(--text-main);
+}
+.mindlist-editor-custom input:focus {
+  border-color: rgba(var(--theme-rgb), 0.4);
+}
+
+/* 内容输入 */
+.mindlist-editor-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  background: rgba(0, 0, 0, 0.02);
+  color: var(--text-main);
+  line-height: 1.6;
+}
+.mindlist-editor-textarea:focus {
+  border-color: rgba(var(--theme-rgb), 0.4);
+}
+
+/* 操作按钮 */
+.mindlist-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.mindlist-editor-btn {
+  flex: 1;
+  padding: 9px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mindlist-editor-btn.cancel {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-muted);
+}
+.mindlist-editor-btn.save {
+  background: var(--theme-primary);
+  color: #fff;
+}
+.mindlist-editor-btn.delete {
+  background: rgba(184, 34, 79, 0.1);
+  color: #b8224f;
+  flex: 0 0 auto;
+  padding: 9px 14px;
+}
