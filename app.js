@@ -3264,11 +3264,32 @@ const Cards = {
   renderWords() {
     this.renderEditBox('edit-tao-words', 'words', 'tao');
     this.renderEditBox('edit-yan-words', 'words', 'yan');
+    this.updateDialogueHint('words');
   },
 
   renderWish() {
     this.renderEditBox('edit-tao-wish', 'wish', 'tao');
     this.renderEditBox('edit-yan-wish', 'wish', 'yan');
+    this.updateDialogueHint('wish');
+  },
+
+  // 根据双方填写状态动态更新对话提示语
+  updateDialogueHint(cardType) {
+    const hintEl = document.getElementById('hint-' + cardType);
+    if (!hintEl) return;
+    const data = this.getDayData();
+    const taoDone = data[cardType] && data[cardType].tao;
+    const yanDone = data[cardType] && data[cardType].yan;
+    if (taoDone && yanDone) {
+      hintEl.textContent = '你们已互相回信，今天的心事已送达 💌';
+      hintEl.classList.add('both-done');
+    } else if (taoDone || yanDone) {
+      hintEl.textContent = '对方已收到你的留言，等候回信中 ✨';
+      hintEl.classList.remove('both-done');
+    } else {
+      hintEl.textContent = '写完留言，等候对方的回信 ✨';
+      hintEl.classList.remove('both-done');
+    }
   },
 
   renderEditBox(elId, cardType, role) {
@@ -4547,6 +4568,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v123', date: '2026-08-25', changes: '提示语无框化+底色调淡/模板文案去框去底色降低视觉干扰/对话提示动态切换(未写→等候回信/一方已写→等候回信中/双方已写→已互相回信)' },
     { v: 'v122', date: '2026-08-25', changes: '新增心细清单模块(投递信件下方)/标签+内容结构/7种预设标签+自定义/仅创建者可编辑删除/爱心互动(看到啦心里记下了)/标签筛选/最新排序/云同步双向合并' },
     { v: 'v121', date: '2026-08-25', changes: '板块更名:打卡语录→今日碎念/打卡愿望→心底期许/全域移除打卡文字/内置3句模板一键填入/双向对话提示小字/页面顶部回复提醒机制' },
     { v: 'v120', date: '2026-08-25', changes: '清空甜蜜语录30条内置语录/仅保留投递内容/无投递时显示引导提示/表现形式不变' },
