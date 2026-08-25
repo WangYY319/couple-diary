@@ -3993,7 +3993,7 @@ body.music-active #tab-0 .card {
 
 .private-whisper-container {
   position: relative;
-  height: 80px;
+  height: 160px;
   overflow: hidden;
   background: linear-gradient(135deg, rgba(180, 150, 220, 0.10), rgba(255, 200, 220, 0.10));
   border-radius: 18px;
@@ -4016,7 +4016,7 @@ body.music-active #tab-0 .card {
 }
 
 .private-whisper-track.auto-scroll {
-  animation: whisperScroll 20s linear infinite;
+  animation: whisperScroll 40s linear infinite;
 }
 
 .private-whisper-track.paused {
