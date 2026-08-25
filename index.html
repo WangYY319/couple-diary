@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="img/favicon.svg">
   <link rel="icon" type="image/svg+xml" sizes="32x32" href="img/favicon.svg">
   <title>TAO&YAN 相处日记</title>
-  <link rel="stylesheet" href="style.css?v=123">
+  <link rel="stylesheet" href="style.css?v=124">
 <script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
 <script>
 (function(){
@@ -729,6 +729,14 @@
         <div class="geo-content" id="geoContent">加载中...</div>
         <div class="read-badge" id="geoReadBadge"></div>
         <button class="geo-refresh-btn" onclick="GeoCard.refresh()" title="换一条">🔄</button>
+      </div>
+
+      <!-- 中国政治 -->
+      <div class="card geo-card" ondblclick="ReadMark.toggle('poli')">
+        <div class="card-title"><span class="icon">📖</span> 中国政治</div>
+        <div class="geo-content" id="poliContent">加载中...</div>
+        <div class="read-badge" id="poliReadBadge"></div>
+        <button class="geo-refresh-btn" onclick="PoliCard.refresh()" title="换一条">🔄</button>
       </div>
 
       <!-- 生活技巧 -->
