@@ -4380,6 +4380,8 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v120', date: '2026-08-25', changes: '清空甜蜜语录30条内置语录/仅保留投递内容/无投递时显示引导提示/表现形式不变' },
+    { v: 'v119', date: '2026-08-25', changes: '私密絮语卡片高度翻倍至160px/滚动动画时长同步调整为40s/补全版本日志v114-v118' },
     { v: 'v118', date: '2026-08-24', changes: '修复清缓存后角色交叉导致数据分离/syncQuizVocab清缓存优先拉取对方数据/syncAll数据量安全检查防止空数据覆盖/joinPair标记isFreshLogin/enterAfterPair确保先拉后推' },
     { v: 'v117', date: '2026-08-24', changes: '修复清缓存后空数据覆盖云端/pushQuizVocab先拉后推保护/pushAllDays空数据保护/Cloud.init增加isFreshLogin标记' },
     { v: 'v116', date: '2026-08-24', changes: '题库优化:趣味问答替换生活物品题为兴趣爱好题/亲密问答调整为更暧昧风格(撒娇心动+暧昧互动+暧昧场景)/投递模块添加提示文案' },
