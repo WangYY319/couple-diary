@@ -1571,12 +1571,17 @@ const CloudSync = {
   async set(key, value) {
     if (!Cloud.pairCode) return;
     try {
-      await fetch(Cloud._url(`custom/${key}`), {
+      const resp = await fetch(Cloud._url(`custom/${key}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(value)
       });
-    } catch (e) { /* 静默失败 */ }
+      if (!resp.ok) {
+        console.warn(`[CloudSync] set(${key}): HTTP ${resp.status}`);
+      }
+    } catch (e) {
+      console.error(`[CloudSync] set(${key}) error:`, e);
+    }
   },
 
   // 通用读取：从云端的 custom/{key} 路径取数据
@@ -1997,13 +2002,13 @@ const CloudSync = {
         const local = PrivateWhisper._getList();
         if (local.length > 0) {
           await this.set('private_whispers', local);
+          console.log('[SYNC] private_whispers: cloud was empty, pushed local, count =', local.length);
         }
         return;
       }
 
       // 双向合并
       const local = PrivateWhisper._getList();
-      let changed = false;
       const localKeys = new Set(local.map(x => `${x.ts}_${x.by}`));
       const newItems = [];
 
@@ -2012,9 +2017,7 @@ const CloudSync = {
         if (item && item.text) {
           const key = `${item.ts}_${item.by}`;
           if (!localKeys.has(key)) {
-            // 本地没有这条 → 新增
             newItems.push(item);
-            changed = true;
           }
         }
       }
@@ -2024,9 +2027,10 @@ const CloudSync = {
         PrivateWhisper._saveList(local);
         PrivateWhisper.render();
         showToast('对方投递了新的私密絮语 💜', 2500);
+        console.log('[SYNC] private_whispers: pulled', newItems.length, 'new items from cloud');
       }
 
-      // 2. 检测本地有但云端没有的（本地新增/云端丢失），推送合并后的完整数据回云端
+      // 2. 检测本地有但云端没有的，推送合并后的完整数据回云端
       const remoteKeys = new Set(remote.map(x => `${x.ts}_${x.by}`));
       let hasLocalOnly = false;
       for (const item of local) {
@@ -2037,11 +2041,13 @@ const CloudSync = {
         }
       }
 
-      // 本地有云端没有的，或合并了新条目 → 推送合并后的完整数据回云端
       if (hasLocalOnly || newItems.length > 0) {
         await this.set('private_whispers', local);
+        console.log('[SYNC] private_whispers: pushed merged data to cloud, count =', local.length);
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      console.error('[SYNC] private_whispers error:', e);
+    }
   },
 
   // 同步心细清单：双向合并
@@ -4609,6 +4615,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v126', date: '2026-08-26', changes: '私密絮语增加强制同步按钮(右上角🔄)/forceSync方法手动拉取+回推/CloudSync.set改为非静默失败(记录HTTP状态码和错误)/syncPrivateWhispers增加诊断日志' },
     { v: 'v125', date: '2026-08-26', changes: '修复私密絮语同步缺陷:原syncPrivateWhispers仅单向拉取(cloud→local)从不回推/云端为空时无兜底推送/_syncSubmitted合并后不回推→改为双向合并(同syncLetters/syncMindList模式):云端为空则推送本地/合并后检测本地独有数据则回推完整数据到云端' },
     { v: 'v124', date: '2026-08-25', changes: '新增中国政治板块(中国地理下方)/考研政治重要定义80条/每日种子随机不重复/换一条功能/已阅标记/复用geo样式' },
     { v: 'v123', date: '2026-08-25', changes: '提示语无框化+底色调淡/模板文案去框去底色降低视觉干扰/对话提示动态切换(未写→等候回信/一方已写→等候回信中/双方已写→已互相回信)' },
@@ -7154,6 +7161,60 @@ const PrivateWhisper = {
     container.addEventListener('mouseleave', () => {
       if (!this._isDragging) this._startAutoScroll();
     });
+  },
+
+  // 强制同步：手动触发云端拉取+回推
+  async forceSync() {
+    if (typeof CloudSync === 'undefined' || !Cloud.pairCode) {
+      showToast('请先配对后再同步');
+      return;
+    }
+    showToast('正在同步私密絮语…', 1500);
+    console.log('[PrivateWhisper] forceSync: local items =', this._getList().length);
+
+    try {
+      const remote = await CloudSync.get('private_whispers');
+      console.log('[PrivateWhisper] forceSync: remote =', remote ? JSON.stringify(remote) : 'null');
+
+      if (!remote || !Array.isArray(remote) || remote.length === 0) {
+        // 云端为空，推送本地
+        const local = this._getList();
+        if (local.length > 0) {
+          await CloudSync.set('private_whispers', local);
+          console.log('[PrivateWhisper] forceSync: pushed local to cloud, count =', local.length);
+          showToast('本地数据已推送到云端 ✅');
+        } else {
+          showToast('云端和本地都没有数据');
+        }
+        return;
+      }
+
+      // 双向合并
+      const local = this._getList();
+      const localKeys = new Set(local.map(x => `${x.ts}_${x.by}`));
+      const newItems = remote.filter(item => item && item.text && !localKeys.has(`${item.ts}_${item.by}`));
+
+      if (newItems.length > 0) {
+        local.push(...newItems);
+        this._saveList(local);
+        this.render();
+        showToast(`收到 ${newItems.length} 条新絮语 💜`, 2500);
+        console.log('[PrivateWhisper] forceSync: got new items =', newItems.length);
+      } else {
+        showToast('暂无新内容，数据已是最新');
+      }
+
+      // 回推合并后的完整数据
+      const remoteKeys = new Set(remote.map(x => `${x.ts}_${x.by}`));
+      const hasLocalOnly = local.some(item => !remoteKeys.has(`${item.ts}_${item.by}`));
+      if (hasLocalOnly || newItems.length > 0) {
+        await CloudSync.set('private_whispers', local);
+        console.log('[PrivateWhisper] forceSync: pushed merged data to cloud, count =', local.length);
+      }
+    } catch (e) {
+      console.error('[PrivateWhisper] forceSync error:', e);
+      showToast('同步失败，请检查网络');
+    }
   },
 
   // 双击标题投递
