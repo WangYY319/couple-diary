@@ -1985,21 +1985,61 @@ const CloudSync = {
     } catch (e) { /* ignore */ }
   },
 
-  // 同步私密絮语
+  // 同步私密絮语：双向合并（与 syncLetters/syncMindList 同模式）
   async syncPrivateWhispers() {
     if (!Cloud.pairCode) return;
+    if (typeof PrivateWhisper === 'undefined') return;
     try {
       const remote = await this.get('private_whispers');
-      if (Array.isArray(remote) && remote.length > 0) {
-        if (typeof PrivateWhisper !== 'undefined') {
-          const beforeLen = PrivateWhisper._getList().length;
-          PrivateWhisper._syncSubmitted(remote);
-          const afterLen = PrivateWhisper._getList().length;
-          if (afterLen > beforeLen) {
-            // 有新内容，toast 提示
-            showToast('对方投递了新的私密絮语 💜', 2000);
+
+      // 云端没有数据，推送本地
+      if (!remote || !Array.isArray(remote) || remote.length === 0) {
+        const local = PrivateWhisper._getList();
+        if (local.length > 0) {
+          await this.set('private_whispers', local);
+        }
+        return;
+      }
+
+      // 双向合并
+      const local = PrivateWhisper._getList();
+      let changed = false;
+      const localKeys = new Set(local.map(x => `${x.ts}_${x.by}`));
+      const newItems = [];
+
+      // 1. 合并云端数据到本地（拉取对方投递的絮语）
+      for (const item of remote) {
+        if (item && item.text) {
+          const key = `${item.ts}_${item.by}`;
+          if (!localKeys.has(key)) {
+            // 本地没有这条 → 新增
+            newItems.push(item);
+            changed = true;
           }
         }
+      }
+
+      if (newItems.length > 0) {
+        local.push(...newItems);
+        PrivateWhisper._saveList(local);
+        PrivateWhisper.render();
+        showToast('对方投递了新的私密絮语 💜', 2500);
+      }
+
+      // 2. 检测本地有但云端没有的（本地新增/云端丢失），推送合并后的完整数据回云端
+      const remoteKeys = new Set(remote.map(x => `${x.ts}_${x.by}`));
+      let hasLocalOnly = false;
+      for (const item of local) {
+        const key = `${item.ts}_${item.by}`;
+        if (!remoteKeys.has(key)) {
+          hasLocalOnly = true;
+          break;
+        }
+      }
+
+      // 本地有云端没有的，或合并了新条目 → 推送合并后的完整数据回云端
+      if (hasLocalOnly || newItems.length > 0) {
+        await this.set('private_whispers', local);
       }
     } catch (e) { /* ignore */ }
   },
@@ -4569,6 +4609,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v125', date: '2026-08-26', changes: '修复私密絮语同步缺陷:原syncPrivateWhispers仅单向拉取(cloud→local)从不回推/云端为空时无兜底推送/_syncSubmitted合并后不回推→改为双向合并(同syncLetters/syncMindList模式):云端为空则推送本地/合并后检测本地独有数据则回推完整数据到云端' },
     { v: 'v124', date: '2026-08-25', changes: '新增中国政治板块(中国地理下方)/考研政治重要定义80条/每日种子随机不重复/换一条功能/已阅标记/复用geo样式' },
     { v: 'v123', date: '2026-08-25', changes: '提示语无框化+底色调淡/模板文案去框去底色降低视觉干扰/对话提示动态切换(未写→等候回信/一方已写→等候回信中/双方已写→已互相回信)' },
     { v: 'v122', date: '2026-08-25', changes: '新增心细清单模块(投递信件下方)/标签+内容结构/7种预设标签+自定义/仅创建者可编辑删除/爱心互动(看到啦心里记下了)/标签筛选/最新排序/云同步双向合并' },
@@ -7132,7 +7173,7 @@ const PrivateWhisper = {
     showToast('私密絮语投递成功！💜', 2000);
   },
 
-  // 同步远端投递絮语
+  // 同步远端投递絮语（含回推合并数据）
   _syncSubmitted(remoteList) {
     if (!Array.isArray(remoteList)) return;
     const local = Store.get(this._STORE_KEY, []);
@@ -7146,6 +7187,10 @@ const PrivateWhisper = {
     if (changed) {
       this._saveList(local);
       this.render();
+      // 回推合并后的完整数据到云端，确保对方也能同步
+      if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+        CloudSync.set(this._CLOUD_KEY, local);
+      }
     }
   }
 };
