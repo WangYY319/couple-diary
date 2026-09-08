@@ -4041,6 +4041,33 @@ body.music-active #tab-0 .card {
   overflow: visible;
 }
 
+.private-whisper-item .whisper-delete {
+  flex-shrink: 0;
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: #bbb;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s, background 0.2s;
+  padding: 0;
+}
+
+.private-whisper-item:hover .whisper-delete {
+  opacity: 1;
+}
+
+.private-whisper-item .whisper-delete:hover {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+}
+
 .private-whisper-item .whisper-text {
   flex: 1;
   overflow: visible;

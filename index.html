@@ -230,7 +230,6 @@
           <div class="private-whisper-mask top"></div>
           <div class="private-whisper-mask bottom"></div>
         </div>
-        <button class="geo-refresh-btn" onclick="PrivateWhisper.forceSync()" title="同步" style="position:absolute;top:8px;right:8px;">🔄</button>
       </div>
 
       <!-- 音乐播放 -->
@@ -302,6 +301,19 @@
         <div class="photo-grid" id="photoGrid"></div>
       </div>
 
+      <!-- 心细清单 -->
+      <div class="card" id="card-mindlist">
+        <div class="card-title"><span class="icon">📝</span> 心细清单</div>
+        <div class="card-dialogue-hint">悄悄记下TA的偏爱与小细节 ✨</div>
+        <div class="mindlist-filter-bar" id="mindlistFilterBar">
+          <span class="mindlist-filter-chip active" data-tag="" onclick="MindList.filterTag('')">全部</span>
+        </div>
+        <div class="mindlist-list" id="mindlistList">
+          <div class="mindlist-empty" id="mindlistEmpty">还没有记录，点下方按钮记一条吧</div>
+        </div>
+        <button class="mindlist-add-btn" onclick="MindList.openEditor()">＋ 记一条</button>
+      </div>
+
       <!-- 投递信件板块 -->
       <div class="card" id="card-letter">
         <div class="card-title"><span class="icon">📧</span> 投递信件</div>
@@ -332,19 +344,6 @@
           </div>
           <button class="letter-export-btn" onclick="LetterBox.exportAll()" title="导出分享">📤</button>
         </div>
-      </div>
-
-      <!-- 心细清单 -->
-      <div class="card" id="card-mindlist">
-        <div class="card-title"><span class="icon">📝</span> 心细清单</div>
-        <div class="card-dialogue-hint">悄悄记下TA的偏爱与小细节 ✨</div>
-        <div class="mindlist-filter-bar" id="mindlistFilterBar">
-          <span class="mindlist-filter-chip active" data-tag="" onclick="MindList.filterTag('')">全部</span>
-        </div>
-        <div class="mindlist-list" id="mindlistList">
-          <div class="mindlist-empty" id="mindlistEmpty">还没有记录，点下方按钮记一条吧</div>
-        </div>
-        <button class="mindlist-add-btn" onclick="MindList.openEditor()">＋ 记一条</button>
       </div>
       <div class="tab-bottom-hint">宝宝，到底啦～</div>
     </div>

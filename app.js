@@ -2010,7 +2010,10 @@ const CloudSync = {
       // 双向合并
       const local = PrivateWhisper._getList();
       const localKeys = new Set(local.map(x => `${x.ts}_${x.by}`));
+      const remoteKeys = new Set(remote.map(x => `${x.ts}_${x.by}`));
+      const currentRole = (typeof App !== 'undefined' && App.currentRole) || '';
       const newItems = [];
+      let deletedCount = 0;
 
       // 1. 合并云端数据到本地（拉取对方投递的絮语）
       for (const item of remote) {
@@ -2022,18 +2025,39 @@ const CloudSync = {
         }
       }
 
-      if (newItems.length > 0) {
-        local.push(...newItems);
-        PrivateWhisper._saveList(local);
-        PrivateWhisper.render();
-        showToast('对方投递了新的私密絮语 💜', 2500);
-        console.log('[SYNC] private_whispers: pulled', newItems.length, 'new items from cloud');
+      // 2. 检测本地有但云端没有的：
+      //    - 对方创建的 → 对方删除了，本地也删除
+      //    - 自己创建的 → 是新内容，保留并回推
+      const remaining = [];
+      for (const item of local) {
+        const key = `${item.ts}_${item.by}`;
+        if (remoteKeys.has(key)) {
+          remaining.push(item);
+        } else if (item.by === currentRole) {
+          // 自己的内容，云端没有 → 是新内容，保留
+          remaining.push(item);
+        } else {
+          // 对方的内容，云端没有 → 对方已删除，本地也删除
+          deletedCount++;
+        }
       }
 
-      // 2. 检测本地有但云端没有的，推送合并后的完整数据回云端
-      const remoteKeys = new Set(remote.map(x => `${x.ts}_${x.by}`));
+      if (newItems.length > 0 || deletedCount > 0) {
+        const merged = remaining.concat(newItems);
+        PrivateWhisper._saveList(merged);
+        PrivateWhisper.render();
+        if (newItems.length > 0) {
+          showToast('对方投递了新的私密絮语 💜', 2500);
+        }
+        console.log('[SYNC] private_whispers: pulled', newItems.length, 'new items, removed', deletedCount, 'deleted items');
+      }
+
+      // 3. 推送合并后的完整数据回云端
+      const finalList = (newItems.length > 0 || deletedCount > 0)
+        ? remaining.concat(newItems)
+        : local;
       let hasLocalOnly = false;
-      for (const item of local) {
+      for (const item of finalList) {
         const key = `${item.ts}_${item.by}`;
         if (!remoteKeys.has(key)) {
           hasLocalOnly = true;
@@ -2041,9 +2065,9 @@ const CloudSync = {
         }
       }
 
-      if (hasLocalOnly || newItems.length > 0) {
-        await this.set('private_whispers', local);
-        console.log('[SYNC] private_whispers: pushed merged data to cloud, count =', local.length);
+      if (hasLocalOnly || newItems.length > 0 || deletedCount > 0) {
+        await this.set('private_whispers', finalList);
+        console.log('[SYNC] private_whispers: pushed merged data to cloud, count =', finalList.length);
       }
     } catch (e) {
       console.error('[SYNC] private_whispers error:', e);
@@ -4622,6 +4646,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v128', date: '2026-09-08', changes: '移除私密絮语独立同步按钮(导航栏已有统一同步)/私密絮语新增删除功能(悬停显示×/仅自己可删/云端同步删除)/投递信件与心细清单位置互换/同步逻辑支持删除传播' },
     { v: 'v127', date: '2026-09-08', changes: '私密絮语高度翻倍(160px→320px)/TAO标签蓝色YAN标签粉色区分角色/甜蜜语录双向同步到私密絮语(投递时同步/云端同步时同步/初始化首次迁移)/去重合并防重复' },
     { v: 'v126', date: '2026-08-26', changes: '私密絮语增加强制同步按钮(右上角🔄)/forceSync方法手动拉取+回推/CloudSync.set改为非静默失败(记录HTTP状态码和错误)/syncPrivateWhispers增加诊断日志' },
     { v: 'v125', date: '2026-08-26', changes: '修复私密絮语同步缺陷:原syncPrivateWhispers仅单向拉取(cloud→local)从不回推/云端为空时无兜底推送/_syncSubmitted合并后不回推→改为双向合并(同syncLetters/syncMindList模式):云端为空则推送本地/合并后检测本地独有数据则回推完整数据到云端' },
@@ -7097,12 +7122,18 @@ const PrivateWhisper = {
 
     // 生成 HTML（列表复制一份用于无缝滚动）
     let html = '';
+    const currentRole = (typeof App !== 'undefined' && App.currentRole) || '';
     for (let i = 0; i < 2; i++) {
       for (const item of list) {
         const by = item.by || 'TAO';
+        const canDelete = by === currentRole;
+        const delBtn = canDelete
+          ? `<button class="whisper-delete" data-ts="${item.ts}" data-by="${by}" onclick="PrivateWhisper.deleteItem(${item.ts}, '${by}', event)" title="删除这条">×</button>`
+          : '';
         html += `<div class="private-whisper-item">
           <span class="whisper-text">${this._escapeHtml(item.text)}</span>
           <span class="whisper-by ${by}">${by}</span>
+          ${delBtn}
         </div>`;
       }
     }
@@ -7273,6 +7304,32 @@ const PrivateWhisper = {
         CloudSync.set(this._CLOUD_KEY, local);
       }
     }
+  },
+
+  // 删除一条絮语（仅自己投递的可删）
+  deleteItem(ts, by, event) {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    const currentRole = (typeof App !== 'undefined' && App.currentRole) || '';
+    if (by !== currentRole) {
+      showToast('只能删除自己投递的内容哦');
+      return;
+    }
+    if (!confirm('确定要删除这条絮语吗？删除后对方也会同步消失。')) return;
+
+    const list = Store.get(this._STORE_KEY, []);
+    const newList = list.filter(x => !(x.ts === ts && x.by === by));
+    if (newList.length === list.length) return;
+
+    this._saveList(newList);
+    this.render();
+    // 同步到云端
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.set(this._CLOUD_KEY, newList);
+    }
+    showToast('已删除 ✕', 1500);
   },
 
   // 从甜蜜语录同步到私密絮语（去重合并）
