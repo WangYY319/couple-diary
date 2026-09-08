@@ -3993,7 +3993,7 @@ body.music-active #tab-0 .card {
 
 .private-whisper-container {
   position: relative;
-  height: 160px;
+  height: 320px;
   overflow: hidden;
   background: linear-gradient(135deg, rgba(180, 150, 220, 0.10), rgba(255, 200, 220, 0.10));
   border-radius: 18px;
@@ -4061,6 +4061,16 @@ body.music-active #tab-0 .card {
   background: rgba(155, 89, 182, 0.12);
   border-radius: 10px;
   letter-spacing: 0.5px;
+}
+
+.private-whisper-item .whisper-by.TAO {
+  color: #1b7fe3;
+  background: rgba(27, 127, 227, 0.12);
+}
+
+.private-whisper-item .whisper-by.YAN {
+  color: #e8296a;
+  background: rgba(232, 41, 106, 0.12);
 }
 
 .private-whisper-empty {

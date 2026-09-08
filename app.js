@@ -2445,6 +2445,13 @@ const App = {
       MusicPlayer.init();
       SweetText.init();
       PrivateWhisper.init();
+      // 将已有的甜蜜语录同步到私密絮语（首次迁移+去重）
+      try {
+        const sweetList = SweetText._getCustom();
+        if (sweetList.length > 0) {
+          PrivateWhisper.syncFromSweetQuotes(sweetList);
+        }
+      } catch (e) { console.warn('[Sync] sweet to whisper init error:', e); }
       Photos.loadAll();
       VoiceRecord.init();
       LoveRain.init();
@@ -4615,6 +4622,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v127', date: '2026-09-08', changes: '私密絮语高度翻倍(160px→320px)/TAO标签蓝色YAN标签粉色区分角色/甜蜜语录双向同步到私密絮语(投递时同步/云端同步时同步/初始化首次迁移)/去重合并防重复' },
     { v: 'v126', date: '2026-08-26', changes: '私密絮语增加强制同步按钮(右上角🔄)/forceSync方法手动拉取+回推/CloudSync.set改为非静默失败(记录HTTP状态码和错误)/syncPrivateWhispers增加诊断日志' },
     { v: 'v125', date: '2026-08-26', changes: '修复私密絮语同步缺陷:原syncPrivateWhispers仅单向拉取(cloud→local)从不回推/云端为空时无兜底推送/_syncSubmitted合并后不回推→改为双向合并(同syncLetters/syncMindList模式):云端为空则推送本地/合并后检测本地独有数据则回推完整数据到云端' },
     { v: 'v124', date: '2026-08-25', changes: '新增中国政治板块(中国地理下方)/考研政治重要定义80条/每日种子随机不重复/换一条功能/已阅标记/复用geo样式' },
@@ -6965,10 +6973,15 @@ const SweetText = {
   // 保存投递的语录
   _saveSubmitted(text) {
     const list = this._getCustom();
-    list.push({ text, by: App.currentRole, ts: Date.now() });
+    const newItem = { text, by: App.currentRole, ts: Date.now() };
+    list.push(newItem);
     Store.set('sweet_submitted', list);
     if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
       CloudSync.set('sweet_submitted', list);
+    }
+    // 同步到私密絮语
+    if (typeof PrivateWhisper !== 'undefined') {
+      PrivateWhisper.syncFromSweetQuotes([newItem]);
     }
     showToast('甜蜜语录投递成功！✅', 2000);
   },
@@ -6978,14 +6991,20 @@ const SweetText = {
     if (!Array.isArray(remoteList)) return;
     const local = this._getCustom();
     let changed = false;
+    const newItems = [];
     for (const item of remoteList) {
       if (item && item.text && !local.find(x => x.text === item.text)) {
         local.push(item);
+        newItems.push(item);
         changed = true;
       }
     }
     if (changed) {
       Store.set('sweet_submitted', local);
+      // 同步到私密絮语
+      if (typeof PrivateWhisper !== 'undefined' && newItems.length > 0) {
+        PrivateWhisper.syncFromSweetQuotes(newItems);
+      }
     }
   }
 };
@@ -7080,9 +7099,10 @@ const PrivateWhisper = {
     let html = '';
     for (let i = 0; i < 2; i++) {
       for (const item of list) {
+        const by = item.by || 'TAO';
         html += `<div class="private-whisper-item">
           <span class="whisper-text">${this._escapeHtml(item.text)}</span>
-          <span class="whisper-by">${item.by || 'TAO'}</span>
+          <span class="whisper-by ${by}">${by}</span>
         </div>`;
       }
     }
@@ -7253,6 +7273,31 @@ const PrivateWhisper = {
         CloudSync.set(this._CLOUD_KEY, local);
       }
     }
+  },
+
+  // 从甜蜜语录同步到私密絮语（去重合并）
+  syncFromSweetQuotes(sweetList) {
+    if (!Array.isArray(sweetList) || sweetList.length === 0) return false;
+    const local = Store.get(this._STORE_KEY, []);
+    let changed = false;
+    for (const item of sweetList) {
+      if (item && item.text && item.ts && item.by) {
+        // 用 ts + by 去重
+        if (!local.find(x => x.ts === item.ts && x.by === item.by)) {
+          local.push({ text: item.text, by: item.by, ts: item.ts, fromSweet: true });
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      this._saveList(local);
+      this.render();
+      // 同步到云端
+      if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+        CloudSync.set(this._CLOUD_KEY, local);
+      }
+    }
+    return changed;
   }
 };
 
