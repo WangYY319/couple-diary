@@ -965,6 +965,26 @@
       </div>
     </div>
 
+    <!-- 心细清单导出 -->
+    <div class="export-section">
+      <div class="export-section-title">📝 心细清单导出</div>
+      <div class="export-section-desc">导出全部心细清单记录（标签+内容+创建者+爱心互动）</div>
+      <div class="export-btn-row">
+        <button class="setting-btn" onclick="ExportPanel.exportMindList('share')">分享</button>
+        <button class="setting-btn primary" onclick="ExportPanel.exportMindList('download')">导出</button>
+      </div>
+    </div>
+
+    <!-- 私密絮语导出 -->
+    <div class="export-section">
+      <div class="export-section-title">🔒 私密絮语导出</div>
+      <div class="export-section-desc">导出全部私密絮语内容（含甜蜜语录同步过来的）</div>
+      <div class="export-btn-row">
+        <button class="setting-btn" onclick="ExportPanel.exportPrivateWhisper('share')">分享</button>
+        <button class="setting-btn primary" onclick="ExportPanel.exportPrivateWhisper('download')">导出</button>
+      </div>
+    </div>
+
     <button class="setting-cancel" onclick="ExportPanel.close()">关闭</button>
   </div>
 </div>

@@ -4646,6 +4646,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v129', date: '2026-09-08', changes: 'PDF数据导出报告增加随机问答和亲密问答/设置导出面板新增心细清单导出(标签+内容+创建者+爱心)/设置导出面板新增私密絮语导出(含甜蜜语录同步标识)/均支持分享和下载两种模式' },
     { v: 'v128', date: '2026-09-08', changes: '移除私密絮语独立同步按钮(导航栏已有统一同步)/私密絮语新增删除功能(悬停显示×/仅自己可删/云端同步删除)/投递信件与心细清单位置互换/同步逻辑支持删除传播' },
     { v: 'v127', date: '2026-09-08', changes: '私密絮语高度翻倍(160px→320px)/TAO标签蓝色YAN标签粉色区分角色/甜蜜语录双向同步到私密絮语(投递时同步/云端同步时同步/初始化首次迁移)/去重合并防重复' },
     { v: 'v126', date: '2026-08-26', changes: '私密絮语增加强制同步按钮(右上角🔄)/forceSync方法手动拉取+回推/CloudSync.set改为非静默失败(记录HTTP状态码和错误)/syncPrivateWhispers增加诊断日志' },
@@ -8160,6 +8161,36 @@ const HistoryView = {
       html += `TAO <span class="badge ${night.tao ? 'done' : 'todo'}">${night.tao ? '已晚安' : '未晚安'}</span>`;
       html += ` YAN <span class="badge ${night.yan ? 'done' : 'todo'}">${night.yan ? '已晚安' : '未晚安'}</span>`;
       html += `</div>`;
+
+      // 随机问答
+      const quizQ = Store.get(`quiz_q_${ds}`, null);
+      if (quizQ && Array.isArray(quizQ) && quizQ.length > 0) {
+        const quizTAO = Store.get(`quiz_a_${ds}_TAO`, []);
+        const quizYAN = Store.get(`quiz_a_${ds}_YAN`, []);
+        html += `<div class="section-title">🎲 随机问答</div>`;
+        quizQ.forEach((q, i) => {
+          const tChoice = (quizTAO[i] !== undefined && q.a) ? q.a[quizTAO[i]] : '未答';
+          const yChoice = (quizYAN[i] !== undefined && q.a) ? q.a[quizYAN[i]] : '未答';
+          html += `<div class="entry"><b>Q${i+1}:</b> ${this.escapeHtml(q.q)}<br>`;
+          html += `<span class="role-tag tao">TAO</span>${this.escapeHtml(tChoice)} `;
+          html += `<span class="role-tag yan">YAN</span>${this.escapeHtml(yChoice)}</div>`;
+        });
+      }
+
+      // 亲密问答
+      const iqaQ = Store.get(`iqa_q_${ds}`, null);
+      if (iqaQ && Array.isArray(iqaQ) && iqaQ.length > 0) {
+        const iqaTAO = Store.get(`iqa_a_${ds}_TAO`, []);
+        const iqaYAN = Store.get(`iqa_a_${ds}_YAN`, []);
+        html += `<div class="section-title pink">💖 亲密问答</div>`;
+        iqaQ.forEach((q, i) => {
+          const tChoice = (iqaTAO[i] !== undefined && q.a) ? q.a[iqaTAO[i]] : '未答';
+          const yChoice = (iqaYAN[i] !== undefined && q.a) ? q.a[iqaYAN[i]] : '未答';
+          html += `<div class="entry"><b>Q${i+1}:</b> ${this.escapeHtml(q.q)}<br>`;
+          html += `<span class="role-tag tao">TAO</span>${this.escapeHtml(tChoice)} `;
+          html += `<span class="role-tag yan">YAN</span>${this.escapeHtml(yChoice)}</div>`;
+        });
+      }
 
       html += `</div></div>`;
     }
@@ -12621,6 +12652,94 @@ const ExportPanel = {
     } else {
       this._downloadText(text, `娱乐内容_${ds}.txt`);
       showToast('娱乐内容已导出 🎮');
+    }
+  },
+
+  // 心细清单导出
+  exportMindList(mode) {
+    if (typeof MindList === 'undefined' || !MindList.items || MindList.items.length === 0) {
+      showToast('还没有心细清单记录');
+      return;
+    }
+    const sorted = [...MindList.items].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    let text = 'TAO & YAN 心细清单\n';
+    text += `导出日期: ${todayStr()}\n`;
+    text += `共 ${sorted.length} 条记录\n`;
+    text += '='.repeat(40) + '\n\n';
+
+    sorted.forEach((item, i) => {
+      const date = item.timestamp ? new Date(item.timestamp).toLocaleDateString('zh-CN') : '未知';
+      const creator = item.creator || '未知';
+      const tag = item.tag || '未分类';
+      const hearts = [];
+      if (item.acknowledgedBy) {
+        if (item.acknowledgedBy.TAO) hearts.push('TAO');
+        if (item.acknowledgedBy.YAN) hearts.push('YAN');
+      }
+      text += `【第${i + 1}条】\n`;
+      text += `  标签：${tag}\n`;
+      text += `  内容：${item.content || ''}\n`;
+      text += `  创建者：${creator}\n`;
+      text += `  创建时间：${date}\n`;
+      if (hearts.length > 0) {
+        text += `  心里记下了：${hearts.join('、')} ❤️\n`;
+      }
+      text += '-'.repeat(30) + '\n\n';
+    });
+
+    text += `${'='.repeat(40)}\n`;
+    text += `导出时间：${new Date().toLocaleString('zh-CN')}\n`;
+
+    if (mode === 'share') {
+      if (navigator.share) {
+        navigator.share({ title: 'TAO & YAN 心细清单', text: text }).catch(() => {});
+      } else {
+        this._copyToClipboard(text, '心细清单已复制');
+      }
+    } else {
+      this._downloadText(text, `心细清单_${todayStr()}.txt`);
+      showToast('心细清单已导出 📝');
+    }
+  },
+
+  // 私密絮语导出
+  exportPrivateWhisper(mode) {
+    if (typeof PrivateWhisper === 'undefined') {
+      showToast('私密絮语模块未加载');
+      return;
+    }
+    const list = PrivateWhisper._getList();
+    if (list.length === 0) {
+      showToast('还没有私密絮语');
+      return;
+    }
+    let text = 'TAO & YAN 私密絮语\n';
+    text += `导出日期: ${todayStr()}\n`;
+    text += `共 ${list.length} 条絮语\n`;
+    text += '='.repeat(40) + '\n\n';
+
+    list.forEach((item, i) => {
+      const date = item.ts ? new Date(item.ts).toLocaleString('zh-CN') : '未知';
+      const by = item.by || 'TAO';
+      const fromSweet = item.fromSweet ? '（甜蜜语录同步）' : '';
+      text += `【第${i + 1}条】${by}${fromSweet}\n`;
+      text += `  时间：${date}\n`;
+      text += `  内容：${item.text || ''}\n`;
+      text += '-'.repeat(30) + '\n\n';
+    });
+
+    text += `${'='.repeat(40)}\n`;
+    text += `导出时间：${new Date().toLocaleString('zh-CN')}\n`;
+
+    if (mode === 'share') {
+      if (navigator.share) {
+        navigator.share({ title: 'TAO & YAN 私密絮语', text: text }).catch(() => {});
+      } else {
+        this._copyToClipboard(text, '私密絮语已复制');
+      }
+    } else {
+      this._downloadText(text, `私密絮语_${todayStr()}.txt`);
+      showToast('私密絮语已导出 🔒');
     }
   },
 
