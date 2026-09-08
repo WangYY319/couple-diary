@@ -4646,6 +4646,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v131', date: '2026-09-08', changes: '私密絮语高亮权限与删除权限对齐:仅投递者本人可操作高亮/对方投递内容点击只暂停滚动不弹出操作条/高亮状态双方同步可见' },
     { v: 'v130', date: '2026-09-08', changes: '私密絮语布局重构:删除按钮移入点击弹出操作条(不再常驻)/新增高亮气泡样式(TAO蓝/YAN粉)/点击条目弹出操作条含高亮星标+删除/5秒自动关闭操作条/高亮状态云端同步' },
     { v: 'v129', date: '2026-09-08', changes: 'PDF数据导出报告增加随机问答和亲密问答/设置导出面板新增心细清单导出(标签+内容+创建者+爱心)/设置导出面板新增私密絮语导出(含甜蜜语录同步标识)/均支持分享和下载两种模式' },
     { v: 'v128', date: '2026-09-08', changes: '移除私密絮语独立同步按钮(导航栏已有统一同步)/私密絮语新增删除功能(悬停显示×/仅自己可删/云端同步删除)/投递信件与心细清单位置互换/同步逻辑支持删除传播' },
@@ -7137,17 +7138,21 @@ const PrivateWhisper = {
         const key = this._itemKey(item);
         const isActive = key === this._activeKey;
         const isHighlighted = !!item.highlighted;
-        const canDelete = by === currentRole;
+        const isOwner = by === currentRole;
         const sideClass = by === 'TAO' ? 'TAO-side' : 'YAN-side';
         const highlightIcon = isHighlighted ? '★' : '☆';
+
+        // 操作条内容：只有投递者本人才能操作高亮和删除
+        let actionsHtml = '';
+        if (isOwner) {
+          actionsHtml += `<button class="action-highlight ${isHighlighted ? 'active' : ''}" onclick="PrivateWhisper.toggleHighlight(${item.ts}, '${by}', event)" title="${isHighlighted ? '取消高亮' : '高亮'}">${highlightIcon}</button>`;
+          actionsHtml += `<button class="action-delete" onclick="PrivateWhisper.deleteItem(${item.ts}, '${by}', event)" title="删除">✕</button>`;
+        }
 
         html += `<div class="private-whisper-item ${sideClass}${isHighlighted ? ' highlighted' : ''}${isActive ? ' active' : ''}" data-key="${key}" data-ts="${item.ts}" data-by="${by}">
           <span class="whisper-text">${this._escapeHtml(item.text)}</span>
           <span class="whisper-by ${by}">${by}</span>
-          <div class="private-whisper-actions">
-            <button class="action-highlight ${isHighlighted ? 'active' : ''}" onclick="PrivateWhisper.toggleHighlight(${item.ts}, '${by}', event)" title="${isHighlighted ? '取消高亮' : '高亮'}">${highlightIcon}</button>
-            ${canDelete ? `<button class="action-delete" onclick="PrivateWhisper.deleteItem(${item.ts}, '${by}', event)" title="删除">✕</button>` : ''}
-          </div>
+          ${isOwner ? `<div class="private-whisper-actions">${actionsHtml}</div>` : ''}
         </div>`;
       }
     }
@@ -7185,10 +7190,16 @@ const PrivateWhisper = {
       if (e.target.closest('.private-whisper-actions')) return;
 
       const key = item.dataset.key;
+      const itemBy = item.dataset.by;
       const isActive = item.classList.contains('active');
+      const currentRole = (typeof App !== 'undefined' && App.currentRole) || '';
+      const isOwner = itemBy === currentRole;
 
       // 暂停自动滚动
       this._pauseAutoScroll();
+
+      // 不是自己投递的内容：只暂停滚动，不弹出操作条
+      if (!isOwner) return;
 
       if (isActive) {
         item.classList.remove('active');
@@ -7214,6 +7225,11 @@ const PrivateWhisper = {
     if (event) {
       event.stopPropagation();
       event.preventDefault();
+    }
+    const currentRole = (typeof App !== 'undefined' && App.currentRole) || '';
+    if (by !== currentRole) {
+      showToast('只能高亮自己投递的内容哦');
+      return;
     }
     const list = Store.get(this._STORE_KEY, []);
     let changed = false;
