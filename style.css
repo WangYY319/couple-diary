@@ -4039,31 +4039,103 @@ body.music-active #tab-0 .card {
   color: #555;
   white-space: normal;
   overflow: visible;
+  cursor: pointer;
+  transition: background 0.2s;
+  position: relative;
 }
 
-.private-whisper-item .whisper-delete {
-  flex-shrink: 0;
-  margin-left: 6px;
-  width: 18px;
-  height: 18px;
-  line-height: 16px;
+.private-whisper-item:active {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* 高亮气泡样式 - TAO */
+.private-whisper-item.highlighted.TAO-side {
+  padding: 8px 14px 8px 18px;
+  margin: 4px 16px 4px 0;
+  margin-left: 20px;
+  background: #e8f3ff;
+  border-radius: 14px 14px 14px 4px;
+  box-shadow: 0 1px 3px rgba(27, 127, 227, 0.1);
+  min-height: auto;
+}
+
+.private-whisper-item.highlighted.TAO-side .whisper-text {
+  color: #0e5fb0;
+  font-weight: 500;
+}
+
+/* 高亮气泡样式 - YAN */
+.private-whisper-item.highlighted.YAN-side {
+  padding: 8px 18px 8px 14px;
+  margin: 4px 0 4px 16px;
+  margin-right: 20px;
+  background: #ffeef3;
+  border-radius: 14px 14px 4px 14px;
+  box-shadow: 0 1px 3px rgba(232, 41, 106, 0.1);
+  min-height: auto;
+}
+
+.private-whisper-item.highlighted.YAN-side .whisper-text {
+  color: #c2185b;
+  font-weight: 500;
+}
+
+/* 操作条 */
+.private-whisper-actions {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, top 0.2s;
+}
+
+.private-whisper-item.active .private-whisper-actions {
+  opacity: 1;
+  pointer-events: auto;
+  top: -32px;
+}
+
+.private-whisper-actions button {
+  width: 24px;
+  height: 24px;
+  line-height: 22px;
   text-align: center;
-  font-size: 14px;
-  color: #bbb;
-  background: transparent;
+  font-size: 13px;
   border: none;
   border-radius: 50%;
+  background: transparent;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s, color 0.2s, background 0.2s;
   padding: 0;
+  transition: background 0.2s, color 0.2s;
 }
 
-.private-whisper-item:hover .whisper-delete {
-  opacity: 1;
+.private-whisper-actions .action-highlight {
+  color: #f1c40f;
 }
 
-.private-whisper-item .whisper-delete:hover {
+.private-whisper-actions .action-highlight:hover {
+  background: rgba(241, 196, 15, 0.15);
+}
+
+.private-whisper-actions .action-highlight.active {
+  color: #f39c12;
+  background: rgba(243, 156, 18, 0.15);
+}
+
+.private-whisper-actions .action-delete {
+  color: #bbb;
+}
+
+.private-whisper-actions .action-delete:hover {
   color: #e74c3c;
   background: rgba(231, 76, 60, 0.1);
 }
@@ -4075,12 +4147,11 @@ body.music-active #tab-0 .card {
   word-break: break-word;
   text-align: left;
   font-weight: 500;
-  padding-right: 4px;
+  padding-right: 8px;
 }
 
 .private-whisper-item .whisper-by {
   flex-shrink: 0;
-  margin-left: 8px;
   padding: 1px 8px;
   font-size: 10px;
   font-weight: 700;

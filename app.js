@@ -4646,6 +4646,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v130', date: '2026-09-08', changes: '私密絮语布局重构:删除按钮移入点击弹出操作条(不再常驻)/新增高亮气泡样式(TAO蓝/YAN粉)/点击条目弹出操作条含高亮星标+删除/5秒自动关闭操作条/高亮状态云端同步' },
     { v: 'v129', date: '2026-09-08', changes: 'PDF数据导出报告增加随机问答和亲密问答/设置导出面板新增心细清单导出(标签+内容+创建者+爱心)/设置导出面板新增私密絮语导出(含甜蜜语录同步标识)/均支持分享和下载两种模式' },
     { v: 'v128', date: '2026-09-08', changes: '移除私密絮语独立同步按钮(导航栏已有统一同步)/私密絮语新增删除功能(悬停显示×/仅自己可删/云端同步删除)/投递信件与心细清单位置互换/同步逻辑支持删除传播' },
     { v: 'v127', date: '2026-09-08', changes: '私密絮语高度翻倍(160px→320px)/TAO标签蓝色YAN标签粉色区分角色/甜蜜语录双向同步到私密絮语(投递时同步/云端同步时同步/初始化首次迁移)/去重合并防重复' },
@@ -7092,6 +7093,7 @@ const PrivateWhisper = {
   _dragStartY: 0,
   _dragStartOffset: 0,
   _autoScrollTimer: null,
+  _activeKey: null, // 当前选中（显示操作条）的条目 key
 
   // 获取所有絮语（按投递时间正序排列）
   _getList() {
@@ -7104,9 +7106,14 @@ const PrivateWhisper = {
     Store.set(this._STORE_KEY, list);
   },
 
+  _itemKey(item) {
+    return `${item.ts}_${item.by || 'TAO'}`;
+  },
+
   init() {
     this.render();
     this._bindDrag();
+    this._bindItemClick();
     this._startAutoScroll();
   },
 
@@ -7127,14 +7134,20 @@ const PrivateWhisper = {
     for (let i = 0; i < 2; i++) {
       for (const item of list) {
         const by = item.by || 'TAO';
+        const key = this._itemKey(item);
+        const isActive = key === this._activeKey;
+        const isHighlighted = !!item.highlighted;
         const canDelete = by === currentRole;
-        const delBtn = canDelete
-          ? `<button class="whisper-delete" data-ts="${item.ts}" data-by="${by}" onclick="PrivateWhisper.deleteItem(${item.ts}, '${by}', event)" title="删除这条">×</button>`
-          : '';
-        html += `<div class="private-whisper-item">
+        const sideClass = by === 'TAO' ? 'TAO-side' : 'YAN-side';
+        const highlightIcon = isHighlighted ? '★' : '☆';
+
+        html += `<div class="private-whisper-item ${sideClass}${isHighlighted ? ' highlighted' : ''}${isActive ? ' active' : ''}" data-key="${key}" data-ts="${item.ts}" data-by="${by}">
           <span class="whisper-text">${this._escapeHtml(item.text)}</span>
           <span class="whisper-by ${by}">${by}</span>
-          ${delBtn}
+          <div class="private-whisper-actions">
+            <button class="action-highlight ${isHighlighted ? 'active' : ''}" onclick="PrivateWhisper.toggleHighlight(${item.ts}, '${by}', event)" title="${isHighlighted ? '取消高亮' : '高亮'}">${highlightIcon}</button>
+            ${canDelete ? `<button class="action-delete" onclick="PrivateWhisper.deleteItem(${item.ts}, '${by}', event)" title="删除">✕</button>` : ''}
+          </div>
         </div>`;
       }
     }
@@ -7144,6 +7157,80 @@ const PrivateWhisper = {
     // 根据条目数量调整滚动速度（越多越慢，保证每条都能看清）
     const duration = Math.max(8, list.length * 2.5);
     track.style.animationDuration = `${duration}s`;
+  },
+
+  // 绑定条目点击事件（显示/隐藏操作条）
+  _bindItemClick() {
+    const container = document.getElementById('privateWhisperContainer');
+    if (!container) return;
+
+    const closeAll = (exceptKey) => {
+      const items = container.querySelectorAll('.private-whisper-item');
+      items.forEach(item => {
+        if (item.dataset.key !== exceptKey) {
+          item.classList.remove('active');
+        }
+      });
+    };
+
+    container.addEventListener('click', (e) => {
+      const item = e.target.closest('.private-whisper-item');
+      if (!item) {
+        // 点击空白处，关闭所有操作条
+        closeAll(null);
+        this._activeKey = null;
+        return;
+      }
+      // 点到操作按钮上的话，不切换选中状态
+      if (e.target.closest('.private-whisper-actions')) return;
+
+      const key = item.dataset.key;
+      const isActive = item.classList.contains('active');
+
+      // 暂停自动滚动
+      this._pauseAutoScroll();
+
+      if (isActive) {
+        item.classList.remove('active');
+        this._activeKey = null;
+      } else {
+        closeAll(key);
+        item.classList.add('active');
+        this._activeKey = key;
+        // 5秒后自动关闭操作条
+        clearTimeout(this._actionTimer);
+        this._actionTimer = setTimeout(() => {
+          const el = container.querySelector(`.private-whisper-item[data-key="${key}"]`);
+          if (el) el.classList.remove('active');
+          if (this._activeKey === key) this._activeKey = null;
+          this._startAutoScroll();
+        }, 5000);
+      }
+    });
+  },
+
+  // 切换高亮
+  toggleHighlight(ts, by, event) {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    const list = Store.get(this._STORE_KEY, []);
+    let changed = false;
+    for (const item of list) {
+      if (item.ts === ts && item.by === by) {
+        item.highlighted = !item.highlighted;
+        changed = true;
+        break;
+      }
+    }
+    if (!changed) return;
+    this._saveList(list);
+    this.render();
+    // 同步到云端
+    if (typeof CloudSync !== 'undefined' && Cloud.pairCode) {
+      CloudSync.set(this._CLOUD_KEY, list);
+    }
   },
 
   _escapeHtml(str) {
