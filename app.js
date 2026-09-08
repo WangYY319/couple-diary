@@ -4646,6 +4646,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v132', date: '2026-09-08', changes: '私密絮语高亮气泡优化:文字区域气泡化/名字标签保持原位与普通条目对齐/滚动速度提升约0.5倍(2.5s→1.7s每条)' },
     { v: 'v131', date: '2026-09-08', changes: '私密絮语高亮权限与删除权限对齐:仅投递者本人可操作高亮/对方投递内容点击只暂停滚动不弹出操作条/高亮状态双方同步可见' },
     { v: 'v130', date: '2026-09-08', changes: '私密絮语布局重构:删除按钮移入点击弹出操作条(不再常驻)/新增高亮气泡样式(TAO蓝/YAN粉)/点击条目弹出操作条含高亮星标+删除/5秒自动关闭操作条/高亮状态云端同步' },
     { v: 'v129', date: '2026-09-08', changes: 'PDF数据导出报告增加随机问答和亲密问答/设置导出面板新增心细清单导出(标签+内容+创建者+爱心)/设置导出面板新增私密絮语导出(含甜蜜语录同步标识)/均支持分享和下载两种模式' },
@@ -7160,7 +7161,7 @@ const PrivateWhisper = {
     track.classList.add('auto-scroll');
 
     // 根据条目数量调整滚动速度（越多越慢，保证每条都能看清）
-    const duration = Math.max(8, list.length * 2.5);
+    const duration = Math.max(5, list.length * 1.7);
     track.style.animationDuration = `${duration}s`;
   },
 

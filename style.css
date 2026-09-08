@@ -4048,36 +4048,33 @@ body.music-active #tab-0 .card {
   background: rgba(0, 0, 0, 0.03);
 }
 
-/* 高亮气泡样式 - TAO */
-.private-whisper-item.highlighted.TAO-side {
-  padding: 8px 14px 8px 18px;
-  margin: 4px 16px 4px 0;
-  margin-left: 20px;
-  background: #e8f3ff;
-  border-radius: 14px 14px 14px 4px;
-  box-shadow: 0 1px 3px rgba(27, 127, 227, 0.1);
-  min-height: auto;
+/* 高亮气泡样式 - 只包裹文字部分，标签保持原位 */
+.private-whisper-item.highlighted {
+  padding-top: 5px;
+  padding-bottom: 5px;
 }
 
+.private-whisper-item.highlighted .whisper-text {
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+/* TAO 高亮：左侧蓝色气泡 */
 .private-whisper-item.highlighted.TAO-side .whisper-text {
+  background: #e8f3ff;
   color: #0e5fb0;
-  font-weight: 500;
+  border-bottom-left-radius: 3px;
+  box-shadow: 0 1px 2px rgba(27, 127, 227, 0.08);
 }
 
-/* 高亮气泡样式 - YAN */
-.private-whisper-item.highlighted.YAN-side {
-  padding: 8px 18px 8px 14px;
-  margin: 4px 0 4px 16px;
-  margin-right: 20px;
-  background: #ffeef3;
-  border-radius: 14px 14px 4px 14px;
-  box-shadow: 0 1px 3px rgba(232, 41, 106, 0.1);
-  min-height: auto;
-}
-
+/* YAN 高亮：右侧粉色气泡 */
 .private-whisper-item.highlighted.YAN-side .whisper-text {
+  background: #ffeef3;
   color: #c2185b;
-  font-weight: 500;
+  border-bottom-right-radius: 3px;
+  box-shadow: 0 1px 2px rgba(232, 41, 106, 0.08);
 }
 
 /* 操作条 */
