@@ -4646,6 +4646,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v133', date: '2026-09-11', changes: '投递信件字数上限从50字调整至1000字' },
     { v: 'v132', date: '2026-09-08', changes: '私密絮语高亮气泡优化:文字区域气泡化/名字标签保持原位与普通条目对齐/滚动速度提升约0.5倍(2.5s→1.7s每条)' },
     { v: 'v131', date: '2026-09-08', changes: '私密絮语高亮权限与删除权限对齐:仅投递者本人可操作高亮/对方投递内容点击只暂停滚动不弹出操作条/高亮状态双方同步可见' },
     { v: 'v130', date: '2026-09-08', changes: '私密絮语布局重构:删除按钮移入点击弹出操作条(不再常驻)/新增高亮气泡样式(TAO蓝/YAN粉)/点击条目弹出操作条含高亮星标+删除/5秒自动关闭操作条/高亮状态云端同步' },
@@ -11811,9 +11812,9 @@ const LetterBox = {
         <button class="letter-send" id="letterSendBtn" onclick="LetterBox._doSend('${fromRole}', '${toRole}')">✓ 确认投递</button>
       </div>
       <div class="letter-greeting">Dear ${toRole}：</div>
-      <textarea class="letter-content" id="letterContentInput" maxlength="50" placeholder="写下想对TA说的话…" rows="5"></textarea>
+      <textarea class="letter-content" id="letterContentInput" maxlength="1000" placeholder="写下想对TA说的话…" rows="5"></textarea>
       <div style="font-size:11px;color:#c8a9a9;margin:0 0 6px 16px;line-height:1.5;">💡 参考：今天想你了 / 想和你去海边 / 谢谢你一直陪着我</div>
-      <div class="letter-counter" id="letterCounter">0 / 50</div>
+      <div class="letter-counter" id="letterCounter">0 / 1000</div>
       <div class="letter-date">${today}</div>
     `;
 
@@ -11827,7 +11828,7 @@ const LetterBox = {
     const textarea = paper.querySelector('#letterContentInput');
     const counter = paper.querySelector('#letterCounter');
     textarea.addEventListener('input', () => {
-      counter.textContent = textarea.value.length + ' / 50';
+      counter.textContent = textarea.value.length + ' / 1000';
     });
 
     setTimeout(() => textarea.focus(), 100);
