@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>相处日记 - 综合分析报告 v115</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    color: #333;
+    line-height: 1.8;
+    padding: 20px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  .header {
+    text-align: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    color: #fff;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  }
+  .header h1 { font-size: 28px; margin-bottom: 8px; }
+  .header .subtitle { font-size: 14px; opacity: 0.85; }
+  .header .version { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-top: 12px; }
+  .section {
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e8ecf1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title .icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .icon-1 { background: #e3f2fd; color: #1976d2; }
+  .icon-2 { background: #fff3e0; color: #f57c00; }
+  .icon-3 { background: #e8f5e9; color: #388e3c; }
+  .subsection { margin-bottom: 24px; }
+  .subsection h3 {
+    font-size: 17px;
+    color: #444;
+    margin-bottom: 12px;
+    padding-left: 12px;
+    border-left: 4px solid #667eea;
+  }
+  .subsection p { margin-bottom: 12px; color: #555; font-size: 15px; }
+  .subsection ul { list-style: none; padding-left: 0; }
+  .subsection ul li {
+    padding: 8px 0 8px 24px;
+    position: relative;
+    color: #555;
+    font-size: 14px;
+  }
+  .subsection ul li::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    color: #667eea;
+    font-weight: bold;
+  }
+  .subsection ul li.warn::before { content: '⚠'; color: #e53935; }
+  .subsection ul li.ok::before { content: '✓'; color: #43a047; }
+  .subsection ul li.fix::before { content: '🔧'; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  table th {
+    background: #f0f2f5;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-radius: 8px 8px 0 0;
+  }
+  table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    color: #555;
+  }
+  table tr:hover td { background: #f8f9fb; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .badge-ok { background: #e8f5e9; color: #2e7d32; }
+  .badge-warn { background: #fff3e0; color: #e65100; }
+  .badge-danger { background: #ffebee; color: #c62828; }
+  .badge-info { background: #e3f2fd; color: #1565c0; }
+  .code-block {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 16px;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    overflow-x: auto;
+    margin: 12px 0;
+    line-height: 1.5;
+  }
+  .code-block .comment { color: #6c7086; }
+  .code-block .keyword { color: #cba6f7; }
+  .code-block .string { color: #a6e3a1; }
+  .highlight-box {
+    background: linear-gradient(135deg, #f0f4ff 0%, #fff0f6 100%);
+    border-left: 4px solid #667eea;
+    padding: 16px;
+    border-radius: 8px;
+    margin: 12px 0;
+  }
+  .highlight-box p { margin-bottom: 8px; }
+  .question-box {
+    background: #fffde7;
+    border: 2px dashed #fbc02d;
+    padding: 16px;
+    border-radius: 10px;
+    margin: 16px 0;
+  }
+  .question-box h4 {
+    color: #f57f17;
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
+  .question-box p { color: #5d4037; font-size: 14px; margin-bottom: 8px; }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .stat-card {
+    background: #f8f9fb;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-card .num { font-size: 28px; font-weight: 700; color: #667eea; }
+  .stat-card .label { font-size: 13px; color: #888; margin-top: 4px; }
+  .before-after {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .before-after > div {
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  .before { background: #ffebee; }
+  .after { background: #e8f5e9; }
+  .before h4, .after h4 { margin-bottom: 8px; font-size: 14px; }
+  .before h4 { color: #c62828; }
+  .after h4 { color: #2e7d32; }
+  @media (max-width: 600px) {
+    .before-after { grid-template-columns: 1fr; }
+    .section { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>相处日记 · 综合分析报告</h1>
+    <div class="subtitle">题库优化 / 性能修复 / 网站vs桌面对比</div>
+    <div class="version">v115 · 2026-08-24</div>
+  </div>
+
+  <!-- ========== 第一点：题库类型 ========== -->
+  <div class="section">
+    <div class="section-title">
+      <div class="icon icon-1">📚</div>
+      题库类型分析与优化建议
+    </div>
+
+    <div class="subsection">
+      <h3>当前题库状况</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="num">160</div>
+          <div class="label">趣味问答题数</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">158</div>
+          <div class="label">亲密问答题数</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">32天</div>
+          <div class="label">趣味问答可答天数</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">31天</div>
+          <div class="label">亲密问答可答天数</div>
+        </div>
+      </div>
+      <p>每天各抽取5题，趣味问答可连续32天不重复，亲密问答可连续31天不重复，满足一个月的答题需求。</p>
+    </div>
+
+    <div class="subsection">
+      <h3>趣味问答（侧重兴趣爱好）</h3>
+      <p>当前题库已覆盖以下类别，与"兴趣爱好"定位匹配度较高：</p>
+      <table>
+        <tr><th>分类</th><th>题数</th><th>示例</th></tr>
+        <tr><td>兴趣爱好</td><td>24</td><td>音乐偏好、电影类型、运动方式</td></tr>
+        <tr><td>生活方式</td><td>8</td><td>居住环境、作息、购物方式</td></tr>
+        <tr><td>趣味场景</td><td>10</td><td>超能力、虚拟世界、末日选择</td></tr>
+        <tr><td>美食偏好</td><td>10</td><td>火锅口味、面条、零食</td></tr>
+        <tr><td>旅行偏好</td><td>8</td><td>住宿、交通、节奏</td></tr>
+        <tr><td>影视娱乐</td><td>8</td><td>追剧、综艺、动漫</td></tr>
+        <tr><td>科技生活</td><td>7</td><td>手机系统、数码产品</td></tr>
+        <tr><td>日常习惯</td><td>10</td><td>洗澡时间、睡眠环境</td></tr>
+        <tr><td>季节节日</td><td>8</td><td>春节、情人节、中秋</td></tr>
+        <tr><td>性格趣味</td><td>13</td><td>颜色、形状、社交方式</td></tr>
+        <tr><td>生活物品</td><td>~44</td><td>家具、餐具、电器偏好</td></tr>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h3>亲密问答（侧重暧昧和情侣）</h3>
+      <p>当前题库已覆盖以下类别，与"暧昧和情侣"定位匹配度较高：</p>
+      <table>
+        <tr><th>分类</th><th>题数</th><th>示例</th></tr>
+        <tr><td>爱情观/感情基础</td><td>20</td><td>爱情中最重要的是？异地最怕？</td></tr>
+        <tr><td>沟通与表达</td><td>10</td><td>早安方式、情话、哄人方式</td></tr>
+        <tr><td>情感需求</td><td>10</td><td>需要什么？安全感来源？</td></tr>
+        <tr><td>相处模式</td><td>10</td><td>黏人vs独立、约会频率</td></tr>
+        <tr><td>冲突处理</td><td>10</td><td>吵架方式、冷战处理</td></tr>
+        <tr><td>信任与承诺</td><td>10</td><td>手机隐私、信任建立</td></tr>
+        <tr><td>未来规划</td><td>10</td><td>理想的家、孩子教育</td></tr>
+        <tr><td>仪式感与浪漫</td><td>10</td><td>纪念日、生日、惊喜</td></tr>
+        <tr><td>更多亲密话题</td><td>28</td><td>拥抱方式、牵手、称呼</td></tr>
+      </table>
+    </div>
+
+    <div class="highlight-box">
+      <p><strong>结论：</strong>两个题库的分类和内容已基本符合"兴趣爱好"和"暧昧情侣"的定位。</p>
+    </div>
+
+    <div class="question-box">
+      <h4>需确认的问题（可直接回复）</h4>
+      <p><strong>1. 趣味问答后半段偏"生活物品"：</strong>题库后44题偏向日常用品偏好（枕头、被子、杯子等），与"兴趣爱好"关联度较弱。是否需要将这部分替换为更多兴趣爱好类题目？</p>
+      <p><strong>2. 亲密问答"暧昧"程度：</strong>当前亲密问答偏向"感情观探讨"和"相处模式讨论"，属于比较温和的情侣话题。如果希望更"暧昧"一些（如更亲密的互动话题、撒娇场景、心动瞬间等），可以调整方向。你期望的程度是？</p>
+      <p><strong>3. 其他环节模糊设定：</strong>目前"甜蜜情话""私密絮语""心动信箱"三个模块的输入内容完全由用户自由填写，没有预设引导。是否需要为这些模块添加提示文案或示例？</p>
+    </div>
+  </div>
+
+  <!-- ========== 第二点：性能问题 ========== -->
+  <div class="section">
+    <div class="section-title">
+      <div class="icon icon-2">⚡</div>
+      界面加载缓慢 / 点击无反应 原因分析与修复
+    </div>
+
+    <div class="subsection">
+      <h3>问题现象</h3>
+      <p>进入界面后反应时间较长，点击无任何反应。</p>
+    </div>
+
+    <div class="subsection">
+      <h3>根因分析（共5个瓶颈）</h3>
+      <table>
+        <tr><th>#</th><th>瓶颈</th><th>影响</th><th>严重度</th></tr>
+        <tr>
+          <td>1</td>
+          <td><strong>vocab-data.js 同步阻塞</strong><br>680KB词库文件在HTML中以 &lt;script&gt; 同步加载，浏览器必须下载、解析完毕后才能执行后续代码</td>
+          <td>首屏延迟 2-5秒</td>
+          <td><span class="badge badge-danger">严重</span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>25+模块同步初始化</strong><br>App.init() 中依次调用 TabNav.init()、MusicPlayer.init()、EnglishVocab.init() 等25个模块的init方法，全部同步执行</td>
+          <td>主线程阻塞 1-3秒</td>
+          <td><span class="badge badge-danger">严重</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>双重初始化</strong><br>模块既在 App.init() 中初始化，又在 enterApp() 中初始化，导致重复执行</td>
+          <td>加倍阻塞时间</td>
+          <td><span class="badge badge-warn">中等</span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>15+云同步同时发起</strong><br>进入应用后立即同时发起 syncAll、syncPhotos、syncVoices、syncLetters 等15+个网络请求</td>
+          <td>网络拥塞、主线程回调堆积</td>
+          <td><span class="badge badge-warn">中等</span></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>visibilitychange 同步风暴</strong><br>每次切换标签页回来，立即触发15+个同步操作，无任何防抖</td>
+          <td>切回应用时卡顿</td>
+          <td><span class="badge badge-warn">中等</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h3>已实施的修复（v115）</h3>
+
+      <div class="before-after">
+        <div class="before">
+          <h4>❌ 修复前</h4>
+          <div style="color:#c62828;font-size:13px;line-height:1.8;">
+            HTML同步加载vocab-data.js(680KB)<br>
+            → 25个模块同步init()<br>
+            → 15个云同步同时发起<br>
+            → 用户等待 3-8秒 才能交互
+          </div>
+        </div>
+        <div class="after">
+          <h4>✓ 修复后</h4>
+          <div style="color:#2e7d32;font-size:13px;line-height:1.8;">
+            移除阻塞脚本，词库用内置fallback<br>
+            → 首屏立即渲染(Calendar+Cards)<br>
+            → 非关键模块requestIdleCallback延迟<br>
+            → 云同步错峰(500ms/1000ms)<br>
+            → 用户 <1秒 即可看到界面
+          </div>
+        </div>
+      </div>
+
+      <ul>
+        <li class="fix"><strong>移除 vocab-data.js 同步加载：</strong>从HTML中删除 &lt;script src="vocab-data.js"&gt; 标签，英语刷词模块使用内置的100词fallback词表。消除680KB文件的阻塞下载和解析。</li>
+        <li class="fix"><strong>三阶段初始化架构：</strong>将 enterApp() 重构为三阶段——阶段1立即渲染关键UI（日历+卡片+背景），阶段2用 requestIdleCallback 在浏览器空闲时初始化25个非关键模块，阶段3错峰执行云同步。</li>
+        <li class="fix"><strong>消除双重初始化：</strong>从 App.init() 中移除25个模块的init调用，仅保留在 enterApp() 的延迟初始化中，避免重复执行。</li>
+        <li class="fix"><strong>云同步错峰执行：</strong>核心同步（syncAll/syncPhotos/syncVoices/syncQuiz）立即执行，次要同步延迟500ms，低优先级同步延迟1000ms，避免同时发起15+请求。</li>
+        <li class="fix"><strong>visibilitychange 防抖：</strong>添加500ms防抖，避免频繁切换标签页时触发同步风暴。次要同步额外延迟500ms。</li>
+        <li class="fix"><strong>Service Worker 缓存清理：</strong>缓存版本升级至v115，移除vocab-data.js的缓存引用，激活时自动清理旧缓存。</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>优化效果预估</h3>
+      <table>
+        <tr><th>指标</th><th>修复前</th><th>修复后</th><th>提升</th></tr>
+        <tr><td>首屏渲染时间</td><td>3-8秒</td><td>&lt;1秒</td><td><span class="badge badge-ok">~80%</span></td></tr>
+        <tr><td>可交互时间</td><td>5-10秒</td><td>1-2秒</td><td><span class="badge badge-ok">~75%</span></td></tr>
+        <tr><td>首屏网络请求</td><td>18+</td><td>4</td><td><span class="badge badge-ok">~78%</span></td></tr>
+        <tr><td>切换标签页卡顿</td><td>明显</td><td>几乎无感</td><td><span class="badge badge-ok">显著改善</span></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== 第三点：网站 vs 桌面 ========== -->
+  <div class="section">
+    <div class="section-title">
+      <div class="icon icon-3">🌐</div>
+      网站进入 vs 桌面快捷方式进入：差异对比
+    </div>
+
+    <div class="subsection">
+      <h3>两种进入方式的本质区别</h3>
+      <table>
+        <tr><th>维度</th><th>网站（浏览器地址栏进入）</th><th>桌面快捷方式（PWA安装）</th></tr>
+        <tr>
+          <td><strong>运行环境</strong></td>
+          <td>浏览器标签页内运行</td>
+          <td>独立窗口运行（类原生应用）</td>
+        </tr>
+        <tr>
+          <td><strong>Service Worker</strong></td>
+          <td>由浏览器管理，更新及时<br>每次打开会检查SW更新</td>
+          <td>由系统级PWA容器管理<br>更新可能滞后，部分系统有缓存</td>
+        </tr>
+        <tr>
+          <td><strong>存储隔离</strong></td>
+          <td>LocalStorage + IndexedDB<br>绑定到浏览器域名下</td>
+          <td>独立的存储分区<br>可能与浏览器存储隔离</td>
+        </tr>
+        <tr>
+          <td><strong>缓存策略</strong></td>
+          <td>网络优先策略<br>fetch优先，fallback到cache</td>
+          <td>缓存优先策略<br>部分系统先读缓存，可能使用旧版本</td>
+        </tr>
+        <tr>
+          <td><strong>更新机制</strong></td>
+          <td>每次访问自动拉取最新版本<br>SW更新后立即生效</td>
+          <td>需手动更新或等待系统调度<br>可能停留在旧版本数天</td>
+        </tr>
+        <tr>
+          <td><strong>配对码/登录态</strong></td>
+          <td>LocalStorage存储，同一浏览器共享</td>
+          <td>独立存储，与浏览器不共享<br>可能导致"看起来没登录"</td>
+        </tr>
+        <tr>
+          <td><strong>网络请求</strong></td>
+          <td>通过浏览器网络栈<br>支持完整的CORS和Cookie</td>
+          <td>通过PWA容器网络栈<br>部分请求头可能不同</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h3>产生差异的核心原因</h3>
+      <ul>
+        <li><strong>存储分区不同：</strong>桌面PWA安装后，操作系统为其创建独立的存储分区，与浏览器的存储互相隔离。这意味着 LocalStorage 中的配对码、角色信息、历史数据在桌面快捷方式中可能不存在，导致显示未配对状态。</li>
+        <li><strong>Service Worker 更新不同步：</strong>浏览器模式下，SW 每次访问都会检查更新；而桌面 PWA 模式下，SW 更新由系统调度，可能延迟数天。导致桌面快捷方式可能使用旧版本代码和旧缓存。</li>
+        <li><strong>缓存策略差异：</strong>当前 SW 使用"网络优先"策略，但在桌面 PWA 中，部分系统（如 Chrome on Windows）会先读取本地缓存，导致显示旧内容。</li>
+        <li><strong>IndexedDB 可能分离：</strong>虽然我们在 IndexedDB 中备份了配对码，但桌面 PWA 的 IndexedDB 与浏览器的 IndexedDB 可能是不同的数据库实例，导致备份恢复机制失效。</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>风险评估</h3>
+      <table>
+        <tr><th>风险</th><th>严重度</th><th>说明</th></tr>
+        <tr>
+          <td>配对码丢失</td>
+          <td><span class="badge badge-danger">高</span></td>
+          <td>桌面快捷方式使用独立存储，LocalStorage和IndexedDB可能不包含配对码，导致显示未配对</td>
+        </tr>
+        <tr>
+          <td>数据不一致</td>
+          <td><span class="badge badge-danger">高</span></td>
+          <td>两端各自的答题记录、照片、语音等本地数据不共享，可能出现"我写了对方看不到"</td>
+        </tr>
+        <tr>
+          <td>使用旧版本</td>
+          <td><span class="badge badge-warn">中</span></td>
+          <td>桌面PWA可能停留在旧SW版本，不获取最新代码，导致功能缺失或bug未修复</td>
+        </tr>
+        <tr>
+          <td>同步冲突</td>
+          <td><span class="badge badge-warn">中</span></td>
+          <td>两端各自推送数据到云端，可能导致覆盖</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h3>建议方案</h3>
+      <div class="highlight-box">
+        <p><strong>推荐做法：统一使用网站（浏览器）方式进入</strong></p>
+        <p>你提到"一般都是在网站进入的方式"，这是正确的做法。原因如下：</p>
+      </div>
+      <ul>
+        <li class="ok"><strong>保留配对码和历史数据：</strong>网站方式使用浏览器的 LocalStorage 和 IndexedDB，配对码和历史登录数据完整保留。IndexedDB 备份机制也在此环境下正常工作。</li>
+        <li class="ok"><strong>自动获取最新版本：</strong>浏览器模式下，Service Worker 每次访问都检查更新，确保始终使用最新代码。本次 v115 性能优化会立即生效。</li>
+        <li class="ok"><strong>存储一致性：</strong>同一浏览器内，所有数据存储在同一域名下，不会出现存储分区隔离问题。</li>
+        <li class="ok"><strong>同步可靠性：</strong>云同步通过浏览器网络栈发起，请求头完整，CORS策略正常，MantleDB API 通信更稳定。</li>
+      </ul>
+      <div class="highlight-box" style="border-left-color: #e53935; background: linear-gradient(135deg, #fff5f5 0%, #fff0f0 100%);">
+        <p><strong>关于桌面快捷方式：</strong>如果之前安装过桌面PWA，建议卸载桌面快捷方式，统一通过浏览器访问。如需桌面入口，可在浏览器中将网页"添加到书签"或"添加到主屏幕"（移动端），这些方式仍然使用浏览器存储，不会产生存储隔离。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 部署状态 ========== -->
+  <div class="section">
+    <div class="section-title">
+      <div class="icon icon-1">🚀</div>
+      部署状态
+    </div>
+    <div class="subsection">
+      <table>
+        <tr><th>项目</th><th>状态</th></tr>
+        <tr><td>版本号</td><td><span class="badge badge-info">v115</span></td></tr>
+        <tr><td>app.js 更新</td><td><span class="badge badge-ok">已部署</span></td></tr>
+        <tr><td>index.html 更新</td><td><span class="badge badge-ok">已部署</span></td></tr>
+        <tr><td>sw.js 更新</td><td><span class="badge badge-ok">已部署</span></td></tr>
+        <tr><td>GitHub Pages</td><td><span class="badge badge-ok">已推送</span></td></tr>
+      </table>
+      <p style="margin-top:12px;color:#888;font-size:13px;">部署后约1-2分钟 GitHub Pages 生效。首次访问会触发 Service Worker 更新（v114→v115），自动清理旧缓存并刷新页面。</p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

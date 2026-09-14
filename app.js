@@ -253,20 +253,20 @@ const Cloud = {
     if (!this.pairCode) return { tao: false, yan: false };
     const now = Date.now();
     const threshold = 180000; // 3 分钟
-    const [taoStatus, yanStatus] = await Promise.all([
-      this.getStatus('TAO'),
-      this.getStatus('YAN')
-    ]);
+    // 只查对方的在线状态（自己必然在线，无需浪费一次 GET 请求）
+    const otherRole = App.currentRole === 'TAO' ? 'YAN' : 'TAO';
+    const otherStatus = await this.getStatus(otherRole);
     // 网络错误时返回 null（不改变当前显示状态），404/超时返回 false（确实离线）
     const parseStatus = (s) => {
       if (!s) return false; // 404 或 null = 确实离线/从未在线
       if (s._networkError) return null; // 网络错误 = 未知，不改变当前状态
       return !!(s.ts && (now - s.ts) < threshold);
     };
-    return {
-      tao: parseStatus(taoStatus),
-      yan: parseStatus(yanStatus)
-    };
+    const otherParsed = parseStatus(otherStatus);
+    const result = { tao: false, yan: false };
+    result[App.currentRole.toLowerCase()] = true; // 自己在线
+    result[otherRole.toLowerCase()] = otherParsed === null ? false : otherParsed;
+    return result;
   },
 
   // 创建配对：写一份 meta 数据占位
@@ -338,8 +338,11 @@ const Cloud = {
     const ns = `couple-pwa-${code.toLowerCase()}`;
     try {
       const r = await fetch(`${this.BASE}/${ns}/meta`, { cache: 'no-cache' });
+      if (r.status === 429) {
+        return { ok: false, error: 'rate_limit', _rateLimited: true };
+      }
       if (!r.ok) {
-        return { ok: false, error: '配对码不存在，请确认后重试' };
+        return { ok: false, error: '配对码不存在', _notFound: true };
       }
       const meta = await r.json();
       // 写入自己的角色到 meta，同时记录最后登录时间（用于角色冲突检测）
@@ -635,47 +638,59 @@ const Cloud = {
     console.log('[Cloud] 旧命名空间清理完成');
   },
 
-  // 启动轮询
+  // 启动轮询（分层调度，减少 API 调用次数，防止 mantledb 免费额度超限）
+  _pollCycle: 0,
   startPolling() {
     if (this.pollTimer) clearInterval(this.pollTimer);
+    this._pollCycle = 0;
     this.pollTimer = setInterval(() => {
       // 仅在应用非历史模式时轮询今天的数据
       if (!App.isHistory) {
+        this._pollCycle++;
+        const cycle = this._pollCycle;
+
+        // Tier 1（每轮 60s）：心跳 + 打卡数据 + 在线状态
         this.heartbeat();
         this.syncToday();
-        // 单独同步问答和刷词数据（不依赖 syncToday 的 isSyncing 状态）
-        this.syncQuizVocab();
-        this.syncSubmittedQuestions();
-        this.syncPhotos();
-        this.syncVoices();
-        // 同步在线时长、信件、头像、运动时间、背景透明度
-        if (typeof CloudSync !== 'undefined') {
-          CloudSync.syncOnlineDuration();
-          CloudSync.syncLetters();
-          CloudSync.syncAvatars();
-          CloudSync.syncExerciseTime();
-          CloudSync.syncRoleProfile();
-          CloudSync.syncBgOpacity();
-          CloudSync.syncPomodoro();
-          CloudSync.syncPomodoroHistory();
-          CloudSync.syncLandmarks();
-          CloudSync.syncThemeColor();
-          CloudSync.syncSweetSubmitted();
-          CloudSync.syncPrivateWhispers();
-          CloudSync.syncMindList();
-          ReadMark.syncAll();
-          RoleName.syncFromCloud();
-        }
-        // 刷新IP地址（拉取对方最新IP）
-        if (typeof IPAddress !== 'undefined') {
-          IPAddress._pullOtherIP();
-        }
-        // 检测双方在线状态（触发动画 + US Online 提示）
         if (typeof Setting !== 'undefined') {
           Setting.refreshStatus();
         }
+
+        // Tier 2（每 3 轮 = 3 分钟）：问答、信件、在线时长、私密絮语、心细清单
+        if (cycle % 3 === 0) {
+          this.syncQuizVocab();
+          this.syncSubmittedQuestions();
+          if (typeof CloudSync !== 'undefined') {
+            CloudSync.syncLetters();
+            CloudSync.syncOnlineDuration();
+            CloudSync.syncPrivateWhispers();
+            CloudSync.syncMindList();
+          }
+        }
+
+        // Tier 3（每 10 轮 = 10 分钟）：头像、运动、背景、番茄钟、地标、主题、甜蜜语录
+        if (cycle % 10 === 0) {
+          this.syncPhotos();
+          this.syncVoices();
+          if (typeof CloudSync !== 'undefined') {
+            CloudSync.syncAvatars();
+            CloudSync.syncExerciseTime();
+            CloudSync.syncRoleProfile();
+            CloudSync.syncBgOpacity();
+            CloudSync.syncPomodoro();
+            CloudSync.syncPomodoroHistory();
+            CloudSync.syncLandmarks();
+            CloudSync.syncThemeColor();
+            CloudSync.syncSweetSubmitted();
+            ReadMark.syncAll();
+            RoleName.syncFromCloud();
+          }
+          if (typeof IPAddress !== 'undefined') {
+            IPAddress._pullOtherIP();
+          }
+        }
       }
-    }, 10000); // 10 秒（原 30 秒，缩短以提升实时性）
+    }, 60000); // 60 秒（大幅降低 API 调用频率）
   },
 
   stopPolling() {
@@ -2636,31 +2651,14 @@ const App = {
     Cloud.heartbeat();
     // 清缓存后重新加入：必须先拉取云端数据恢复本地，再推送
     Cloud.syncAll().then(() => {
-      // syncAll 完成后，本地数据已从云端恢复，此时再推送和同步其他模块
-      Cloud.syncSubmittedQuestions();
+      // syncAll 完成后，仅同步最关键的几个模块（其余由轮询逐步同步）
       Cloud.syncQuizVocab();
-      Cloud.syncPhotos();
-      Cloud.syncVoices();
-      Cloud.startPolling();
-      // 同步在线时长、信件、头像、运动时间、背景透明度
       if (typeof CloudSync !== 'undefined') {
-        CloudSync.syncOnlineDuration();
         CloudSync.syncLetters();
-        CloudSync.syncAvatars();
-        CloudSync.syncExerciseTime();
-        CloudSync.syncBgOpacity();
-        CloudSync.syncPomodoro();
-        CloudSync.syncPomodoroHistory();
-        CloudSync.syncLandmarks();
-        CloudSync.syncThemeColor();
-        CloudSync.syncSweetSubmitted();
+        CloudSync.syncOnlineDuration();
         CloudSync.syncPrivateWhispers();
-        CloudSync.syncMindList();
-        ReadMark.syncAll();
-        RoleName.syncFromCloud();
       }
-      // IP地址显示已移除
-      // 清缓存恢复后，标记为已完成恢复
+      Cloud.startPolling();
       Cloud.isFreshLogin = false;
       showToast('已配对成功，开始你们的日记吧 💕');
     }).catch(() => {
@@ -2668,9 +2666,7 @@ const App = {
       Cloud.startPolling();
       Cloud.syncQuizVocab();
       if (typeof CloudSync !== 'undefined') {
-        CloudSync.syncSweetSubmitted();
-        CloudSync.syncPrivateWhispers();
-        CloudSync.syncMindList();
+        CloudSync.syncLetters();
       }
       showToast('已配对成功，开始你们的日记吧 💕');
     });
@@ -3075,7 +3071,17 @@ const Pair = {
       App.enterAfterPair(role);
       return;
     }
-    // 加入失败说明配对码尚不存在，创建它
+    // 频率限制 → 不再回退到创建新码，直接报错（等限制恢复后重试）
+    if (joinResult._rateLimited) {
+      showToast('⏳ 该配对码请求频率超限，请等待几小时后重试');
+      const pairScreen = document.getElementById('pairScreen');
+      if (pairScreen) {
+        pairScreen.style.display = 'flex';
+        Pair.showCreateView();
+      }
+      return;
+    }
+    // meta 不存在 → 创建它（保留原命名空间数据）
     showToast('正在创建默认配对...');
     const createResult = await Cloud.createPairWithCode(DEFAULT_PAIR_CODE, role);
     if (createResult.ok) {
@@ -3152,8 +3158,13 @@ const Pair = {
       App.enterAfterPair(role);
       return;
     }
+    // 频率限制 → 提示等待
+    if (r._rateLimited) {
+      showToast('⏳ 该配对码请求频率超限（24h内超过1万次），请等待几小时后重试');
+      return;
+    }
     // meta 不存在 → 用原配对码重建（数据仍在原命名空间下，不会被覆盖）
-    if (r.error && r.error.includes('不存在')) {
+    if (r._notFound) {
       showToast('配对码元数据缺失，正在重建...');
       const createResult = await Cloud.createPairWithCode(code, role);
       if (createResult.ok) {
@@ -3161,6 +3172,8 @@ const Pair = {
         App.enterAfterPair(role);
         return;
       }
+      showToast('重建配对失败，请稍后重试');
+      return;
     }
     showToast(r.error || '加入失败，请检查配对码');
   },
@@ -4973,7 +4986,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
-    { v: 'v138', date: '2026-09-14', changes: '修复YAN界面不显示TAO数据:根本原因是浏览器HTTP缓存导致GET请求返回旧数据/所有API GET请求添加cache:no-cache参数/SW不再拦截跨域API请求(仅缓存同源静态资源)/修复同时上线不触发US Online(心跳GET被缓存导致读不到对方在线状态)/修复打卡/信件/在线时长等板块同步异常/快捷登录配对码meta缺失时自动重建(保留原命名空间数据不丢失)' },
+    { v: 'v138', date: '2026-09-14', changes: '修复YAN不显示TAO数据+API频率超限:1.所有GET请求添加cache:no-cache防浏览器缓存旧数据 2.SW不再拦截跨域API请求 3.轮询从10s改为60s并分层调度(Tier1每60s:打卡+心跳+在线状态/Tier2每3min:问答+信件+絮语/Tier3每10min:头像+番茄钟+主题等) 4.在线状态检测只查对方(1次GET→省一半) 5.配对码meta不存在时自动重建 6.429频率限制友好提示 7.enterAfterPair精简初始同步(15+模块→4个,其余轮询补齐)' },
     { v: 'v137', date: '2026-09-14', changes: '彻底修复在线状态闪烁:网络请求失败时不改变状态(区分404和网络错误)/refreshStatus防竞态锁/首页导航栏显示版本号' },
     { v: 'v136', date: '2026-09-14', changes: '修复在线状态不稳定:自己的状态不再被云端数据覆盖/在线阈值从90秒放宽至3分钟/心跳失败自动重试/页面切回前台时立即发送心跳' },
     { v: 'v135', date: '2026-09-14', changes: '修复同步锁死锁问题:syncAll/syncToday改用finally确保isSyncing释放/新增同步状态诊断面板(手机端设置页进入/查看各模块同步状态/强制解锁/手动同步/诊断日志)' },

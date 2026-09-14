@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>清缓存后无法实时互动 - 原因分析与修复</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+    color: #333; line-height: 1.8; padding: 20px;
+  }
+  .container { max-width: 860px; margin: 0 auto; }
+  .header {
+    text-align: center; padding: 40px 20px;
+    background: linear-gradient(135deg, #e53935 0%, #ff6f00 100%);
+    border-radius: 16px; color: #fff; margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(229,57,53,0.2);
+  }
+  .header h1 { font-size: 26px; margin-bottom: 8px; }
+  .header .subtitle { font-size: 14px; opacity: 0.9; }
+  .header .version { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-top: 12px; }
+  .section {
+    background: #fff; border-radius: 16px; padding: 32px; margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  }
+  .section-title {
+    font-size: 20px; font-weight: 700; margin-bottom: 20px;
+    padding-bottom: 12px; border-bottom: 2px solid #e8ecf1;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .icon-1 { background: #ffebee; }
+  .icon-2 { background: #fff3e0; }
+  .icon-3 { background: #e8f5e9; }
+  .icon-4 { background: #e3f2fd; }
+  .subsection { margin-bottom: 24px; }
+  .subsection h3 { font-size: 16px; color: #444; margin-bottom: 12px; padding-left: 12px; border-left: 4px solid #e53935; }
+  .subsection p { margin-bottom: 12px; color: #555; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  table th { background: #f5f5f5; padding: 10px; text-align: left; font-weight: 600; border-radius: 6px 6px 0 0; }
+  table td { padding: 10px; border-bottom: 1px solid #eee; color: #555; vertical-align: top; }
+  table tr:hover td { background: #fafafa; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+  .badge-danger { background: #ffebee; color: #c62828; }
+  .badge-warn { background: #fff3e0; color: #e65100; }
+  .badge-ok { background: #e8f5e9; color: #2e7d32; }
+  .badge-info { background: #e3f2fd; color: #1565c0; }
+  .flow-box { background: #f8f9fb; border-radius: 10px; padding: 16px; margin: 12px 0; }
+  .flow-step { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; }
+  .flow-step .num { width: 28px; height: 28px; border-radius: 50%; background: #e53935; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .flow-step .num.ok { background: #43a047; }
+  .flow-step .num.warn { background: #f57c00; }
+  .flow-step .content { flex: 1; font-size: 14px; color: #555; }
+  .flow-step .content strong { color: #333; }
+  .danger-box { background: #fff5f5; border: 2px solid #ffcdd2; border-radius: 10px; padding: 16px; margin: 12px 0; }
+  .danger-box h4 { color: #c62828; font-size: 15px; margin-bottom: 8px; }
+  .danger-box p { color: #5d4037; font-size: 14px; margin-bottom: 8px; }
+  .fix-box { background: #f1f8e9; border: 2px solid #c5e1a5; border-radius: 10px; padding: 16px; margin: 12px 0; }
+  .fix-box h4 { color: #2e7d32; font-size: 15px; margin-bottom: 8px; }
+  .fix-box p { color: #33691e; font-size: 14px; margin-bottom: 8px; }
+  .code-block { background: #1e1e2e; color: #cdd6f4; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; overflow-x: auto; margin: 8px 0; }
+  .tip-box { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 12px; border-radius: 8px; margin: 12px 0; }
+  .tip-box p { color: #1565c0; font-size: 14px; margin: 0; }
+  .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .before-after > div { padding: 12px; border-radius: 8px; font-size: 13px; }
+  .before { background: #ffebee; }
+  .after { background: #e8f5e9; }
+  .before h4 { color: #c62828; margin-bottom: 6px; font-size: 14px; }
+  .after h4 { color: #2e7d32; margin-bottom: 6px; font-size: 14px; }
+  @media (max-width: 600px) { .before-after { grid-template-columns: 1fr; } .section { padding: 20px; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>清缓存后无法实时互动：原因分析</h1>
+    <div class="subtitle">登录历史 / 根因分析 / 修复方案 / 规避建议</div>
+    <div class="version">v117 · 2026-08-24</div>
+  </div>
+
+  <!-- ========== 登录历史与流程 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-1">📋</div> 登录历史与配对流程</div>
+
+    <div class="subsection">
+      <h3>正常登录流程（首次）</h3>
+      <div class="flow-box">
+        <div class="flow-step"><div class="num ok">1</div><div class="content"><strong>选择角色</strong> → 用户在入口页选择 TAO 或 YAN</div></div>
+        <div class="flow-step"><div class="num ok">2</div><div class="content"><strong>自动配对</strong> → <code>Pair.autoJoin(role)</code> 使用默认配对码 <code>U2A6KA</code> 加入</div></div>
+        <div class="flow-step"><div class="num ok">3</div><div class="content"><strong>写入本地</strong> → pairCode 和 role 保存到 LocalStorage + IndexedDB 双重备份</div></div>
+        <div class="flow-step"><div class="num ok">4</div><div class="content"><strong>进入应用</strong> → <code>enterAfterPair()</code> 启动云同步 + 10秒轮询</div></div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>正常回访（缓存完好）</h3>
+      <div class="flow-box">
+        <div class="flow-step"><div class="num ok">1</div><div class="content"><strong>Cloud.init()</strong> → 从 LocalStorage 读取 <code>ty_pairCode</code> → 找到</div></div>
+        <div class="flow-step"><div class="num ok">2</div><div class="content"><strong>验证角色</strong> → 从 LocalStorage 读取 <code>ty_role</code> → 找到</div></div>
+        <div class="flow-step"><div class="num ok">3</div><div class="content"><strong>直接进入</strong> → <code>enterApp()</code> 启动云同步和轮询</div></div>
+        <div class="flow-step"><div class="num ok">4</div><div class="content"><strong>实时互动</strong> → 每10秒轮询 <code>syncToday()</code> + <code>syncQuizVocab()</code> 等</div></div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>清缓存后登录（出问题的场景）</h3>
+      <div class="flow-box">
+        <div class="flow-step"><div class="num warn">1</div><div class="content"><strong>LocalStorage 全部清除</strong> → pairCode、role、所有日记数据、问答答案、配对历史 → 全部丢失</div></div>
+        <div class="flow-step"><div class="num warn">2</div><div class="content"><strong>IndexedDB 可能被清除</strong> → 取决于浏览器"清除数据"的范围<br><span style="color:#e65100;">• 仅"清除缓存"：IndexedDB 保留 → 可恢复 pairCode</span><br><span style="color:#c62828;">• "清除所有数据"：IndexedDB 也清除 → pairCode 备份丢失</span></div></div>
+        <div class="flow-step"><div class="num warn">3</div><div class="content"><strong>Cloud.init() 尝试恢复</strong> → LocalStorage 无 pairCode → 查 IndexedDB 备份</div></div>
+        <div class="flow-step"><div class="num warn">4</div><div class="content"><strong>如果 IndexedDB 有备份</strong> → 恢复 pairCode 和 role → 进入应用</div></div>
+        <div class="flow-step"><div class="num warn">5</div><div class="content"><strong>如果 IndexedDB 也清除</strong> → 显示入口页 → 用户选角色 → <code>autoJoin()</code> 重新加入配对码 U2A6KA</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 根因分析 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-2">🔍</div> 根因分析：为什么无法实时互动</div>
+
+    <p style="margin-bottom:16px;font-size:15px;">清缓存后虽然能重新进入应用（通过 IndexedDB 备份或重新加入配对码），但<strong style="color:#c62828;">实时互动会中断</strong>。以下是4个根因：</p>
+
+    <div class="danger-box">
+      <h4>根因1：pushQuizVocab() 用空数据覆盖云端（最严重）</h4>
+      <p><strong>问题：</strong>清缓存后本地问答答案为空 <code>[]</code>。<code>syncQuizVocab()</code> 先执行 <code>pushQuizVocab()</code>，将空答案推送到云端，<strong>覆盖了之前存储的答题数据</strong>。</p>
+      <p><strong>影响：</strong>对方在下次轮询（10秒后）拉取到空数据，显示"对方未答题"，已答题的进度丢失。</p>
+      <div class="code-block"><span style="color:#6c7086;">// 修复前的代码流程</span>
+syncQuizVocab() {
+  await pushQuizVocab();  <span style="color:#c62828;">// ← 推送空数据到云端，覆盖！</span>
+  remote = await pullQuizVocab();  <span style="color:#6c7086;">// 拉取对方数据</span>
+}</div>
+    </div>
+
+    <div class="danger-box">
+      <h4>根因2：pushAllDays() 可能用空数据覆盖云端日记备份</h4>
+      <p><strong>问题：</strong>清缓存后本地日记数据为空。<code>syncAll()</code> 虽然先拉取 <code>days_all</code> 并合并，但如果拉取失败（网络抖动），<code>pushAllDays()</code> 会用空数据覆盖云端备份。</p>
+      <p><strong>影响：</strong>云端 days_all 变为空，双方的日记数据永久丢失。</p>
+    </div>
+
+    <div class="danger-box">
+      <h4>根因3：ns_cleanup_v108 标志丢失，导致重复清理</h4>
+      <p><strong>问题：</strong>清缓存后 LocalStorage 中的 <code>ty_ns_cleanup_v108</code> 标志丢失。<code>syncAll()</code> 调用 <code>cleanupOldNamespace()</code> 时，检测到标志不存在，<strong>重复执行旧命名空间数据清理</strong>。</p>
+      <p><strong>影响：</strong>虽然主要清理旧数据，但重复执行可能触发额外的网络请求和延迟，影响同步性能。</p>
+    </div>
+
+    <div class="danger-box">
+      <h4>根因4：IndexedDB 数据也被清除导致照片/语音丢失</h4>
+      <p><strong>问题：</strong>部分浏览器"清除所有站点数据"会同时清除 IndexedDB（<code>couple_pwa_db</code> 照片库、<code>couple_letter_db</code> 信件库）。虽然云端仍有备份，但需要重新下载，量大时耗时较长。</p>
+      <p><strong>影响：</strong>对方的照片和语音在本地消失，需要从云端逐个下载恢复，期间界面显示为空。</p>
+    </div>
+
+    <table>
+      <tr><th>根因</th><th>严重度</th><th>数据丢失风险</th><th>实时互动影响</th></tr>
+      <tr><td>pushQuizVocab 覆盖空数据</td><td><span class="badge badge-danger">致命</span></td><td>答题进度丢失</td><td>对方看到"未答题"</td></tr>
+      <tr><td>pushAllDays 覆盖空数据</td><td><span class="badge badge-danger">致命</span></td><td>日记数据丢失</td><td>日记内容消失</td></tr>
+      <tr><td>ns_cleanup 重复执行</td><td><span class="badge badge-warn">中等</span></td><td>无直接丢失</td><td>同步延迟增加</td></tr>
+      <tr><td>IndexedDB 被清除</td><td><span class="badge badge-warn">中等</span></td><td>需重新下载</td><td>照片/语音暂时为空</td></tr>
+    </table>
+  </div>
+
+  <!-- ========== 修复方案 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-3">🔧</div> 已实施的修复（v117）</div>
+
+    <div class="before-after">
+      <div class="before">
+        <h4>修复前</h4>
+        <div style="color:#c62828;">
+          pushQuizVocab() 直接推送空数据<br>
+          → 云端被覆盖<br>
+          → 对方拉到空数据<br>
+          → 实时互动中断
+        </div>
+      </div>
+      <div class="after">
+        <h4>修复后</h4>
+        <div style="color:#2e7d32;">
+          pushQuizVocab() 先拉取云端旧数据<br>
+          → 本地为空但云端有数据 → 恢复<br>
+          → 推送恢复后的完整数据<br>
+          → 实时互动正常
+        </div>
+      </div>
+    </div>
+
+    <div class="fix-box">
+      <h4>修复1：pushQuizVocab() 增加"先拉后推"保护</h4>
+      <p>在推送前先拉取云端已有的自己的数据。如果本地为空但云端有数据，说明是清缓存场景，先用云端数据恢复本地，再推送恢复后的完整数据。</p>
+      <div class="code-block"><span style="color:#6c7086;">// 修复后</span>
+async pushQuizVocab() {
+  <span style="color:#a6e3a1;">// 先拉取云端已有的数据</span>
+  const existing = await fetch(...);
+  if (quizAnswers.length === 0 && existing.quizAnswers.length > 0) {
+    <span style="color:#a6e3a1;">// 检测到清缓存，用云端恢复</span>
+    Store.set('quiz_a_...', existing.quizAnswers);
+    needRestore = true;
+  }
+  if (needRestore) {
+    <span style="color:#a6e3a1;">// 推送恢复后的完整数据</span>
+    await POST(restoredData);
+    return;
+  }
+  <span style="color:#6c7086;">// 正常推送</span>
+  await POST(localData);
+}</div>
+    </div>
+
+    <div class="fix-box">
+      <h4>修复2：pushAllDays() 增加空数据保护</h4>
+      <p>当本地日记数据为空时，不再直接推送空数据。而是先从云端拉取 <code>days_all</code> 恢复到本地，避免用空数据覆盖云端。</p>
+    </div>
+
+    <div class="fix-box">
+      <h4>修复3：Cloud.init() 增加 isFreshLogin 标记</h4>
+      <p>当检测到配对码从 IndexedDB 备份恢复（而非 LocalStorage 直接读取），标记 <code>isFreshLogin = true</code>，后续同步逻辑可据此优先从云端拉取而非推送。</p>
+    </div>
+  </div>
+
+  <!-- ========== 规避建议 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-4">💡</div> 规避建议</div>
+
+    <div class="subsection">
+      <h3>日常使用建议</h3>
+      <table>
+        <tr><th>建议</th><th>原因</th><th>操作方法</th></tr>
+        <tr>
+          <td><strong>不要清除站点数据</strong></td>
+          <td>清除缓存会删除 LocalStorage 中的配对码和所有本地数据</td>
+          <td>如需清理空间，仅清除"缓存图片和文件"，<strong>不要勾选"Cookie和网站数据"</strong></td>
+        </tr>
+        <tr>
+          <td><strong>统一通过浏览器访问</strong></td>
+          <td>桌面PWA有独立存储分区，与浏览器数据不共享</td>
+          <td>通过 https://wangyy319.github.io/couple-diary/ 直接访问</td>
+        </tr>
+        <tr>
+          <td><strong>不要清除IndexedDB</strong></td>
+          <td>IndexedDB存储配对码备份和照片/语音/信件</td>
+          <td>浏览器设置中"清除数据"时，确保未勾选"IndexedDB"</td>
+        </tr>
+        <tr>
+          <td><strong>清缓存后先等待同步</strong></td>
+          <td>重新进入后需要从云端拉取数据恢复</td>
+          <td>进入应用后等待5-10秒，看到数据恢复后再操作</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h3>如果已经出现无法互动的情况</h3>
+      <div class="flow-box">
+        <div class="flow-step"><div class="num ok">1</div><div class="content"><strong>双方都刷新页面</strong> → 等待 Service Worker 更新到 v117</div></div>
+        <div class="flow-step"><div class="num ok">2</div><div class="content"><strong>清缓存的一方重新进入</strong> → 系统会自动从云端恢复答题数据和日记数据</div></div>
+        <div class="flow-step"><div class="num ok">3</div><div class="content"><strong>等待10-20秒</strong> → 轮询同步恢复后，双方即可恢复实时互动</div></div>
+        <div class="flow-step"><div class="num ok">4</div><div class="content"><strong>验证</strong> → 在一方操作答题或写日记，另一方应在10秒内看到更新</div></div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>存储层级与清缓存影响对照</h3>
+      <table>
+        <tr><th>存储位置</th><th>存储内容</th><th>清缓存影响</th><th>恢复机制</th></tr>
+        <tr>
+          <td>LocalStorage</td>
+          <td>配对码、角色、日记、问答答案</td>
+          <td><span class="badge badge-danger">必清</span></td>
+          <td>IndexedDB备份 + 云端同步</td>
+        </tr>
+        <tr>
+          <td>IndexedDB (couple_backup_db)</td>
+          <td>配对码和角色的备份</td>
+          <td><span class="badge badge-warn">可能清除</span></td>
+          <td>重新通过配对码 U2A6KA 加入</td>
+        </tr>
+        <tr>
+          <td>IndexedDB (couple_pwa_db)</td>
+          <td>照片、语音二进制数据</td>
+          <td><span class="badge badge-warn">可能清除</span></td>
+          <td>从云端逐个下载恢复</td>
+        </tr>
+        <tr>
+          <td>IndexedDB (couple_letter_db)</td>
+          <td>信件数据</td>
+          <td><span class="badge badge-warn">可能清除</span></td>
+          <td>从云端同步恢复</td>
+        </tr>
+        <tr>
+          <td>Service Worker Cache</td>
+          <td>HTML/CSS/JS 静态文件</td>
+          <td><span class="badge badge-ok">可清</span></td>
+          <td>下次访问自动重新缓存</td>
+        </tr>
+        <tr>
+          <td>云端 MantleDB</td>
+          <td>所有同步数据的云端备份</td>
+          <td><span class="badge badge-ok">不受影响</span></td>
+          <td>无需恢复</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="tip-box">
+      <p><strong>核心结论：</strong>清缓存后的数据恢复依赖于云端备份。v117 修复后，即使本地数据被清空，系统会先从云端拉取恢复，再用恢复后的完整数据推送，<strong>不会再用空数据覆盖云端</strong>。双方刷新到 v117 后即可恢复实时互动。</p>
+    </div>
+  </div>
+
+  <!-- ========== 部署状态 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-4">🚀</div> 部署状态</div>
+    <table>
+      <tr><th>项目</th><th>状态</th></tr>
+      <tr><td>版本号</td><td><span class="badge badge-info">v117</span></td></tr>
+      <tr><td>pushQuizVocab 空数据保护</td><td><span class="badge badge-ok">已修复</span></td></tr>
+      <tr><td>pushAllDays 空数据保护</td><td><span class="badge badge-ok">已修复</span></td></tr>
+      <tr><td>isFreshLogin 标记</td><td><span class="badge badge-ok">已添加</span></td></tr>
+      <tr><td>GitHub Pages 部署</td><td><span class="badge badge-ok">已推送</span></td></tr>
+    </table>
+    <p style="margin-top:12px;color:#888;font-size:13px;">部署后约1-2分钟 GitHub Pages 生效。双方各刷新一次页面，Service Worker 自动更新（v116→v117），修复即可生效。</p>
+  </div>
+
+</div>
+</body>
+</html>

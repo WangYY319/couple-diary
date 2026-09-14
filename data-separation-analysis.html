@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>问答异常 + 数据分离 - 根因分析与修复</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #d5dbe5 100%); color: #333; line-height: 1.8; padding: 20px; }
+  .container { max-width: 900px; margin: 0 auto; }
+  .header { text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #7b1fa2 0%, #e65100 100%); border-radius: 16px; color: #fff; margin-bottom: 24px; box-shadow: 0 8px 32px rgba(123,31,162,0.2); }
+  .header h1 { font-size: 26px; margin-bottom: 8px; }
+  .header .subtitle { font-size: 14px; opacity: 0.9; }
+  .header .version { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; margin-top: 12px; }
+  .section { background: #fff; border-radius: 16px; padding: 32px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+  .section-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #e8ecf1; display: flex; align-items: center; gap: 10px; }
+  .section-title .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .icon-q { background: #f3e5f5; }
+  .icon-d { background: #ffebee; }
+  .icon-f { background: #e8f5e9; }
+  .icon-r { background: #fff3e0; }
+  .subsection { margin-bottom: 24px; }
+  .subsection h3 { font-size: 16px; color: #444; margin-bottom: 12px; padding-left: 12px; border-left: 4px solid #7b1fa2; }
+  .subsection p { margin-bottom: 12px; color: #555; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  table th { background: #f5f5f5; padding: 10px; text-align: left; font-weight: 600; border-radius: 6px 6px 0 0; }
+  table td { padding: 10px; border-bottom: 1px solid #eee; color: #555; vertical-align: top; }
+  table tr:hover td { background: #fafafa; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+  .badge-danger { background: #ffebee; color: #c62828; }
+  .badge-warn { background: #fff3e0; color: #e65100; }
+  .badge-ok { background: #e8f5e9; color: #2e7d32; }
+  .badge-info { background: #e3f2fd; color: #1565c0; }
+  .danger-box { background: #fff5f5; border: 2px solid #ffcdd2; border-radius: 10px; padding: 16px; margin: 12px 0; }
+  .danger-box h4 { color: #c62828; font-size: 15px; margin-bottom: 8px; }
+  .danger-box p { color: #5d4037; font-size: 14px; margin-bottom: 8px; }
+  .fix-box { background: #f1f8e9; border: 2px solid #c5e1a5; border-radius: 10px; padding: 16px; margin: 12px 0; }
+  .fix-box h4 { color: #2e7d32; font-size: 15px; margin-bottom: 8px; }
+  .fix-box p { color: #33691e; font-size: 14px; margin-bottom: 8px; }
+  .code-block { background: #1e1e2e; color: #cdd6f4; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; overflow-x: auto; margin: 8px 0; white-space: pre; }
+  .tip-box { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 12px; border-radius: 8px; margin: 12px 0; }
+  .tip-box p { color: #1565c0; font-size: 14px; margin: 0; }
+  .warn-box { background: #fff8e1; border-left: 4px solid #ff8f00; padding: 12px; border-radius: 8px; margin: 12px 0; }
+  .warn-box p { color: #e65100; font-size: 14px; margin: 0; }
+  .flow-box { background: #f8f9fb; border-radius: 10px; padding: 16px; margin: 12px 0; }
+  .flow-step { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; }
+  .flow-step .num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; color: #fff; }
+  .flow-step .num.r { background: #e53935; }
+  .flow-step .num.y { background: #f57c00; }
+  .flow-step .num.g { background: #43a047; }
+  .flow-step .content { flex: 1; font-size: 14px; color: #555; }
+  .flow-step .content strong { color: #333; }
+  .risk-table td:first-child { width: 30%; }
+  @media (max-width: 600px) { .section { padding: 20px; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>问答异常 + 数据完全分离：根因分析</h1>
+    <div class="subtitle">未操作已有答案 / 配对码一致但数据隔离 / 长期方案</div>
+    <div class="version">v118 · 2026-08-24</div>
+  </div>
+
+  <!-- ========== 问题1：未操作已有答案 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-q">❓</div> 问题1：未操作但已有答案</div>
+
+    <div class="subsection">
+      <h3>现象描述</h3>
+      <p>对方反馈安卓手机打开后，趣味问答和亲密问答板块存在<strong>未填写但已有回答过的问题</strong>。疑问是否系统自动操作或有人入侵。</p>
+    </div>
+
+    <div class="subsection">
+      <h3>根因分析</h3>
+      <p><strong>结论：不是系统自动操作，也不是被入侵。是云同步逻辑的 bug 导致的"幽灵答案"。</strong></p>
+
+      <div class="danger-box">
+        <h4>根因A：v117 的 pushQuizVocab 恢复逻辑误恢复</h4>
+        <p>上一版本修复"清缓存后空数据覆盖云端"时，在 pushQuizVocab 中添加了"先拉取云端旧数据恢复本地"的逻辑。但这个恢复使用的是 <code>App.currentRole</code>：</p>
+        <div class="code-block"><span style="color:#6c7086;">// v117 代码</span>
+if (quizAnswers.length === 0 && existing.quizAnswers.length > 0) {
+  Store.set(`quiz_a_${ds}_${role}`, existing.quizAnswers);  <span style="color:#e53935;">// role = App.currentRole</span>
+}</div>
+        <p>如果对方清缓存后重新登录，但角色选择与之前不同（例如之前是TAO，清缓存后选了YAN），恢复逻辑会将 <strong>TAO的答题数据恢复到YAN的存储槽位</strong>，导致YAN看起来"已有答案"。</p>
+      </div>
+
+      <div class="danger-box">
+        <h4>根因B：syncQuizVocab 的拉取逻辑角色交叉</h4>
+        <p><code>pullQuizVocab()</code> 拉取的是 "对方角色" 的数据：</p>
+        <div class="code-block"><span style="color:#6c7086;">// 代码逻辑</span>
+const otherRole = App.currentRole === 'TAO' ? 'YAN' : 'TAO';
+const r = await fetch(this._url(`extra/${ds}/${otherRole}`, qaNs));</div>
+        <p>如果本地角色被错误设置（清缓存后角色恢复不正确），拉取到的"对方数据"实际是<strong>自己的数据</strong>，然后存入对方的存储槽位。这导致界面显示"对方已答题"，但实际是自己的旧答案。</p>
+      </div>
+
+      <div class="danger-box">
+        <h4>根因C：问答题目缓存被错误恢复</h4>
+        <p>清缓存后 <code>quiz_q_${dateStr}</code>（今日题目）为空。如果 v117 的恢复逻辑从云端拉取了旧题目缓存并恢复，而这些题目可能是前几天的旧题目，与今日实际应生成的题目不同。用户看到的是<strong>旧题目的旧答案</strong>，以为是今天"已有答案"。</p>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>排除安全风险</h3>
+      <table>
+        <tr><th>排查项</th><th>结论</th><th>依据</th></tr>
+        <tr><td>是否有人入侵网站</td><td><span class="badge badge-ok">否</span></td><td>GitHub Pages 是静态托管，无法被入侵。配对码 U2A6KA 虽然是公开的，但只有知道这个码的人才能访问云端数据</td></tr>
+        <tr><td>是否系统自动答题</td><td><span class="badge badge-ok">否</span></td><td>系统没有任何自动答题逻辑，所有答案都是用户点击选择后通过 _answer() 方法保存的</td></tr>
+        <tr><td>是否MantleDB被篡改</td><td><span class="badge badge-ok">否</span></td><td>MantleDB 是按命名空间隔离的KV存储，配对码一致的命名空间只有你们两人能写</td></tr>
+        <tr><td>配对码是否泄露</td><td><span class="badge badge-warn">低风险</span></td><td>U2A6KA 是固定默认码，如果有第三方知道此码理论上可访问你们的命名空间数据。但无法影响你们的本地界面</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========== 问题2：配对码一致但数据分离 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-d">🔗</div> 问题2：配对码一致但数据完全分离</div>
+
+    <div class="subsection">
+      <h3>现象描述</h3>
+      <p>对方登录后，虽然设置里配对码一致（都是 U2A6KA），但<strong>界面数据完全分离</strong>，看不到彼此的数据，仿佛在两个不同的空间。</p>
+    </div>
+
+    <div class="subsection">
+      <h3>根因分析</h3>
+
+      <div class="danger-box">
+        <h4>根因1：角色恢复不一致（最核心原因）</h4>
+        <p>你们两人使用固定配对码 U2A6KA，一个选 TAO，一个选 YAN。云端数据结构是：</p>
+        <div class="code-block">命名空间: couple-pwa-u2a6ka
+  ├── days_all          (双方日记，按角色字段区分: greet.tao / greet.yan)
+  ├── meta              (配对元数据)
+  └── qa-2026Q3 命名空间
+       ├── extra/2026-08-24/TAO  (TAO的问答答案)
+       └── extra/2026-08-24/YAN  (YAN的问答答案)</div>
+        <p>如果对方清缓存后，角色信息丢失，重新选择时<strong>选了与你相同的角色</strong>（例如都选了TAO），那么：</p>
+        <ul style="margin-left:20px;margin-bottom:8px;">
+          <li>他推送数据到 <code>extra/.../TAO</code> → 覆盖了你的TAO数据</li>
+          <li>他拉取"对方数据"时拉取 <code>extra/.../YAN</code> → 拉到的是空（因为你不是YAN）</li>
+          <li>他看不到你的数据，你也看不到他的</li>
+          <li><strong>数据完全分离</strong></li>
+        </ul>
+      </div>
+
+      <div class="danger-box">
+        <h4>根因2：清缓存后本地数据丢失，syncAll 恢复不完整</h4>
+        <p>清缓存后 LocalStorage 全部清空。<code>syncAll()</code> 从云端拉取 <code>days_all</code> 并合并到本地，但：</p>
+        <ul style="margin-left:20px;margin-bottom:8px;">
+          <li>如果 <code>days_all</code> 之前被 v117 的 bug 用空数据覆盖过 → 云端也为空</li>
+          <li>如果网络不稳定，<code>pullAllDays()</code> 失败 → 本地保持为空</li>
+          <li><code>pushAllDays()</code> 在本地为空时又用空数据覆盖云端 → 恶性循环</li>
+        </ul>
+      </div>
+
+      <div class="danger-box">
+        <h4>根因3：安卓浏览器存储策略更激进</h4>
+        <p>安卓 Chrome 的"清除浏览数据"默认会清除 <strong>LocalStorage + IndexedDB + Service Worker Cache</strong>，比 iOS Safari 更彻底。iOS Safari 的"清除历史记录与网站数据"有时只清除部分缓存，IndexedDB 可能保留。这就是为什么<strong>你的苹果手机正常，对方的安卓出问题</strong>。</p>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>数据分离的流程图</h3>
+      <div class="flow-box">
+        <div class="flow-step"><div class="num r">1</div><div class="content"><strong>对方清缓存</strong> → LocalStorage 全清 → pairCode、role、所有本地数据丢失</div></div>
+        <div class="flow-step"><div class="num r">2</div><div class="content"><strong>IndexedDB 也被清</strong>（安卓Chrome默认行为）→ 备份也丢失</div></div>
+        <div class="flow-step"><div class="num y">3</div><div class="content"><strong>重新打开网站</strong> → Cloud.init() 无法恢复 → 显示入口页选角色</div></div>
+        <div class="flow-step"><div class="num r">4</div><div class="content"><strong>选了与之前不同的角色</strong>（或不记得之前选的什么）→ 角色冲突</div></div>
+        <div class="flow-step"><div class="num r">5</div><div class="content"><strong>autoJoin 用新角色加入</strong> → joinPair 写入 meta → 角色可能与你的重复</div></div>
+        <div class="flow-step"><div class="num r">6</div><div class="content"><strong>syncQuizVocab 拉取"对方"数据</strong> → 实际拉到的是自己的旧数据或空数据</div></div>
+        <div class="flow-step"><div class="num r">7</div><div class="content"><strong>pushQuizVocab 推送"自己"数据</strong> → 覆盖了云端正确角色的数据</div></div>
+        <div class="flow-step"><div class="num r">8</div><div class="content"><strong>数据完全分离</strong> → 双方看不到彼此的数据</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 修复方案 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-f">🔧</div> v118 修复方案</div>
+
+    <div class="fix-box">
+      <h4>修复1：syncQuizVocab 清缓存优先拉取</h4>
+      <p>当 <code>isFreshLogin = true</code> 时，<code>syncQuizVocab()</code> 先拉取对方数据恢复本地，确保本地有对方数据后再推送自己数据。避免角色交叉导致的数据污染。</p>
+      <div class="code-block"><span style="color:#a6e3a1;">// 修复后</span>
+async syncQuizVocab() {
+  if (this.isFreshLogin) {
+    <span style="color:#a6e3a1;">// 先拉取对方数据</span>
+    const remote = await this.pullQuizVocab();
+    if (remote.quizAnswers?.length > 0)
+      Store.set(`quiz_a_${ds}_${otherRole}`, remote.quizAnswers);
+  }
+  <span style="color:#6c7086;">// 再推送（已有防空数据覆盖保护）</span>
+  await this.pushQuizVocab();
+}</div>
+    </div>
+
+    <div class="fix-box">
+      <h4>修复2：syncAll 增加数据量安全检查</h4>
+      <p>在 <code>pushAllDays()</code> 前增加检查：如果本地数据量明显少于云端（<50%），说明恢复不完整，跳过推送，防止用不完整数据覆盖云端。</p>
+    </div>
+
+    <div class="fix-box">
+      <h4>修复3：joinPair 标记 isFreshLogin</h4>
+      <p>重新加入配对时标记 <code>isFreshLogin = true</code>，同时记录角色最后登录时间到 meta，后续可用于角色冲突检测。</p>
+    </div>
+
+    <div class="fix-box">
+      <h4>修复4：enterAfterPair 确保先拉后推</h4>
+      <p>配对成功后，确保 <code>syncAll()</code>（拉取恢复）完成后再执行 <code>syncQuizVocab()</code>（推送），避免恢复不完整时推送覆盖。恢复完成后清除 <code>isFreshLogin</code> 标记。</p>
+    </div>
+  </div>
+
+  <!-- ========== 长期方案与风险 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-r">📋</div> 长期方案与风险说明</div>
+
+    <div class="subsection">
+      <h3>当前架构的固有风险</h3>
+      <table class="risk-table">
+        <tr><th>风险</th><th>严重度</th><th>说明</th></tr>
+        <tr>
+          <td><strong>角色无绑定验证</strong></td>
+          <td><span class="badge badge-danger">高</span></td>
+          <td>配对码 U2A6KA 是公开的，角色选择由用户手动操作。如果有人选了与你相同的角色加入，会覆盖你的数据。当前没有任何机制阻止两个人选同一个角色</td>
+        </tr>
+        <tr>
+          <td><strong>配对码公开可见</strong></td>
+          <td><span class="badge badge-warn">中</span></td>
+          <td>U2A6KA 写死在代码中，任何查看网页源码的人都能看到。虽然 MantleDB 命名空间隔离，但知道码的人可以读取/写入你们的云端数据</td>
+        </tr>
+        <tr>
+          <td><strong>清缓存=数据重置</strong></td>
+          <td><span class="badge badge-danger">高</span></td>
+          <td>LocalStorage 和 IndexedDB 都被清除后，本地数据完全丢失。虽然云端有备份，但恢复依赖网络稳定性和同步逻辑正确性。任何一步出错就可能导致数据分离</td>
+        </tr>
+        <tr>
+          <td><strong>无操作审计日志</strong></td>
+          <td><span class="badge badge-warn">中</span></td>
+          <td>无法追踪谁在什么时间做了什么操作。当数据异常时，无法确定是bug还是人为</td>
+        </tr>
+        <tr>
+          <td><strong>MantleDB 无权限控制</strong></td>
+          <td><span class="badge badge-warn">中</span></td>
+          <td>云端存储 MantleDB 是公开的KV存储，任何知道命名空间的人都可以读写。没有鉴权机制</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h3>建议的长期改进方向</h3>
+      <table>
+        <tr><th>改进项</th><th>优先级</th><th>实施方案</th></tr>
+        <tr>
+          <td><strong>角色绑定机制</strong></td>
+          <td><span class="badge badge-danger">高</span></td>
+          <td>创建配对时为每个角色生成唯一token，加入时必须提供对应token。防止两人选同一角色。可通过 meta 中存储角色token实现</td>
+        </tr>
+        <tr>
+          <td><strong>配对码加密</strong></td>
+          <td><span class="badge badge-warn">中</span></td>
+          <td>将固定配对码改为用户自定义配对码（自定义6位码），不写死在代码中。虽然 MantleDB 无鉴权，但自定义码降低了被猜测的风险</td>
+        </tr>
+        <tr>
+          <td><strong>操作日志</strong></td>
+          <td><span class="badge badge-warn">中</span></td>
+          <td>在云端记录关键操作日志（登录、答题、清缓存恢复等），便于排查异常</td>
+        </tr>
+        <tr>
+          <td><strong>数据版本快照</strong></td>
+          <td><span class="badge badge-info">低</span></td>
+          <td>每次 syncAll 后保存一个数据快照到云端（按日期），出问题时可回滚到之前的版本</td>
+        </tr>
+        <tr>
+          <td><strong>角色冲突检测提示</strong></td>
+          <td><span class="badge badge-danger">高</span></td>
+          <td>加入配对时检查 meta 中的 lastTaoLogin / lastYanLogin 时间。如果对方近期活跃于同一角色，提示用户"此角色已被对方使用，请选择另一角色"</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h3>立即可执行的规避措施</h3>
+      <div class="flow-box">
+        <div class="flow-step"><div class="num g">1</div><div class="content"><strong>双方确认各自的角色</strong>：你用TAO，对方用YAN（或反过来）。在设置页可以看到当前角色。如果角色重复，让对方重新选择正确角色</div></div>
+        <div class="flow-step"><div class="num g">2</div><div class="content"><strong>对方刷新到v118</strong>：清缓存后重新打开网站，Service Worker会自动更新到v118，修复角色交叉和数据覆盖问题</div></div>
+        <div class="flow-step"><div class="num g">3</div><div class="content"><strong>对方手动点🔄同步</strong>：进入应用后点击右上角同步按钮，强制拉取云端完整数据</div></div>
+        <div class="flow-step"><div class="num g">4</div><div class="content"><strong>不要清除"所有数据"</strong>：安卓浏览器清理时只选"缓存图片和文件"，不选"Cookie和网站数据"</div></div>
+      </div>
+    </div>
+
+    <div class="warn-box">
+      <p><strong>重要提醒：</strong>如果对方当前角色与你相同（都是TAO或都是YAN），请让对方在入口页重新选择正确的角色（YAN）。角色不一致是导致数据分离的最直接原因。双方刷新到v118后，点击🔄强制同步即可恢复。</p>
+    </div>
+  </div>
+
+  <!-- ========== 部署 ========== -->
+  <div class="section">
+    <div class="section-title"><div class="icon icon-r">🚀</div> 部署状态</div>
+    <table>
+      <tr><th>项目</th><th>状态</th></tr>
+      <tr><td>版本号</td><td><span class="badge badge-info">v118</span></td></tr>
+      <tr><td>syncQuizVocab 清缓存优先拉取</td><td><span class="badge badge-ok">已修复</span></td></tr>
+      <tr><td>syncAll 数据量安全检查</td><td><span class="badge badge-ok">已修复</span></td></tr>
+      <tr><td>joinPair isFreshLogin标记</td><td><span class="badge badge-ok">已修复</span></td></tr>
+      <tr><td>enterAfterPair 先拉后推保证</td><td><span class="badge badge-ok">已修复</span></td></tr>
+      <tr><td>GitHub Pages 部署</td><td><span class="badge badge-ok">已推送</span></td></tr>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>
