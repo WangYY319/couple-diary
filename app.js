@@ -1673,28 +1673,46 @@ const CloudSync = {
     }
   },
 
-  // 同步在线时长：合并双方数据
+  // 同步在线时长：合并双方所有历史数据
   async syncOnlineDuration() {
     if (!Cloud.pairCode) return;
     if (typeof SyncDiag !== 'undefined') SyncDiag.record('onlineDuration', 'syncing');
     try {
-      const today = OnlineDuration._todayStr();
       const localData = Store.get('online_duration', {});
-      const localToday = localData[today] || { tao: 0, yan: 0 };
 
-      // 拉取云端数据
+      // 拉取云端全量数据
       const remoteData = await this.get('online_duration');
-      if (remoteData && remoteData[today]) {
-        // 合并：取双方各自的最大值（各自角色的时间不会同时被两人写入）
-        const remoteToday = remoteData[today];
-        localToday.tao = Math.max(localToday.tao || 0, remoteToday.tao || 0);
-        localToday.yan = Math.max(localToday.yan || 0, remoteToday.yan || 0);
-        localData[today] = localToday;
+      if (!remoteData || typeof remoteData !== 'object') {
+        // 云端没有，直接推送本地
+        if (Object.keys(localData).length > 0) {
+          await this.set('online_duration', localData);
+        }
+        if (typeof SyncDiag !== 'undefined') SyncDiag.record('onlineDuration', 'success');
+        return;
+      }
+
+      // 全量合并：每个日期每个角色取最大值
+      let changed = false;
+      const allDates = new Set([...Object.keys(localData), ...Object.keys(remoteData)]);
+      allDates.forEach(dateStr => {
+        const local = localData[dateStr] || { tao: 0, yan: 0 };
+        const remote = remoteData[dateStr] || { tao: 0, yan: 0 };
+        const merged = {
+          tao: Math.max(local.tao || 0, remote.tao || 0),
+          yan: Math.max(local.yan || 0, remote.yan || 0)
+        };
+        if (merged.tao !== local.tao || merged.yan !== local.yan) {
+          localData[dateStr] = merged;
+          changed = true;
+        }
+      });
+
+      if (changed) {
         Store.set('online_duration', localData);
         OnlineDuration.refresh();
       }
 
-      // 推送合并后的数据
+      // 推送合并后的全量数据
       await this.set('online_duration', localData);
       if (typeof SyncDiag !== 'undefined') SyncDiag.record('onlineDuration', 'success');
     } catch (e) {
@@ -5639,6 +5657,7 @@ const DetailMenu = {
   TAB_SECTIONS: {
     0: [
       { icon: '🎭', name: '亲密主角', selector: '.role-card' },
+      { icon: '📅', name: '赴约纪行', selector: '.date-count-card' },
       { icon: '💌', name: '甜蜜语录', selector: '.sweet-text-card' },
       { icon: '🔒', name: '私密絮语', selector: '.private-whisper-card' },
       { icon: '🎵', name: '音乐播放', selector: '.music-card' }
@@ -5646,6 +5665,7 @@ const DetailMenu = {
     1: [
       { icon: '❤️', name: '发射爱心', selector: '#card-greet' },
       { icon: '📷', name: '相处照片', selector: '.photo-card' },
+      { icon: '📝', name: '心细清单', selector: '#card-mindlist' },
       { icon: '✉️', name: '投递信件', selector: '#card-letter' }
     ],
     2: [
@@ -5653,6 +5673,7 @@ const DetailMenu = {
       { icon: '💬', name: '今日碎念', selector: '#card-words' },
       { icon: '🌟', name: '心底期许', selector: '#card-wish' },
       { icon: '🎲', name: '随机问答', selector: '.quiz-card' },
+      { icon: '💖', name: '亲密问答', selector: '.iqa-card' },
       { icon: '🎤', name: '语音留言', selector: '.record-card' },
       { icon: '✨', name: '晚安道别', selector: '#card-night' }
     ],
@@ -5666,6 +5687,7 @@ const DetailMenu = {
       { icon: '📜', name: '唐宋诗词', selector: '.poem-card' },
       { icon: '🏛️', name: '历史文化', selector: '.history-card' },
       { icon: '🗺️', name: '中国地理', selector: '.geo-card' },
+      { icon: '📖', name: '中国政治', selector: '#card-poli' },
       { icon: '💡', name: '生活技巧', selector: '.life-tip-card' },
       { icon: '😄', name: '笑话大全', selector: '.joke-card' },
       { icon: '📍', name: '地标记地', selector: '.landmark-card' }
