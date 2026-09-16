@@ -4058,12 +4058,12 @@ body.music-active #tab-0 .card {
 }
 
 .dc-days.future {
-  color: #ffb300;
-  text-shadow: 0 1px 3px rgba(255, 179, 0, 0.35);
+  color: #e53935;
+  text-shadow: 0 1px 3px rgba(229, 57, 53, 0.35);
 }
 
 .dc-days.past {
-  color: #ffd93d;
+  color: #ef7a78;
 }
 
 .dc-date {
