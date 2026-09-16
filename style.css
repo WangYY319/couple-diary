@@ -4058,16 +4058,16 @@ body.music-active #tab-0 .card {
 }
 
 .dc-days.future {
-  color: var(--tao-color);
+  color: #c99a2e;
+  text-shadow: 0 1px 3px rgba(201, 154, 46, 0.3);
 }
 
 .dc-days.past {
-  color: var(--yan-color);
+  color: #d4b060;
 }
 
 .dc-date {
-  font-size: 11px;
-  color: var(--text-hint);
+  display: none;
   line-height: 1.3;
 }
 
