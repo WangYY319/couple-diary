@@ -682,6 +682,7 @@ const Cloud = {
             CloudSync.syncLandmarks();
             CloudSync.syncThemeColor();
             CloudSync.syncSweetSubmitted();
+            if (typeof DateCount !== 'undefined') DateCount.syncFromCloud();
             ReadMark.syncAll();
             RoleName.syncFromCloud();
           }
@@ -2657,6 +2658,7 @@ const App = {
         CloudSync.syncLetters();
         CloudSync.syncOnlineDuration();
         CloudSync.syncPrivateWhispers();
+        if (typeof DateCount !== 'undefined') DateCount.syncFromCloud();
       }
       Cloud.startPolling();
       Cloud.isFreshLogin = false;
@@ -2766,6 +2768,7 @@ const App = {
       MusicPlayer.init();
       SweetText.init();
       PrivateWhisper.init();
+      DateCount.init();
       // 将已有的甜蜜语录同步到私密絮语（首次迁移+去重）
       try {
         const sweetList = SweetText._getCustom();
@@ -4986,6 +4989,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v139', date: '2026-09-16', changes: '新增时数查询板块:首页亲密主角下方/三个横向模块可自定义名称和日期/自动计算距离天数(未来/过去/今天)/云端双向同步' },
     { v: 'v138', date: '2026-09-14', changes: '修复YAN不显示TAO数据+API频率超限:1.所有GET请求添加cache:no-cache防浏览器缓存旧数据 2.SW不再拦截跨域API请求 3.轮询从10s改为60s并分层调度(Tier1每60s:打卡+心跳+在线状态/Tier2每3min:问答+信件+絮语/Tier3每10min:头像+番茄钟+主题等) 4.在线状态检测只查对方(1次GET→省一半) 5.配对码meta不存在时自动重建 6.429频率限制友好提示 7.enterAfterPair精简初始同步(15+模块→4个,其余轮询补齐)' },
     { v: 'v137', date: '2026-09-14', changes: '彻底修复在线状态闪烁:网络请求失败时不改变状态(区分404和网络错误)/refreshStatus防竞态锁/首页导航栏显示版本号' },
     { v: 'v136', date: '2026-09-14', changes: '修复在线状态不稳定:自己的状态不再被云端数据覆盖/在线阈值从90秒放宽至3分钟/心跳失败自动重试/页面切回前台时立即发送心跳' },
@@ -7282,6 +7286,199 @@ const VoiceRecord = {
         tx.oncomplete = () => { this.voices = []; resolve(); };
       });
     } catch (e) { /* ignore */ }
+  }
+};
+
+// ====== 时数查询模块 ======
+const DateCount = {
+  STORAGE_KEY: 'date_count_items',
+  CLOUD_KEY: 'date_count',
+
+  defaults: [
+    { label: '在一起', date: '' },
+    { label: '下次见面', date: '' },
+    { label: '纪念日', date: '' }
+  ],
+
+  _getList() {
+    const list = Store.get(this.STORAGE_KEY, null);
+    if (!list || !Array.isArray(list) || list.length !== 3) {
+      return JSON.parse(JSON.stringify(this.defaults));
+    }
+    return list;
+  },
+
+  _saveList(list) {
+    Store.set(this.STORAGE_KEY, list);
+    this.render();
+  },
+
+  init() {
+    this.render();
+  },
+
+  render() {
+    const list = this._getList();
+    for (let i = 0; i < 3; i++) {
+      const item = list[i];
+      const labelEl = document.getElementById('dcLabel' + i);
+      const daysEl = document.getElementById('dcDays' + i);
+      const dateEl = document.getElementById('dcDate' + i);
+      if (!labelEl || !daysEl || !dateEl) continue;
+
+      labelEl.textContent = item.label || '未命名';
+
+      if (item.date) {
+        const diff = this._calcDays(item.date);
+        const absDays = Math.abs(diff);
+        daysEl.textContent = absDays + '天';
+        daysEl.classList.remove('future', 'past');
+        if (diff > 0) {
+          daysEl.classList.add('future'); // 未来的日子
+          dateEl.textContent = '还有 ' + item.date;
+        } else if (diff < 0) {
+          daysEl.classList.add('past'); // 过去的日子
+          dateEl.textContent = '已过 ' + item.date;
+        } else {
+          dateEl.textContent = '就是今天！';
+        }
+      } else {
+        daysEl.textContent = '—';
+        daysEl.classList.remove('future', 'past');
+        dateEl.textContent = '点击设置日期';
+      }
+    }
+  },
+
+  _calcDays(dateStr) {
+    if (!dateStr) return 0;
+    const target = new Date(dateStr + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffMs = target - today;
+    return Math.round(diffMs / (1000 * 60 * 60 * 24));
+  },
+
+  openEditor(index) {
+    const list = this._getList();
+    const item = list[index];
+
+    // 创建弹窗
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.onclick = (e) => { if (e.target === overlay) document.body.removeChild(overlay); };
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background:#fff;border-radius:16px;padding:20px;width:100%;max-width:320px;box-shadow:0 10px 40px rgba(0,0,0,0.2);';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:16px;font-weight:600;margin-bottom:16px;text-align:center;color:#333;';
+    title.textContent = '编辑时数';
+
+    // 名称输入
+    const nameLabel = document.createElement('div');
+    nameLabel.style.cssText = 'font-size:13px;color:#666;margin-bottom:6px;';
+    nameLabel.textContent = '名称';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = item.label || '';
+    nameInput.placeholder = '例如：在一起 / 下次见面';
+    nameInput.style.cssText = 'width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:12px;box-sizing:border-box;';
+
+    // 日期输入
+    const dateLabel = document.createElement('div');
+    dateLabel.style.cssText = 'font-size:13px;color:#666;margin-bottom:6px;';
+    dateLabel.textContent = '日期';
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.value = item.date || '';
+    dateInput.style.cssText = 'width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:16px;box-sizing:border-box;';
+
+    // 按钮行
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:10px;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '取消';
+    cancelBtn.style.cssText = 'flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;background:#f5f5f5;font-size:14px;cursor:pointer;';
+    cancelBtn.onclick = () => document.body.removeChild(overlay);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = '保存';
+    saveBtn.style.cssText = 'flex:1;padding:10px;border:none;border-radius:8px;background:var(--theme-accent,#ff6b9d);color:#fff;font-size:14px;font-weight:600;cursor:pointer;';
+    saveBtn.onclick = () => {
+      const newLabel = nameInput.value.trim() || ('时数' + (index + 1));
+      const newDate = dateInput.value;
+      const newList = this._getList();
+      newList[index] = { label: newLabel, date: newDate };
+      this._saveList(newList);
+      this._pushToCloud();
+      document.body.removeChild(overlay);
+    };
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(saveBtn);
+
+    modal.appendChild(title);
+    modal.appendChild(nameLabel);
+    modal.appendChild(nameInput);
+    modal.appendChild(dateLabel);
+    modal.appendChild(dateInput);
+    modal.appendChild(btnRow);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    nameInput.focus();
+  },
+
+  async _pushToCloud() {
+    if (!Cloud.pairCode) return;
+    try {
+      const list = this._getList();
+      await CloudSync.set(this.CLOUD_KEY, list);
+      console.log('[SYNC] date_count pushed to cloud');
+    } catch (e) {
+      console.warn('[SYNC] date_count push failed:', e);
+    }
+  },
+
+  async syncFromCloud() {
+    if (!Cloud.pairCode) return;
+    try {
+      const remote = await CloudSync.get(this.CLOUD_KEY);
+      if (!remote || !Array.isArray(remote) || remote.length === 0) {
+        // 云端为空，如果本地有数据则推送
+        const local = this._getList();
+        const hasData = local.some(x => x.date);
+        if (hasData) {
+          await this._pushToCloud();
+        }
+        return;
+      }
+      // 云端有数据，合并到本地（以云端为准，因为是共享数据）
+      const local = this._getList();
+      let changed = false;
+      const merged = [];
+      for (let i = 0; i < 3; i++) {
+        const r = remote[i] || this.defaults[i];
+        const l = local[i] || this.defaults[i];
+        // 取云端的（共享数据，任一方修改都同步）
+        merged.push({
+          label: r.label || l.label || this.defaults[i].label,
+          date: r.date || l.date || ''
+        });
+        if (r.label !== l.label || r.date !== l.date) {
+          changed = true;
+        }
+      }
+      if (changed) {
+        Store.set(this.STORAGE_KEY, merged);
+        this.render();
+        console.log('[SYNC] date_count updated from cloud');
+      }
+    } catch (e) {
+      console.warn('[SYNC] date_count sync failed:', e);
+    }
   }
 };
 
