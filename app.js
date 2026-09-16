@@ -7334,14 +7334,11 @@ const DateCount = {
         daysEl.textContent = absDays + '天';
         daysEl.classList.remove('future', 'past');
         if (diff > 0) {
-          daysEl.classList.add('future'); // 未来的日子
-          dateEl.textContent = '还有 ' + item.date;
+          daysEl.classList.add('future'); // 未来的日子 - 深金高亮
         } else if (diff < 0) {
-          daysEl.classList.add('past'); // 过去的日子
-          dateEl.textContent = '已过 ' + item.date;
-        } else {
-          dateEl.textContent = '就是今天！';
+          daysEl.classList.add('past'); // 过去的日子 - 浅金
         }
+        // 日期小字已隐藏，不再设置文本
       } else {
         daysEl.textContent = '—';
         daysEl.classList.remove('future', 'past');
