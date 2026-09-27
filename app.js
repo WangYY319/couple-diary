@@ -217,15 +217,15 @@ const Cloud = {
     if (!this.pairCode) return;
     const trySend = async (attempt) => {
       try {
-        await fetch(this._url(`status/${App.currentRole}`), {
+        const r = await fetch(this._url(`status/${App.currentRole}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ts: Date.now() })
         });
+        if (r.status === 429) { this.onRateLimited(); return false; }
         return true;
       } catch (e) {
         if (attempt === 1) {
-          // 第一次失败，3秒后重试（应对短暂网络波动）
           setTimeout(() => trySend(2), 3000);
         }
         return false;
@@ -239,6 +239,7 @@ const Cloud = {
     if (!this.pairCode) return null;
     try {
       const r = await fetch(this._url(`status/${role}`), { cache: 'no-cache' });
+      if (r.status === 429) { this.onRateLimited(); return null; }
       if (!r.ok) {
         if (r.status === 404) return null; // 对方从未心跳过，确实是离线
         return { _networkError: true }; // 其他HTTP错误视为网络问题
@@ -640,24 +641,38 @@ const Cloud = {
 
   // 启动轮询（分层调度，减少 API 调用次数，防止 mantledb 免费额度超限）
   _pollCycle: 0,
+  _rateLimited: false,
+  _rateLimitResumeAt: 0,
+
   startPolling() {
     if (this.pollTimer) clearInterval(this.pollTimer);
     this._pollCycle = 0;
     this.pollTimer = setInterval(() => {
+      // 限流中：暂停所有请求，等恢复时间到了再恢复
+      if (this._rateLimited) {
+        if (Date.now() < this._rateLimitResumeAt) {
+          console.log('[POLL] 限流暂停中，跳过本轮');
+          return;
+        }
+        // 恢复
+        this._rateLimited = false;
+        console.log('[POLL] 限流恢复，重新开始轮询');
+      }
+
       // 仅在应用非历史模式时轮询今天的数据
       if (!App.isHistory) {
         this._pollCycle++;
         const cycle = this._pollCycle;
 
-        // Tier 1（每轮 60s）：心跳 + 打卡数据 + 在线状态
+        // Tier 1（每轮 90s）：心跳 + 打卡数据 + 在线状态
         this.heartbeat();
         this.syncToday();
         if (typeof Setting !== 'undefined') {
           Setting.refreshStatus();
         }
 
-        // Tier 2（每 3 轮 = 3 分钟）：问答、信件、在线时长、私密絮语、心细清单
-        if (cycle % 3 === 0) {
+        // Tier 2（每 4 轮 = 6 分钟）：问答、信件、在线时长、私密絮语、心细清单
+        if (cycle % 4 === 0) {
           this.syncQuizVocab();
           this.syncSubmittedQuestions();
           if (typeof CloudSync !== 'undefined') {
@@ -668,8 +683,8 @@ const Cloud = {
           }
         }
 
-        // Tier 3（每 10 轮 = 10 分钟）：头像、运动、背景、番茄钟、地标、主题、甜蜜语录
-        if (cycle % 10 === 0) {
+        // Tier 3（每 12 轮 = 18 分钟）：头像、运动、背景、番茄钟、地标、主题、甜蜜语录
+        if (cycle % 12 === 0) {
           this.syncPhotos();
           this.syncVoices();
           if (typeof CloudSync !== 'undefined') {
@@ -691,7 +706,18 @@ const Cloud = {
           }
         }
       }
-    }, 60000); // 60 秒（大幅降低 API 调用频率）
+    }, 90000); // 90 秒（进一步降低 API 调用频率）
+  },
+
+  // 检测到429限流时调用
+  onRateLimited() {
+    this._rateLimited = true;
+    // 暂停 30 分钟后自动恢复
+    this._rateLimitResumeAt = Date.now() + 30 * 60 * 1000;
+    console.warn('[POLL] 检测到限流，暂停轮询 30 分钟');
+    if (typeof showToast !== 'undefined') {
+      showToast('⚠️ API限流，已暂停同步，30分钟后恢复');
+    }
   },
 
   stopPolling() {
@@ -1108,12 +1134,10 @@ const Cloud = {
         if (r.ok) return true; // 成功
         // 413 = payload 太大，不重试直接失败
         if (r.status === 413) return false;
-        // 429 = 限流，等待更长时间后重试
+        // 429 = 限流，通知轮询暂停，不再重试
         if (r.status === 429) {
-          if (attempt < retries) {
-            await new Promise(res => setTimeout(res, 2000 * (attempt + 1)));
-          }
-          continue;
+          if (typeof Cloud !== 'undefined') Cloud.onRateLimited();
+          return false;
         }
         // 其他错误（500 等）重试
       } catch (e) { /* 网络错误，重试 */ }
@@ -1647,6 +1671,10 @@ const CloudSync = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(value)
       });
+      if (resp.status === 429) {
+        Cloud.onRateLimited();
+        return;
+      }
       if (!resp.ok) {
         console.warn(`[CloudSync] set(${key}): HTTP ${resp.status}`);
       }
@@ -1660,6 +1688,10 @@ const CloudSync = {
     if (!Cloud.pairCode) return null;
     try {
       const r = await fetch(Cloud._url(`custom/${key}`), { cache: 'no-cache' });
+      if (r.status === 429) {
+        Cloud.onRateLimited();
+        return null;
+      }
       if (!r.ok) {
         if (r.status !== 404) {
           console.warn(`[CloudSync] get(${key}): HTTP ${r.status}`);
@@ -2487,11 +2519,32 @@ const App = {
 
   async init() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        // 每次加载页面时检查 SW 更新
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // 新 SW 已就绪，强制跳过等待立即激活
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          }
+        });
+      }).catch(() => {});
       // 监听 Service Worker 强制刷新消息
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'FORCE_RELOAD') {
           window.location.reload();
+        }
+      });
+      // 页面可见时检查 SW 更新
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.getRegistration().then(reg => {
+            if (reg) reg.update();
+          });
         }
       });
     }
@@ -5007,6 +5060,10 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v143', date: '2026-09-27', changes: '防限流三重保障:1.轮询间隔60s→90s+Tier2从3轮改4轮+Tier3从10轮改12轮 2.所有API请求检测429自动暂停轮询30分钟 3.Service Worker自动检查更新+强制激活,杜绝旧代码后台高频请求' },
+    { v: 'v142', date: '2026-09-27', changes: '信件详情弹窗长内容支持内部滚动查看全文(正文区overflow+纸张max-height:88vh)' },
+    { v: 'v141', date: '2026-09-16', changes: '补全导航菜单4个缺失板块(赴约纪行/心细清单/亲密问答/中国政治)+修复在线时长同步只同步今天不同步历史的bug' },
+    { v: 'v140', date: '2026-09-16', changes: '赴约纪行:去掉文字阴影高亮,仅用颜色深浅区分(已过浅红/未来正红)' },
     { v: 'v139', date: '2026-09-16', changes: '新增时数查询板块:首页亲密主角下方/三个横向模块可自定义名称和日期/自动计算距离天数(未来/过去/今天)/云端双向同步' },
     { v: 'v138', date: '2026-09-14', changes: '修复YAN不显示TAO数据+API频率超限:1.所有GET请求添加cache:no-cache防浏览器缓存旧数据 2.SW不再拦截跨域API请求 3.轮询从10s改为60s并分层调度(Tier1每60s:打卡+心跳+在线状态/Tier2每3min:问答+信件+絮语/Tier3每10min:头像+番茄钟+主题等) 4.在线状态检测只查对方(1次GET→省一半) 5.配对码meta不存在时自动重建 6.429频率限制友好提示 7.enterAfterPair精简初始同步(15+模块→4个,其余轮询补齐)' },
     { v: 'v137', date: '2026-09-14', changes: '彻底修复在线状态闪烁:网络请求失败时不改变状态(区分404和网络错误)/refreshStatus防竞态锁/首页导航栏显示版本号' },
