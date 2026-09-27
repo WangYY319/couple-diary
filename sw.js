@@ -1,5 +1,5 @@
 /* TAO & YAN 相处日记 - Service Worker */
-const CACHE_NAME = 'couple-pwa-v142';
+const CACHE_NAME = 'couple-pwa-v143';
 const URLS_TO_CACHE = [
   './',
   './index.html',
@@ -15,6 +15,13 @@ self.addEventListener('install', (event) => {
       .then((cache) => cache.addAll(URLS_TO_CACHE).catch(() => {}))
       .then(() => self.skipWaiting())
   );
+});
+
+// 接收 SKIP_WAITING 消息，立即激活
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {
