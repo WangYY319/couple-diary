@@ -7369,6 +7369,8 @@ body.music-active #tab-0 .card {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px 0;
+  overflow-y: auto;
   animation: fadeIn 0.25s;
 }
 
@@ -7376,10 +7378,13 @@ body.music-active #tab-0 .card {
   width: 84%;
   max-width: 340px;
   min-height: 240px;
+  max-height: 88vh;
   border-radius: 14px;
   padding: 24px;
   position: relative;
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
   animation: letterSlideUp 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
@@ -7410,6 +7415,9 @@ body.music-active #tab-0 .card {
   color: var(--text-main);
   font-family: 'Georgia', serif;
   word-break: break-word;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .letter-detail-date {
