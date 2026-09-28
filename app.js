@@ -5060,6 +5060,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v144', date: '2026-09-28', changes: '心细清单每条记录右上角显示记录日期(同年M.D格式/跨年YY.M.D/小字淡化不显眼)' },
     { v: 'v143', date: '2026-09-27', changes: '防限流三重保障:1.轮询间隔60s→90s+Tier2从3轮改4轮+Tier3从10轮改12轮 2.所有API请求检测429自动暂停轮询30分钟 3.Service Worker自动检查更新+强制激活,杜绝旧代码后台高频请求' },
     { v: 'v142', date: '2026-09-27', changes: '信件详情弹窗长内容支持内部滚动查看全文(正文区overflow+纸张max-height:88vh)' },
     { v: 'v141', date: '2026-09-16', changes: '补全导航菜单4个缺失板块(赴约纪行/心细清单/亲密问答/中国政治)+修复在线时长同步只同步今天不同步历史的bug' },
@@ -12989,9 +12990,11 @@ const MindList = {
       const otherRole = item.creator === 'TAO' ? 'YAN' : 'TAO';
       const otherAcked = item.acknowledgedBy && item.acknowledgedBy[otherRole];
       const creatorEmoji = item.creator === 'TAO' ? '🐱' : '🐶';
+      const dateStr = this._formatDate(item.timestamp);
 
       return `
         <div class="mindlist-item ${item.creator.toLowerCase()}-created">
+          <div class="mindlist-item-date">${dateStr}</div>
           <div class="mindlist-item-tag">${this._esc(item.tag)}</div>
           <div class="mindlist-item-content">${this._esc(item.content)}</div>
           <div class="mindlist-item-footer">
@@ -13011,6 +13014,21 @@ const MindList = {
     const d = document.createElement('div');
     d.textContent = s || '';
     return d.innerHTML;
+  },
+
+  // 简洁日期格式化：同年显示 M.D，跨年显示 YY.M.D
+  _formatDate(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    if (d.getFullYear() !== now.getFullYear()) {
+      const yy = String(d.getFullYear()).slice(-2);
+      return `${yy}.${m}.${day}`;
+    }
+    return `${m}.${day}`;
   },
 
   // 云同步
