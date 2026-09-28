@@ -7613,6 +7613,7 @@ body.music-active #tab-0 .card {
 
 /* 单条记录 */
 .mindlist-item {
+  position: relative;
   padding: 10px 12px;
   margin-bottom: 8px;
   border-radius: 12px;
@@ -7626,6 +7627,18 @@ body.music-active #tab-0 .card {
 }
 .mindlist-item.yan-created {
   border-left: 3px solid rgba(184, 34, 79, 0.3);
+}
+
+/* 记录日期（右上角，小字淡化） */
+.mindlist-item-date {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.55;
+  pointer-events: none;
+  line-height: 1;
 }
 
 /* 标签 */
