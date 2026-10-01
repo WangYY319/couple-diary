@@ -3487,7 +3487,10 @@ const Calendar = {
       else greetItems.push('<span class="dc-badge todo">TAO 待完成</span>');
       if (greet.yan) greetItems.push('<span class="dc-badge done">YAN 已完成</span>');
       else greetItems.push('<span class="dc-badge todo">YAN 待完成</span>');
-      if (greet.count) greetItems.push(`<span class="dc-badge info">累计 ${greet.count} 次</span>`);
+      if (greet.tao && greet.yan) {
+        const totalCount = (typeof Cards !== 'undefined') ? Cards.calcGreetCount() : 0;
+        greetItems.push(`<span class="dc-badge info">累计 ${totalCount} 次</span>`);
+      }
       cardHtml += `<div class="dc-row"><span class="dc-label">❤️ 爱心记录</span><div class="dc-badges">${greetItems.join('')}</div></div>`;
 
       // 今日碎念
@@ -3596,7 +3599,10 @@ const DateSearch = {
     else greetItems.push('<span class="search-badge todo">TAO 待完成</span>');
     if (greet.yan) greetItems.push('<span class="search-badge done">YAN 已完成</span>');
     else greetItems.push('<span class="search-badge todo">YAN 待完成</span>');
-    if (greet.count) greetItems.push(`<span class="search-badge info">累计 ${greet.count} 次</span>`);
+    if (greet.tao && greet.yan) {
+      const totalCount = (typeof Cards !== 'undefined') ? Cards.calcGreetCount() : 0;
+      greetItems.push(`<span class="search-badge info">累计 ${totalCount} 次</span>`);
+    }
     html += `<div class="search-result-row"><span class="search-label">❤️ 爱心记录</span>${greetItems.join('')}</div>`;
 
     // 今日碎念
@@ -3671,6 +3677,18 @@ const Cards = {
     return data;
   },
 
+  // 实时计算累计爱心次数（遍历所有天数，双方都完成的计1次）
+  // 不依赖存储的 count 字段，避免数据丢失导致计数重置
+  calcGreetCount() {
+    const allDays = Store.getAllDays();
+    let count = 0;
+    for (const ds of Object.keys(allDays)) {
+      const d = allDays[ds];
+      if (d && d.greet && d.greet.tao && d.greet.yan) count++;
+    }
+    return count;
+  },
+
   renderAll() {
     this.renderGreet();
     this.renderWords();
@@ -3733,7 +3751,7 @@ const Cards = {
       mergedEl.classList.add('show');
       leftEl.classList.add('merged');
       rightEl.classList.add('merged');
-      countEl.textContent = data.greet.count || 1;
+      countEl.textContent = this.calcGreetCount() || 1;
       countEl.classList.add('show');
       statusEl.textContent = '💕 两人已拼接成完整爱心';
       statusEl.style.color = '#22c55e';
@@ -5060,6 +5078,7 @@ const Setting = {
   },
 
   VERSION_LOG: [
+    { v: 'v145', date: '2026-10-01', changes: '发射爱心累计次数改为实时计算(遍历所有天数统计双方完成次数),不再依赖存储的count字段,杜绝数据同步导致计数重置' },
     { v: 'v144', date: '2026-09-28', changes: '心细清单每条记录右上角显示记录日期(同年M.D格式/跨年YY.M.D/小字淡化不显眼)' },
     { v: 'v143', date: '2026-09-27', changes: '防限流三重保障:1.轮询间隔60s→90s+Tier2从3轮改4轮+Tier3从10轮改12轮 2.所有API请求检测429自动暂停轮询30分钟 3.Service Worker自动检查更新+强制激活,杜绝旧代码后台高频请求' },
     { v: 'v142', date: '2026-09-27', changes: '信件详情弹窗长内容支持内部滚动查看全文(正文区overflow+纸张max-height:88vh)' },
